@@ -37,6 +37,9 @@ class StubWindow:
     def after(self, delay, callback):
         self.delayed.append((delay, callback))
 
+    def _poll_result(self):
+        return VarynDesktop._poll_result(self)
+
 
 def intent(text="synthetic"):
     return NativeToolIntent("openai", "stage_note", {"text": text})
