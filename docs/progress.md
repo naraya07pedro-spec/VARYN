@@ -173,3 +173,8 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 - Added double-click Windows `Launch-VARYN.cmd`, offline Python/Tkinter process-RSS doctor, and reproducible source-only desktop ZIP builder.
 - [GitHub Actions #41671709750](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41671709750) passed **225 tests per OS** and built source ZIPs on Windows and Ubuntu; Windows publishes a seven-day downloadable artifact. Ten new offline regression tests passed. The Windows doctor-process RSS was ~20.6 MB on CI, **not the GUI's total RAM**. ZIP byte identity between OS checkouts is not guaranteed.
 - Windows laptop GUI interaction and total app RAM remain **unverified**. The ZIP is source-only and requires installed Python+Tkinter, not a one-click standalone EXE.
+
+## Checkpoint 14A: Bounded synthetic agent runtime
+- Fixed in-process tool registry: `inspect_status` (read only) and `stage_note` (mutates synthetic RAM notes). Untrusted proposals cannot invoke shell/files/browser/network or install tools.
+- One-time approval token required for mutation; steps, pending proposals and note count capped; audit omits note contents and token.
+- 14 offline regression tests; CI pending. Token issuer is callable from Python and **not authenticated** as a human. No model-to-agent execution or GUI approvals yet.
