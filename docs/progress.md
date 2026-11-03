@@ -198,3 +198,8 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 - Supports parse-only mock response shapes from OpenAI Responses, Anthropic Messages and Gemini generateContent, normalized to fixed registered VARYN tool proposals. Rejects multiple calls, forged/unknown tool names, duplicate JSON keys and oversized payloads.
 - `stage_native_tool_call()` sends a proposal for review, **not execution**. Fifteen synthetic headless tests; [GitHub Actions #41682862672](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41682862672) passed **293 tests per OS** on Windows and Ubuntu.
 - No native tool declarations are sent to provider APIs and no live API/desktop native-tool round trip has been tested. Model responses remain untrusted.
+
+## Checkpoint 15B: Provider-native request-side tool declarations
+- Added OpenAI, Anthropic and Gemini request builders for the exact two synthetic local tools, plus an opt-in client using existing bounded HTTPS transports, per-call confirmation, env-based credentials and a session quota.
+- Response envelopes are staged for existing proposal review, **never automatically dispatched**. Fifteen entirely synthetic transport tests added; CI pending.
+- Native tools are **not enabled in the desktop chat UI** and no real API compatibility or paid call has been tested. No encrypted private-task persistence or real-world tools.
