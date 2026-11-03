@@ -68,3 +68,8 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 - On the existing synthetic benchmark the expected positive hit rate is 3/5, compared with 2/5 before the change. [GitHub Actions #41611678899](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41611678899) passed 49 unit tests plus CLI smoke checks on Windows and Ubuntu.
 - Added six independent glossary tests, including false-positive and isolation checks.
 - This is not general multilingual semantic search and does not establish real-world quality.
+
+## Checkpoint 09: SQLite FTS5 indexing
+- On-disk FTS5 virtual table and triggers now support historical recall outside the latest write window, plus automatic updates and one-time backfill.
+- Nine synthetic index tests added. Benchmark expectation on existing hand-labeled fixtures: 4/5 positive hits, 1/1 negative correctly rejected. CI pending.
+- Indexing requires FTS5 support and additional on-disk space. First-use migration and performance on the owner's Windows laptop remain unverified.
