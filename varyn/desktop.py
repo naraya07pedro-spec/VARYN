@@ -4,6 +4,7 @@ Run: python -m varyn.desktop
 The UI never touches Tk widgets from worker threads, never reads local memory,
 and never persists a transcript. Real providers require account API credentials.
 """
+import argparse
 import queue
 import threading
 import tkinter as tk
@@ -13,12 +14,13 @@ from varyn.desktop_controller import DesktopController, DEFAULT_MODELS, PROVIDER
 from varyn.providers import ProviderError
 from varyn.desktop_lifecycle import DesktopRequestState
 from varyn.desktop_approval import DesktopApprovalController
+from varyn.agent_recovery import AgentRecoveryJournal
 from varyn.agent_runtime import AgentRejected, AgentLimitReached
 from varyn.tool_protocol import stage_tool_intent
 
 
 class VarynDesktop(tk.Tk):
-    def __init__(self, controller=None):
+    def __init__(self, controller=None, *, agent_journal=None):
         super().__init__()
         self.controller = controller or DesktopController(allow_live_providers=True)
         self.title("VARYN  |  Local AI Workspace (Opt-in Live MVP)")
@@ -32,12 +34,21 @@ class VarynDesktop(tk.Tk):
         self.status_line = tk.StringVar(value="")
         self._results = queue.Queue()
         self._lifecycle = DesktopRequestState()
-        self._approval = DesktopApprovalController()
+        self._agent_journal = agent_journal
+        self._approval = DesktopApprovalController(journal=agent_journal)
         self._busy = False
         self._closing = False
         self._build()
         self.protocol("WM_DELETE_WINDOW", self._close)
         self._refresh_status()
+        if self._approval.recovered is not None:
+            stale = self._approval.recovered
+            self._append(
+                "RECOVERY", "Recovered metadata only: "
+                f"{stale['needs_review']} proposals need fresh review, "
+                f"{stale['needs_reconciliation']} dispatches need reconciliation. "
+                "No saved action was resumed or replayed."
+            )
 
     def _build(self):
         style = ttk.Style(self)
@@ -320,6 +331,8 @@ class VarynDesktop(tk.Tk):
         ):
             return
         self._approval.reject_all_pending()
+        if self._agent_journal is not None:
+            self._agent_journal.close()
         self.controller.discard_pending_history()
         self._lifecycle.close()
         self._closing = True
@@ -327,11 +340,23 @@ class VarynDesktop(tk.Tk):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="VARYN desktop")
+    parser.add_argument("--agent-journal", metavar="PATH",
+                        help="Opt-in metadata-only SQLite recovery file")
+    args = parser.parse_args()
+    journal = (AgentRecoveryJournal(args.agent_journal)
+               if args.agent_journal else None)
     try:
-        window = VarynDesktop()
+        window = VarynDesktop(agent_journal=journal)
     except tk.TclError:
+        if journal is not None:
+            journal.close()
         raise SystemExit("A graphical desktop session is required")
-    window.mainloop()
+    try:
+        window.mainloop()
+    finally:
+        if journal is not None:
+            journal.close()
 
 
 if __name__ == "__main__":
