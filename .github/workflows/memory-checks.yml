@@ -31,6 +31,8 @@ jobs:
         run: python -c "import tkinter; print('Tkinter module available')"
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
+      - name: Synthetic offline desktop Python memory probe (not process RSS)
+        run: python -m varyn.desktop_perf
       - name: Synthetic performance benchmark (informational, no speed gate)
         run: python -m varyn.performance --rows 300 --repeats 5
       - name: Check memory CLI
