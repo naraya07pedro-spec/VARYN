@@ -7,6 +7,7 @@ import argparse
 import os
 import sqlite3
 import tempfile
+from contextlib import closing
 from pathlib import Path
 
 
@@ -30,8 +31,8 @@ def backup_database(source, destination):
     fd, temporary = tempfile.mkstemp(prefix=".varyn-backup-", suffix=".sqlite3", dir=destination.parent)
     os.close(fd)
     try:
-        with sqlite3.connect(f"file:{source.as_posix()}?mode=ro", uri=True) as origin:
-            with sqlite3.connect(temporary) as snapshot:
+        with closing(sqlite3.connect(f"file:{source.as_posix()}?mode=ro", uri=True)) as origin:
+            with closing(sqlite3.connect(temporary)) as snapshot:
                 origin.backup(snapshot)
                 if snapshot.execute("PRAGMA quick_check").fetchone()[0] != "ok":
                     raise sqlite3.DatabaseError("Backup failed SQLite integrity check")
