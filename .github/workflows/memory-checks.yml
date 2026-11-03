@@ -24,6 +24,8 @@ jobs:
           python-version: '3.12'
       - name: Unit tests (standard library only)
         run: python -m unittest discover -s tests -v
+      - name: Synthetic performance benchmark (informational, no speed gate)
+        run: python -m varyn.performance --rows 300 --repeats 5
       - name: Check memory CLI
         run: |
           python -m varyn.memory --db smoke.sqlite3 --owner demo add --project VARYN --content "checkpoint verified"
