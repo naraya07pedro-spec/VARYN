@@ -65,5 +65,5 @@ Entries describe committed changes and verification separately. This is a histor
 - **Expected baseline:** 2/5 positive cases found (40% hit rate and 0.4 MRR), 1/1 negative correctly rejected (100% in this one negative case). These are *fixture results, not evidence of real-world quality*.
 - **Known failures intentionally retained:** Bahasa Indonesia synonym mismatch, older note excluded by recent-candidate limit, and a matching note too large for the character budget. We do not erase these failures to make the benchmark look better.
 - **Tests added:** eight regression checks for metrics, individual scenarios, and JSON output.
-- **Verification:** awaiting CI at time of this commit.
+- **Verification:** [GitHub Actions #41607148369](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41607148369) passed 43 unit tests (35 prior + 8 evaluation checks) and CLI smoke steps on Windows and Ubuntu at code commit `bef68fa6ca38f6b2f65fb22667aee7cde0bfc92e`.
 - **Next:** improve retrieval quality with a measured intervention and expand the evaluation set independently before any accuracy claim.
