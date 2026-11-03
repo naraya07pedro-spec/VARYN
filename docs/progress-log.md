@@ -108,3 +108,11 @@ Dataset: 300 synthetic records, five retrieval repetitions; GitHub-hosted VMs, n
 | Python-traced peak bytes during queries | 25,699 | 26,476 |
 
 **Interpretation guardrails:** this sample does not measure process RSS, native SQLite memory, sustained throughput, CPU percentages, or warm/cold filesystem-cache effects. One run per OS with five repeats is not a statistically robust performance comparison. Runner CPU, SQLite versions, storage, and load differ. Not a promise of owner laptop speed or low RAM consumption.
+
+## 2026-11-03 — Checkpoint 11A: Heuristic secret write guard
+- **Implemented:** `varyn/safety.py` with a small, deterministic detector for recognizable private-key headers, common GitHub/OpenAI/AWS-like credential formats, bearer values and credential assignments.
+- **Enforced:** `MemoryStore.add` and `DecisionJournal.put` reject matches **before** writing any SQLite row or decision revision.
+- **Disclosure:** errors contain a fixed generic message, not the rejected input value.
+- **Tests added:** six synthetic safety tests for detection, zero-write behavior, decision-source checks, ordinary content, deliberate false negative, and invalid types.
+- **Verification:** CI pending on both Ubuntu and Windows at the time of this documentation update.
+- **Critical limitations:** heuristic checks can miss disguised or unknown secrets and can reject innocent text. Existing stored data is NOT scanned, erased, encrypted, or migrated. The database and backups remain plaintext, and caller-selected `owner_id` is NOT authentication. This is not a secure personal-data readiness gate.
