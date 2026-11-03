@@ -193,3 +193,8 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 - Optional SQLite journal records proposal identity, digest, tool, status and timestamp. Crash recovery marks pending proposals for new review and uncertain dispatched actions for reconciliation; **zero automatic replay**.
 - Integrated into the desktop approval bridge, and the Tk app accepts `--agent-journal PATH`. Default is still RAM-only unless opted in.
 - 14 synthetic cross-platform tests added; [GitHub Actions #41680888700](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41680888700) passed **278 tests per OS** on Windows and Ubuntu after correcting SQLite test cleanup on Windows. No persisted note contents, approvals, executable arguments, encrypted journal or automatic task resumption.
+
+## Checkpoint 15A: Native provider response tool-call normalization
+- Supports parse-only mock response shapes from OpenAI Responses, Anthropic Messages and Gemini generateContent, normalized to fixed registered VARYN tool proposals. Rejects multiple calls, forged/unknown tool names, duplicate JSON keys and oversized payloads.
+- `stage_native_tool_call()` sends a proposal for review, **not execution**. Fifteen synthetic headless tests; CI pending.
+- No native tool declarations are sent to provider APIs and no live API/desktop native-tool round trip has been tested. Model responses remain untrusted.
