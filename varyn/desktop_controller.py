@@ -49,6 +49,7 @@ class DesktopController:
             raise ValueError("Offline controller accepts only FakeProvider")
         self._router = BudgetedRouter(ProviderRouter(providers=providers), self._budget)
         self._history = []
+        self._history_epoch = 0
         self._lock = Lock()
         self.network_consent = False
         self.context_consent = False
@@ -75,6 +76,7 @@ class DesktopController:
         with self._lock:
             network_ok = self.network_consent
             context_ok = self.context_consent
+            history_epoch = self._history_epoch
         if context is not None and not context_ok:
             raise PermissionError("Local context sharing is disabled")
         if provider != "fake":
@@ -95,8 +97,9 @@ class DesktopController:
         )
         # A mutex prevents the GUI clearing history concurrently with completion.
         with self._lock:
-            self._history.append(("user", question.strip()))
-            self._history.append(("assistant", reply.text))
+            if history_epoch == self._history_epoch:
+                self._history.append(("user", question.strip()))
+                self._history.append(("assistant", reply.text))
         return result
 
     @property
@@ -106,7 +109,13 @@ class DesktopController:
 
     def clear_history(self):
         with self._lock:
+            self._history_epoch += 1
             self._history.clear()
+
+    def discard_pending_history(self):
+        """Reject in-flight completion from future RAM history without canceling API."""
+        with self._lock:
+            self._history_epoch += 1
 
     def status(self):
         usage = self._budget.snapshot()
