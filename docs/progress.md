@@ -168,3 +168,8 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 - Added user-visible "Discard pending reply" and close-with-request warnings. These **do not cancel the external request or prevent its billing**.
 - Added bounded offline desktop Python allocation probe; [GitHub Actions #41668489358](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41668489358) passed **215 discovered tests per OS** with lifecycle tests and probe. Probe does not cover full process RAM or GUI rendering.
 - Native GUI acceptance and real Windows laptop RAM measurements remain open.
+
+## Checkpoint 13D: Desktop preflight and source packaging
+- Added double-click Windows `Launch-VARYN.cmd`, offline Python/Tkinter process-RSS doctor, and reproducible source-only desktop ZIP builder.
+- CI now generates a source ZIP on both OSes and uploads the Windows ZIP as an Actions artifact. Ten new regression tests; CI pending.
+- Windows laptop GUI interaction and total app RAM remain **unverified**. The ZIP is source-only and requires installed Python+Tkinter, not a one-click standalone EXE.
