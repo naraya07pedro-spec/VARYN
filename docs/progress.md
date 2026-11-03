@@ -9,6 +9,12 @@
 - Small automated tests for persistence, owner-scoping, deletion, project filtering, and literal search.
 - Git ignore rules to prevent accidental routine commits of local database files and common secrets.
 
+## Second checkpoint: consistent SQLite backups
+- Added `varyn/backup.py` using SQLite's official online backup interface.
+- Existing backup destinations are never overwritten; new snapshots are checked with `PRAGMA quick_check`.
+- Four backup tests passed in a local Python environment on 3 November 2026; GitHub Actions and Windows-specific execution remain to be verified.
+- Backups are **unencrypted** and currently intended for synthetic data only. Backups on the same physical disk do not protect against hardware loss.
+
 ## Crucial limitations
 - `--owner` is a user-provided label, **not authentication**. Any person with database access can impersonate another label. This is a logical scoping prototype, not security isolation.
 - No encryption at rest, provenance tracking, semantic search, token budgeting, conflict resolution, provider login, model calls, agents, or user interface yet.
@@ -25,4 +31,4 @@ python -m varyn.memory --db demo.sqlite3 --owner demo search --query "verified"
 ```
 
 ## Next gate
-Verify tests, then add non-sensitive synthetic memory records, export/backup testing, and provenance, before attempting real provider integrations.
+Verify tests, then add non-sensitive synthetic memory records, export/backup testing, and provenance, and restore/Windows-specific tests before attempting real provider integrations.
