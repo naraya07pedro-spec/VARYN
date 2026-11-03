@@ -56,5 +56,5 @@ Entries describe committed changes and verification separately. This is a histor
 - **Diagnostics:** `matched`, `no_match_in_sample`, or `matches_exceeded_budget`. These are retrieval outcomes, **not** proof that a fact is absent.
 - **Budget:** continues enforcing serialized JSON character limits, including diagnostic fields. No token counter is claimed.
 - **Tests added:** six synthetic regressions for duplicate notes, decision precedence, distinct decisions, no-match diagnostics, over-budget matching evidence, and diagnostic length.
-- **Verification:** Windows and Ubuntu CI pending at time of commit.
+- **Verification:** [GitHub Actions #41604448473](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41604448473) passed on Windows and Ubuntu at code commit `f7fef0096d2f7c3b5067889cf6e36f84738ad616`: 35 unit tests (29 existing + 6 new) and CLI smoke checks.
 - **Caveats:** deduplication is exact normalization only, not semantic similarity. Data scoping still uses untrusted caller owner labels, not authentication.
