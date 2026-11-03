@@ -11,6 +11,10 @@ import stat
 from pathlib import Path
 
 
+def _is_windows():
+    return os.name == "nt"
+
+
 def audit_storage(path):
     """Inspect ONE existing SQLite file without reading or changing its contents.
 
@@ -30,7 +34,7 @@ def audit_storage(path):
         return _report(findings, "rejected")
 
     # Do not resolve or display the path, and never call sqlite on its content.
-    if os.name == "nt":
+    if _is_windows():
         findings.append("windows_acl_not_inspected")
     else:
         mode = target.stat(follow_symlinks=False).st_mode
