@@ -243,3 +243,24 @@ with SealedMemorySession(checkpoint_dir=directory) as session:
 This is **opt-in**: previous manual saving remains unchanged. Each public write triggers full SQLite-image serialization and DPAPI encryption into a fresh file; prior files remain immutable. If a save fails, the public write raises an error but is **already present in RAM** and remains unsaved, so blind retries may duplicate records or create a revision conflict. Inspect `has_unsaved_changes` and retry *saving* to a new path instead.
 
 **Not zero-data-loss:** file publication and OS caches cannot guarantee survival of abrupt electrical power loss. Disk growth is unbounded without a retention policy, and full-image encryption on every write adds CPU/I/O; no actual laptop power-loss acceptance test has occurred. Use only synthetic data, not private client data.
+
+### Checkpoint 11E: Safe checkpoint inventory and limit
+
+Inspect an existing directory of synthetic encrypted snapshots without touching its contents:
+
+```powershell
+python -m varyn.checkpoint_lifecycle --directory "D:\\VARYN\\synthetic-checkpoints" --keep-latest 10 --max-bytes 104857600
+```
+
+Output contains **only numeric counts and advisory status**, not file paths, names or record contents. It warns when checkpoints exceed a selected budget, but **does not delete anything** or claim that recovery is verified. Files must match exactly `checkpoint-<32 hex>.varyn`; all other files are excluded. Direct symlink checkpoint paths are rejected.
+
+To prevent unchecked growth from the opt-in Windows checkpoint-on-write session:
+
+```python
+from varyn.sealed_memory import SealedMemorySession
+with SealedMemorySession(checkpoint_dir="D:/VARYN/synthetic-checkpoints",
+                         max_checkpoints=100) as session:
+    session.add("VARYN", "synthetic only")
+```
+
+The count cap is checked **before** public memory/decision writes, so hitting the limit stops new mutations. The default cap is 100 only when a checkpoint directory is configured. This trades continuity of new writes for preserving all existing snapshots; manual investigation is required. No automatic rotation, secure deletion or reliable disk-space reservation is implemented. Directory race conditions and files outside the managed pattern remain limitations.
