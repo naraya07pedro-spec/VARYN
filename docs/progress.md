@@ -55,5 +55,5 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 ## Checkpoint 06: context quality (3 November 2026)
 - Added suppression of whitespace/case-equivalent repeated notes without combining distinct decision keys.
 - Added explicit retrieval status to distinguish no lexical match from budget-excluded evidence.
-- Added six targeted synthetic tests; CI verification pending.
+- Added six targeted synthetic tests. [GitHub Actions #41604448473](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41604448473) passed 35 total unit tests plus CLI smoke checks on Windows and Ubuntu.
 - Did not add semantic matching, true citations, authentication, encryption, provider calls, or model token budgets.
