@@ -20,9 +20,9 @@ class RetrievalEvaluationTests(unittest.TestCase):
         self.assertTrue(self.cases["other_project_excluded"]["hit"])
         self.assertEqual(self.cases["other_project_excluded"]["returned"], [])
 
-    def test_synonym_failure_is_not_hidden(self):
-        self.assertFalse(self.cases["no_lexical_match"]["hit"])
-        self.assertEqual(self.cases["no_lexical_match"]["status"], "no_match_in_sample")
+    def test_bilingual_glossary_recovers_storage_alias(self):
+        self.assertTrue(self.cases["no_lexical_match"]["hit"])
+        self.assertEqual(self.cases["no_lexical_match"]["status"], "matched")
 
     def test_candidate_pool_failure_is_not_hidden(self):
         self.assertFalse(self.cases["candidate_pool_miss"]["hit"])
@@ -35,8 +35,8 @@ class RetrievalEvaluationTests(unittest.TestCase):
         m = self.report["metrics"]
         self.assertEqual(m["positive_cases"], 5)
         self.assertEqual(m["negative_cases"], 1)
-        self.assertEqual(m["positive_hit_rate"], 0.4)
-        self.assertEqual(m["positive_mrr"], 0.4)
+        self.assertEqual(m["positive_hit_rate"], 0.6)
+        self.assertEqual(m["positive_mrr"], 0.6)
         self.assertEqual(m["negative_correct_rejection_rate"], 1.0)
         self.assertEqual(self.report["dataset_type"], "hand_labeled_synthetic_only")
 
