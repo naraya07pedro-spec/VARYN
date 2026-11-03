@@ -63,7 +63,7 @@ class ContextTests(unittest.TestCase):
         self.assertLess(len(result["items"]), 20)
 
     def test_long_unfitting_record_is_skipped(self):
-        self.mem.add("VARYN", "storage " + "X" * 20000)
+        self.mem.add("VARYN", "storage " + "X" * 19000)
         self.mem.add("VARYN", "storage short")
         result = self.build(max_chars=450)
         self.assertEqual([x["content"] for x in result["items"]], ["storage short"])
