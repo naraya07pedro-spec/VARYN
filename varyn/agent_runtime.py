@@ -95,8 +95,8 @@ class BoundedAgent:
         """Stage a proposal. This does not execute anything or reserve a step."""
         raw = self._validate(tool, arguments)
         with self._lock:
-            if self._steps >= self._max_steps:
-                raise AgentLimitReached("Agent step budget exhausted")
+            if self._steps + len(self._proposals) >= self._max_steps:
+                raise AgentLimitReached("Agent step or pending proposal budget exhausted")
             proposal_id = token_urlsafe(24)
             digest = sha256(tool.encode("ascii") + b"\0" + raw).hexdigest()
             proposal = AgentProposal(proposal_id, tool,
