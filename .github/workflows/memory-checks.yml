@@ -24,6 +24,11 @@ jobs:
           python-version: '3.12'
       - name: Install optional recovery cryptography dependency
         run: python -m pip install -r requirements-recovery.txt
+      - name: Compile desktop entrypoint without launching a window
+        run: python -m py_compile varyn/desktop.py varyn/desktop_controller.py
+      - name: Check Windows Tkinter import (no graphical session)
+        if: runner.os == 'Windows'
+        run: python -c "import tkinter; print('Tkinter module available')"
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
       - name: Synthetic performance benchmark (informational, no speed gate)
