@@ -76,3 +76,11 @@ Entries describe committed changes and verification separately. This is a histor
 - **Independent checks:** six additional positive/negative glossary tests, including cross-project/owner-label filtering.
 - **Verification:** [GitHub Actions #41611678899](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41611678899) passed Windows and Ubuntu on code commit `08dd2502dcbc50d1f23acd5d979dbaac78c36423`: 49 unit tests (43 previous + 6 new) and existing CLI smoke steps.
 - **Risks:** hardcoded aliases can create false positives; glossary is not semantic reasoning or machine translation. No authentication/encryption, and no model/provider calls.
+
+## 2026-11-03 — Checkpoint 09: Disk-backed SQLite FTS5 memory indexing
+- **Implemented:** `varyn/index.py` creates an SQLite FTS5 external-content index, one-time backfill of legacy memory rows, and insert/update/delete triggers for subsequent changes.
+- **Integration:** `varyn/context.py` selects recent matching **search hits**, rather than only the latest written notes. Search expansion uses the existing small bilingual glossary, with quoted/parameterized FTS expressions.
+- **Tests added:** nine synthetic regressions for historical recall, legacy backfill, insert/delete/update triggers, owner/project filtering, bilingual expansion, operator-like input, reopening, and many irrelevant records.
+- **Controlled benchmark expectation:** 4 of 5 positives retrieved (80%), previously 3/5 (60%). One negative remains correctly rejected. One oversized record still fails to fit; percentages are from six designed fixtures and cannot describe real-world accuracy.
+- **Verification:** pending GitHub Actions on Ubuntu and Windows.
+- **Cautions:** FTS5 must be present in the local Python SQLite build. First index creation rebuilds on-disk index and may temporarily consume disk/CPU. No laptop performance benchmark, memory measurement, encryption, or actual authentication. Source annotations are unverified.
