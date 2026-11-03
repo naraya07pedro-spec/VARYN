@@ -76,5 +76,11 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 
 ## Checkpoint 10: Synthetic performance and memory benchmark (3 November 2026)
 - Added a bounded benchmark for indexing and query latency, on-disk SQLite main file size, and Python-only peak tracked allocations.
-- Added four instrumentation tests; scheduled a 300-note, five-query benchmark on CI for both Windows and Ubuntu. Verification pending.
+- Added four instrumentation tests; scheduled a 300-note, five-query benchmark on CI for both Windows and Ubuntu. [GitHub Actions #41614154173](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41614154173) passed 62 unit tests and benchmark/CLI steps on Windows and Ubuntu.
 - These metrics do not measure total native SQLite memory, full process RSS, or the actual owner's Windows laptop.
+
+### Verified checkpoint 10 runner observations
+- Ubuntu: index build 4.334 ms; median query 4.492 ms.
+- Windows: index build 94.605 ms; median query 7.184 ms.
+- Both: 300 synthetic notes, five query repetitions; database main file 114,688 bytes after indexing.
+- Python-traced query peaks: 25,699 bytes (Ubuntu), 26,476 bytes (Windows). **Not total RAM or native SQLite allocations.** See chronological progress log for full measurement table and methodology.
