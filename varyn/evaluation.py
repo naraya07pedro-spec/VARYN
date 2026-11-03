@@ -73,7 +73,7 @@ def run_evaluation():
             "penyimpanan", "storage location is D drive",
         ),
         _scenario(
-            "candidate_pool_miss",
+            "historical_index_hit",
             lambda m, d: (
                 m.add("VARYN", "storage original relevant"),
                 m.add("VARYN", "irrelevant newer"),
@@ -105,7 +105,7 @@ def run_evaluation():
         },
         "limitations": (
             "Small purpose-built fixtures, not representative user queries. "
-            "A tiny glossary handles selected aliases but misses unlisted synonyms, excluded old records, and over-budget evidence. "
+            "A tiny glossary handles selected aliases but misses unlisted synonyms and over-budget evidence. Indexed matching now finds historical records outside the recent-write pool. "
             "Owner labels are not authentication; no private data or real LLM calls."
         ),
     }
