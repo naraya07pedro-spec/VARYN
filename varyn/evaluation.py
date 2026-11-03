@@ -47,7 +47,7 @@ def _scenario(name, setup, query, expected, max_chars=4000, max_candidates=500):
 
 
 def run_evaluation():
-    """Report all cases, including intentional known-failure lexical examples."""
+    """Report all cases, including known limitations that remain after alias expansion."""
     cases = [
         _scenario(
             "literal_memory",
@@ -68,7 +68,7 @@ def run_evaluation():
             "storage", None,
         ),
         _scenario(
-            "no_lexical_match",
+            "bilingual_storage_alias",
             lambda m, d: m.add("VARYN", "storage location is D drive"),
             "penyimpanan", "storage location is D drive",
         ),
@@ -105,7 +105,7 @@ def run_evaluation():
         },
         "limitations": (
             "Small purpose-built fixtures, not representative user queries. "
-            "Lexical search misses synonyms, excluded old records, and over-budget evidence. "
+            "A tiny glossary handles selected aliases but misses unlisted synonyms, excluded old records, and over-budget evidence. "
             "Owner labels are not authentication; no private data or real LLM calls."
         ),
     }
