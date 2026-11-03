@@ -58,3 +58,12 @@ Entries describe committed changes and verification separately. This is a histor
 - **Tests added:** six synthetic regressions for duplicate notes, decision precedence, distinct decisions, no-match diagnostics, over-budget matching evidence, and diagnostic length.
 - **Verification:** [GitHub Actions #41604448473](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41604448473) passed on Windows and Ubuntu at code commit `f7fef0096d2f7c3b5067889cf6e36f84738ad616`: 35 unit tests (29 existing + 6 new) and CLI smoke checks.
 - **Caveats:** deduplication is exact normalization only, not semantic similarity. Data scoping still uses untrusted caller owner labels, not authentication.
+
+## 2026-11-03 — Checkpoint 07: Retrieval evaluation
+- **Code:** `varyn/evaluation.py` runs six independent, labeled, synthetic scenarios with no external provider calls or real data.
+- **Metrics:** positive hit rate, positive mean reciprocal rank (MRR), and correct rejection rate for negative cases. Denominators are included.
+- **Expected baseline:** 2/5 positive cases found (40% hit rate and 0.4 MRR), 1/1 negative correctly rejected (100% in this one negative case). These are *fixture results, not evidence of real-world quality*.
+- **Known failures intentionally retained:** Bahasa Indonesia synonym mismatch, older note excluded by recent-candidate limit, and a matching note too large for the character budget. We do not erase these failures to make the benchmark look better.
+- **Tests added:** eight regression checks for metrics, individual scenarios, and JSON output.
+- **Verification:** awaiting CI at time of this commit.
+- **Next:** improve retrieval quality with a measured intervention and expand the evaluation set independently before any accuracy claim.
