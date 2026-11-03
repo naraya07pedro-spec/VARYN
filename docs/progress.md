@@ -117,3 +117,9 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 - Windows encrypted session can export a separate NEW recovery file and reopen it into RAM using a passphrase independent of its old DPAPI account.
 - 13 synthetic regression methods added. [GitHub Actions #41626491782](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41626491782) passed 117 discovered tests on Windows and Ubuntu; Windows-native integration passed on Windows.
 - Backup placement, passphrase strength/custody, device-migration acceptance, app authentication and secure data migration remain unverified. Still not ready for sensitive data.
+
+## Checkpoint 11D-2: Recovery verification and unsaved-change guard
+- Added read-only-in-memory portable recovery verifier: authenticated decrypt, SQLite integrity, minimum schema, owner-label consistency and metadata-only counts.
+- Added opt-in `has_unsaved_changes` and `close_checked()` to help avoid silently discarding API-level writes on normal closure.
+- Twelve additional tests (seven cross-platform recovery inspection, five Windows-only dirty-state). CI pending.
+- Not automatic autosave, OS-level process-crash protection, FTS deep validation, secure identity, or verified real-device disaster recovery.
