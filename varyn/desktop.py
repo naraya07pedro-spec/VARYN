@@ -11,6 +11,7 @@ from tkinter import messagebox, ttk
 
 from varyn.desktop_controller import DesktopController, DEFAULT_MODELS, PROVIDERS
 from varyn.providers import ProviderError
+from varyn.desktop_lifecycle import DesktopRequestState
 
 
 class VarynDesktop(tk.Tk):
@@ -27,6 +28,7 @@ class VarynDesktop(tk.Tk):
         self.consent_context = tk.BooleanVar(value=False)
         self.status_line = tk.StringVar(value="")
         self._results = queue.Queue()
+        self._lifecycle = DesktopRequestState()
         self._busy = False
         self._closing = False
         self._build()
@@ -98,6 +100,9 @@ class VarynDesktop(tk.Tk):
         ttk.Button(controls, text="Clear RAM chat", command=self._clear).pack(
             side="left", padx=8
         )
+        ttk.Button(controls, text="Discard pending reply", command=self._discard).pack(
+            side="left"
+        )
         ttk.Label(
             outer, text="History and usage counters reset on restart. Live APIs may bill.",
             style="V.TLabel",
@@ -160,38 +165,43 @@ class VarynDesktop(tk.Tk):
                 parent=self,
             ):
                 return
+        request_id = self._lifecycle.begin()
         self._busy = True
         self.send_button.configure(state="disabled")
         self._refresh_status()
         worker = threading.Thread(
             target=self._send_worker,
-            args=(question, selected_provider, selected_model, live),
+            args=(request_id, question, selected_provider, selected_model, live),
             daemon=True,
         )
         worker.start()
         self.after(75, self._poll_result)
 
-    def _send_worker(self, question, provider, model, live):
+    def _send_worker(self, request_id, question, provider, model, live):
         # No Tk widget access from the worker thread.
         try:
             result = self.controller.send(
                 question, provider=provider, model=model,
                 confirm_live_request=live,
             )
-            self._results.put(("ok", question, result.answer))
+            self._results.put((request_id, "ok", question, result.answer))
         except (ValueError, PermissionError, ProviderError) as error:
-            self._results.put(("error", "", str(error)))
+            self._results.put((request_id, "error", "", str(error)))
         except Exception:
             # Don't echo potentially sensitive raw exception details in UI.
-            self._results.put(("error", "", "Request failed; retry not automatic"))
+            self._results.put((request_id, "error", "", "Request failed; retry not automatic"))
 
     def _poll_result(self):
         if self._closing:
             return
         try:
-            kind, question, message = self._results.get_nowait()
+            request_id, kind, question, message = self._results.get_nowait()
         except queue.Empty:
             self.after(75, self._poll_result)
+            return
+        if not self._lifecycle.finish(request_id):
+            if self._lifecycle.busy:
+                self.after(75, self._poll_result)
             return
         if kind == "ok":
             self._append("YOU", question.strip())
@@ -213,7 +223,30 @@ class VarynDesktop(tk.Tk):
         self.transcript.configure(state="disabled")
         self._refresh_status()
 
+    def _discard(self):
+        if not self._lifecycle.busy:
+            return
+        # The provider MAY STILL complete and charge: only hide its reply.
+        if not messagebox.askyesno(
+            "Discard reply (not remote cancellation)",
+            "Hide this pending reply? The API request will keep running and may still be billed.",
+            parent=self,
+        ):
+            return
+        self._lifecycle.discard_visible()
+        self._busy = False
+        self.send_button.configure(state="normal")
+        self._append("NOTICE", "Reply hidden; remote API request was not canceled")
+        self._refresh_status()
+
     def _close(self):
+        if self._lifecycle.busy and not messagebox.askyesno(
+            "Close without canceling remote API",
+            "A request is in flight. Closing hides its result but cannot cancel remote processing or billing. Close anyway?",
+            parent=self,
+        ):
+            return
+        self._lifecycle.close()
         self._closing = True
         self.destroy()
 
