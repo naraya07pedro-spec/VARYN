@@ -171,5 +171,5 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 
 ## Checkpoint 13D: Desktop preflight and source packaging
 - Added double-click Windows `Launch-VARYN.cmd`, offline Python/Tkinter process-RSS doctor, and reproducible source-only desktop ZIP builder.
-- CI now generates a source ZIP on both OSes and uploads the Windows ZIP as an Actions artifact. Ten new regression tests; CI pending.
+- [GitHub Actions #41671709750](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41671709750) passed **225 tests per OS** and built source ZIPs on Windows and Ubuntu; Windows publishes a seven-day downloadable artifact. Ten new offline regression tests passed. The Windows doctor-process RSS was ~20.6 MB on CI, **not the GUI's total RAM**. ZIP byte identity between OS checkouts is not guaranteed.
 - Windows laptop GUI interaction and total app RAM remain **unverified**. The ZIP is source-only and requires installed Python+Tkinter, not a one-click standalone EXE.
