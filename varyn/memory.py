@@ -11,11 +11,12 @@ from datetime import datetime, timezone
 from varyn.safety import assert_no_obvious_secrets
 
 class MemoryStore:
-    def __init__(self, path, owner_id):
+    def __init__(self, path, owner_id, *, connection=None):
         if not isinstance(owner_id, str) or not owner_id.strip():
             raise ValueError("A trusted owner ID is required")
         self.owner_id = owner_id
-        self.db = sqlite3.connect(path)
+        self._owns_connection = connection is None
+        self.db = sqlite3.connect(path) if connection is None else connection
         self.db.row_factory = sqlite3.Row
         self.db.execute("""CREATE TABLE IF NOT EXISTS memories (
             id INTEGER PRIMARY KEY,
@@ -28,7 +29,8 @@ class MemoryStore:
         self.db.commit()
 
     def close(self):
-        self.db.close()
+        if self._owns_connection:
+            self.db.close()
 
     def add(self, project, content):
         project, content = project.strip(), content.strip()
