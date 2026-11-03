@@ -151,3 +151,8 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 - Added opt-in wrapper `BudgetedRouter` using lock-protected `UsageBudget` with max requests, reserved output token ceiling, and aggregate usage reports without content.
 - Failed or ambiguous requests keep their reserved quota, so no silent retry/fallback can evade the budget. Eleven new offline tests; [GitHub Actions #41635271566](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41635271566) passed 184 tests per OS on Windows and Ubuntu, alongside existing benchmark/CLI steps.
 - **Not money/cost assurance**: no persistent or multi-process enforcement, automatic price tracking, direct-provider bypass prevention or reconciliation with provider billing.
+
+## Checkpoint 13A: Lightweight offline desktop MVP
+- Built `varyn.desktop` (Tkinter) with offline fake chat, provider/model selection, network/context permission indicators and in-process usage status.
+- `varyn.desktop_controller` denies all live-provider calls even if consent switches are on; no automatic upload, no persisted history, no API usage.
+- 13 headless regression tests added; CI pending. UI rendering and actual laptop resource performance are not yet acceptance-tested.
