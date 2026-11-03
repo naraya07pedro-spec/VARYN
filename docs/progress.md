@@ -206,4 +206,4 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 
 ## Checkpoint 15C: Desktop native proposal review
 - Desktop has a separate native-tool proposal action. A worker parses the selected provider response; only the UI thread may stage the current proposal after request identity verification.
-- No memory export, automatic tool execution or model-issued approval. Ten new headless tests. CI pending; vendor accounts and GUI interaction untested.
+- No memory export, automatic tool execution or model-issued approval. Ten new headless tests. [GitHub Actions #41688204257](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41688204257) passed **318 tests per OS** on Windows and Ubuntu; vendor accounts and GUI interaction untested.
