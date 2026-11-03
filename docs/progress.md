@@ -25,7 +25,7 @@
 ## Fourth checkpoint: revisioned decisions (3 November 2026)
 - Added a separate SQLite decision journal with mandatory source labels and preserved history.
 - Latest revision is selected explicitly; stale revision writes are rejected transactionally.
-- Seven synthetic tests added. CI verification for this checkpoint is pending.
+- Seven synthetic tests added. [GitHub Actions #41601099846](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41601099846) passed 21 total unit tests plus CLI smoke checks on Windows and Ubuntu.
 - Provenance is **recorded, not independently verified**, and no user identity/authentication exists.
 
 ## Crucial limitations
