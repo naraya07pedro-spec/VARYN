@@ -73,3 +73,9 @@ python -m varyn.context --db demo.sqlite3 --owner demo --project VARYN --query "
 ```
 
 This prints a JSON package with lexical matches from the local memory store and **latest** matching decision revisions only. It enforces a character cap on the serialized JSON, **not** an LLM token budget. Only a recent candidate pool is searched; synonyms may not match. Every retrieved content field must be treated as untrusted data by any future model adapter. No model invocation occurs.
+
+### Context quality and missing-evidence diagnostics (Checkpoint 06)
+- Duplicate raw notes that differ only by case/spacing are suppressed; a current decision with the same text is preferred over a raw note.
+- Retrieval reports `matched`, `no_match_in_sample`, or `matches_exceeded_budget`.
+- **A no-match status does not mean the information is false or absent**: retrieval scans only a bounded pool and uses lexical matching.
+- The package remains bounded by serialized characters, not provider model tokens.
