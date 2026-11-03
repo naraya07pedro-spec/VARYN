@@ -79,3 +79,9 @@ This prints a JSON package with lexical matches from the local memory store and 
 - Retrieval reports `matched`, `no_match_in_sample`, or `matches_exceeded_budget`.
 - **A no-match status does not mean the information is false or absent**: retrieval scans only a bounded pool and uses lexical matching.
 - The package remains bounded by serialized characters, not provider model tokens.
+
+### Checkpoint 08: Minimal bilingual glossary
+
+The keyword retriever now understands a very small, explicitly reviewed glossary, including `penyimpanan/storage`, `memori/memory`, and `cadangan/backup`. There is no background model or embedding download.
+
+Use `python -m varyn.evaluation` to reproduce the six-case synthetic benchmark. Its positive hit rate is expected to move from 40% to 60% on these fixed synthetic fixtures. That is **not** a valid real-world accuracy claim; the older-record and budget-related misses still remain.
