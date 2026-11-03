@@ -181,5 +181,5 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 
 ## Checkpoint 14B: UI demonstration of human approval
 - Introduced a desktop approval bridge with exact proposal ID, digest, action summary and risk. The desktop `Demo agent approval` action opens a Yes/No dialog for a fixed synthetic in-RAM note only.
-- Tokens are one-use, consumed without appearing in the GUI; explicit rejection and close invalidate pending previews. 11 headless tests; CI pending.
+- Tokens are one-use, consumed without appearing in the GUI; explicit rejection and close invalidate pending previews. Eleven headless tests; [GitHub Actions #41677185493](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41677185493) passed 250 tests per OS on Windows and Ubuntu. Physical desktop clicks remain unverified.
 - This is not authenticated authorization or model-to-tool access. Untrusted Python code can still bypass the demonstrative boundary, and graphical clicks remain untested on the user's laptop.
