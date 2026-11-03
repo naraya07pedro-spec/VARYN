@@ -1,6 +1,7 @@
 import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
 from varyn.backup import backup_database
 
@@ -10,20 +11,22 @@ class BackupTests(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.base = Path(self.tmp.name)
         self.source = self.base / "memory.sqlite3"
-        with sqlite3.connect(self.source) as db:
+        with closing(sqlite3.connect(self.source)) as db:
             db.execute("CREATE TABLE entries (content TEXT)")
             db.execute("INSERT INTO entries VALUES (?)", ("VARYN milestone",))
+            db.commit()
 
     def tearDown(self):
         self.tmp.cleanup()
 
     def test_consistent_snapshot_and_original_unchanged(self):
         copy = backup_database(self.source, self.base / "copy.sqlite3")
-        with sqlite3.connect(copy) as db:
+        with closing(sqlite3.connect(copy)) as db:
             self.assertEqual(db.execute("SELECT content FROM entries").fetchone()[0], "VARYN milestone")
-        with sqlite3.connect(self.source) as db:
+        with closing(sqlite3.connect(self.source)) as db:
             db.execute("INSERT INTO entries VALUES ('later')")
-        with sqlite3.connect(copy) as db:
+            db.commit()
+        with closing(sqlite3.connect(copy)) as db:
             self.assertEqual(db.execute("SELECT count(*) FROM entries").fetchone()[0], 1)
 
     def test_does_not_overwrite(self):
