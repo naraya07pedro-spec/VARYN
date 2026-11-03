@@ -123,3 +123,8 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 - Added opt-in `has_unsaved_changes` and `close_checked()` to help avoid silently discarding API-level writes on normal closure.
 - Twelve additional tests (seven cross-platform recovery inspection, five Windows-only dirty-state). [GitHub Actions #41627317120](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41627317120) passed 129 discovered tests per OS and benchmark/CLI checks; Windows-only cases passed natively.
 - Not automatic autosave, OS-level process-crash protection, FTS deep validation, secure identity, or verified real-device disaster recovery.
+
+## Checkpoint 11D-3: Encrypted checkpoint-on-write (opt-in)
+- A Windows sealed-memory session may now create a NEW DPAPI-encrypted snapshot immediately after each API-level memory or decision write using `checkpoint_dir`. The last successful snapshot is exposed as `last_checkpoint`.
+- A failed checkpoint does not overwrite the previous snapshot; it raises and leaves the in-RAM write pending/dirty. Six new Windows-only tests; CI pending.
+- Risk: full-image encryption on every write increases disk use, CPU and I/O; no retention policy, actual power-loss qualification or process-crash guarantee. Default behavior remains manual save.
