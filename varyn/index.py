@@ -67,8 +67,8 @@ def retrieve_indexed_memories(connection, owner_id, project, query, limit):
     """Return matching indexed notes, newest-first, scoped before LIMIT."""
     ensure_memory_index(connection)
     return connection.execute(
-        """SELECT m.id, m.content, m.created_at FROM memory_fts AS idx
-           JOIN memories AS m ON m.id = idx.rowid
+        """SELECT m.id, m.content, m.created_at FROM memory_fts
+           JOIN memories AS m ON m.id = memory_fts.rowid
            WHERE memory_fts MATCH ? AND m.owner_id=? AND m.project=?
            ORDER BY m.id DESC LIMIT ?""",
         (match_expression(query), owner_id, project, limit),
