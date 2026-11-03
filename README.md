@@ -264,3 +264,22 @@ with SealedMemorySession(checkpoint_dir="D:/VARYN/synthetic-checkpoints",
 ```
 
 The count cap is checked **before** public memory/decision writes, so hitting the limit stops new mutations. The default cap is 100 only when a checkpoint directory is configured. This trades continuity of new writes for preserving all existing snapshots; manual investigation is required. No automatic rotation, secure deletion or reliable disk-space reservation is implemented. Directory race conditions and files outside the managed pattern remain limitations.
+
+### Checkpoint 12A: Offline-tested AI provider contract
+
+The standard-library `varyn.providers` module has two ways to execute the **same high-level interface**: `FakeProvider` for zero-network tests and a minimal `OpenAIResponsesProvider` for the official OpenAI Responses API. The default denies network access. Credentials are read only from the `OPENAI_API_KEY` environment variable when a real call is explicitly enabled.
+
+```python
+from varyn.providers import FakeProvider, OpenAIResponsesProvider
+
+reply = FakeProvider().generate("Test the provider contract", model="fake-test")
+print(reply.text)  # deterministic test reply; no paid inference
+
+# LIVE opt-in example (may incur API charges):
+# provider = OpenAIResponsesProvider(allow_network=True)
+# reply = provider.generate("Explain this fixture", model="YOUR_SUPPORTED_MODEL")
+```
+
+To attach bounded, retrieved VARYN context, pass `context=session.context("VARYN","storage")` together with **`allow_context_upload=True`**. Without that second flag, uploading local memory is refused. The context text is labeled *untrusted* and placed in the user input, never a developer/system instruction; this does **not** make model prompt injection impossible. The adapter requests `store=False`, disallows tool calls and redirects, and uses fixed request/response caps. Generic errors do not echo raw API responses.
+
+**Honest boundaries:** there is no completed live API integration test, no automatic provider routing, no streaming, no cost accounting, no integrated UI, no agent action loop, and no verified private-data security. A live opt-in request can cost money and transmit your input to a third party; please do **not** use real secrets or private client data yet.
