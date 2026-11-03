@@ -65,6 +65,6 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 
 ## Checkpoint 08: bilingual lexical pilot (3 November 2026)
 - Added a narrow bilingual glossary, preserving all prior owner/project scoping and character budgeting.
-- On the existing synthetic benchmark the expected positive hit rate is 3/5, compared with 2/5 before the change. CI verification pending.
+- On the existing synthetic benchmark the expected positive hit rate is 3/5, compared with 2/5 before the change. [GitHub Actions #41611678899](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41611678899) passed 49 unit tests plus CLI smoke checks on Windows and Ubuntu.
 - Added six independent glossary tests, including false-positive and isolation checks.
 - This is not general multilingual semantic search and does not establish real-world quality.
