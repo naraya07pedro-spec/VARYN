@@ -84,3 +84,11 @@ Entries describe committed changes and verification separately. This is a histor
 - **Controlled benchmark expectation:** 4 of 5 positives retrieved (80%), previously 3/5 (60%). One negative remains correctly rejected. One oversized record still fails to fit; percentages are from six designed fixtures and cannot describe real-world accuracy.
 - **Verification:** [GitHub Actions #41612795744](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41612795744) passed on Ubuntu and Windows at code commit `c0b24bfebfe7a359df31415201fcc733f4b5eb7b`, with 58 unit tests (49 prior + 9 index tests) and memory/backup/restore CLI smoke checks.
 - **Cautions:** FTS5 must be present in the local Python SQLite build. First index creation rebuilds on-disk index and may temporarily consume disk/CPU. No laptop performance benchmark, memory measurement, encryption, or actual authentication. Source annotations are unverified.
+
+## 2026-11-03 — Checkpoint 10: Synthetic performance and memory instrumentation
+- **Implemented:** `varyn/performance.py` builds a bounded synthetic dataset, times first-time FTS5 index creation, then runs repeated retrieval operations.
+- **Measurements:** index build milliseconds; min/median/max query milliseconds; SQLite main-file byte sizes; Python `tracemalloc` peak bytes for index build and queries. Also asserts an old indexed note is retrievable.
+- **CI:** runs the same synthetic benchmark on Windows and Ubuntu using 300 records and five retrieval repetitions per OS. Four small instrumentation regression tests added. No arbitrary speed threshold in the build gate.
+- **Verification:** CI pending at this checkpoint's initial commit. Real numbers will be recorded after jobs complete.
+- **Critical limitation:** `tracemalloc` does **not** measure total process RSS, SQLite's native allocation, other process activity, or Windows OS page cache. Synthetic CI runners do not represent the owner's own computer or available disk space. Disk numbers are for the SQLite main file only.
+- **Safety:** does not modify or inspect the user's local files, does not download models, and consumes no paid API. Timing is informational, not a production performance guarantee.
