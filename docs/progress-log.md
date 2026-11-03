@@ -114,5 +114,5 @@ Dataset: 300 synthetic records, five retrieval repetitions; GitHub-hosted VMs, n
 - **Enforced:** `MemoryStore.add` and `DecisionJournal.put` reject matches **before** writing any SQLite row or decision revision.
 - **Disclosure:** errors contain a fixed generic message, not the rejected input value.
 - **Tests added:** six synthetic safety tests for detection, zero-write behavior, decision-source checks, ordinary content, deliberate false negative, and invalid types.
-- **Verification:** CI pending on both Ubuntu and Windows at the time of this documentation update.
+- **Verification:** [GitHub Actions #41614839681](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41614839681) passed **68 unit tests** on each of Windows and Ubuntu (62 previous + 6 new), plus synthetic performance and CLI checks, at code commit `f7b5e82baee6ba09aacab164ff0542d860b7b1f7`. Subsequent changes only update documentation and PR description.
 - **Critical limitations:** heuristic checks can miss disguised or unknown secrets and can reject innocent text. Existing stored data is NOT scanned, erased, encrypted, or migrated. The database and backups remain plaintext, and caller-selected `owner_id` is NOT authentication. This is not a secure personal-data readiness gate.
