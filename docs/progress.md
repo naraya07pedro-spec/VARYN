@@ -73,3 +73,8 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 - On-disk FTS5 virtual table and triggers now support historical recall outside the latest write window, plus automatic updates and one-time backfill.
 - Nine synthetic index tests added. Benchmark expectation on existing hand-labeled fixtures: 4/5 positive hits, 1/1 negative correctly rejected. [GitHub Actions #41612795744](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41612795744) passed on both Windows and Ubuntu.
 - Indexing requires FTS5 support and additional on-disk space. First-use migration and performance on the owner's Windows laptop remain unverified.
+
+## Checkpoint 10: Synthetic performance and memory benchmark (3 November 2026)
+- Added a bounded benchmark for indexing and query latency, on-disk SQLite main file size, and Python-only peak tracked allocations.
+- Added four instrumentation tests; scheduled a 300-note, five-query benchmark on CI for both Windows and Ubuntu. Verification pending.
+- These metrics do not measure total native SQLite memory, full process RSS, or the actual owner's Windows laptop.
