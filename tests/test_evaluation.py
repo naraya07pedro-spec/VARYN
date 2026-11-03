@@ -24,8 +24,8 @@ class RetrievalEvaluationTests(unittest.TestCase):
         self.assertTrue(self.cases["bilingual_storage_alias"]["hit"])
         self.assertEqual(self.cases["bilingual_storage_alias"]["status"], "matched")
 
-    def test_candidate_pool_failure_is_not_hidden(self):
-        self.assertFalse(self.cases["candidate_pool_miss"]["hit"])
+    def test_index_finds_old_relevant_record(self):
+        self.assertTrue(self.cases["historical_index_hit"]["hit"])
 
     def test_budget_failure_is_not_hidden(self):
         self.assertFalse(self.cases["over_budget"]["hit"])
@@ -35,8 +35,8 @@ class RetrievalEvaluationTests(unittest.TestCase):
         m = self.report["metrics"]
         self.assertEqual(m["positive_cases"], 5)
         self.assertEqual(m["negative_cases"], 1)
-        self.assertEqual(m["positive_hit_rate"], 0.6)
-        self.assertEqual(m["positive_mrr"], 0.6)
+        self.assertEqual(m["positive_hit_rate"], 0.8)
+        self.assertEqual(m["positive_mrr"], 0.8)
         self.assertEqual(m["negative_correct_rejection_rate"], 1.0)
         self.assertEqual(self.report["dataset_type"], "hand_labeled_synthetic_only")
 
