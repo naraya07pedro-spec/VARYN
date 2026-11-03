@@ -14,7 +14,6 @@ from varyn.index import ensure_memory_index
 from varyn.decisions import DecisionJournal
 from varyn.context import build_context
 from varyn.memory import MemoryStore
-from varyn.recovery import read_recovery, write_recovery
 
 _OWNER = "local-windows-session"
 
@@ -40,8 +39,12 @@ class SealedMemorySession:
         self.journal = None
         try:
             if source is not None or recovery_source is not None:
-                image = (read_sealed(source) if source is not None else
-                         read_recovery(recovery_source, recovery_passphrase))
+                if source is not None:
+                    image = read_sealed(source)
+                else:
+                    # Optional cryptography dependency is needed only for portable recovery.
+                    from varyn.recovery import read_recovery
+                    image = read_recovery(recovery_source, recovery_passphrase)
                 if not image.startswith(b"SQLite format 3\x00"):
                     raise SealedDataError("Invalid encrypted SQLite image")
                 try:
@@ -144,6 +147,7 @@ class SealedMemorySession:
         """Portable password-encrypted NEW snapshot. Never emit plaintext SQLite."""
         self._active()
         self.store.db.commit()
+        from varyn.recovery import write_recovery
         image = self.store.db.serialize()
         return write_recovery(destination, image, passphrase)
 
