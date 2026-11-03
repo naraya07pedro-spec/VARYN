@@ -196,5 +196,5 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 
 ## Checkpoint 15A: Native provider response tool-call normalization
 - Supports parse-only mock response shapes from OpenAI Responses, Anthropic Messages and Gemini generateContent, normalized to fixed registered VARYN tool proposals. Rejects multiple calls, forged/unknown tool names, duplicate JSON keys and oversized payloads.
-- `stage_native_tool_call()` sends a proposal for review, **not execution**. Fifteen synthetic headless tests; CI pending.
+- `stage_native_tool_call()` sends a proposal for review, **not execution**. Fifteen synthetic headless tests; [GitHub Actions #41682862672](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41682862672) passed **293 tests per OS** on Windows and Ubuntu.
 - No native tool declarations are sent to provider APIs and no live API/desktop native-tool round trip has been tested. Model responses remain untrusted.
