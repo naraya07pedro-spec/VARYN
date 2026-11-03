@@ -119,3 +119,15 @@ python -m varyn.storage_audit --db "D:\\VARYN\\data\\memory.sqlite3"
 The command returns diagnostic JSON **without exposing local path or contents**. It rejects missing files and symbolic-link file paths. On POSIX systems it checks whether group/other bits allow access. On Windows it reports that Windows ACLs **have not been inspected**, because POSIX mode bits cannot establish Windows file security. It never repairs permissions or enables access.
 
 **The audit always reports `ready_for_sensitive_data=false`.** Encryption, trusted identity, comprehensive ACL auditing, and backup protection are still unfinished. Neither a successful test nor a clean file-mode check makes this prototype suitable for private data.
+
+### Checkpoint 11C-1: Experimental Windows DPAPI envelope
+
+A separate Python module, `varyn.dpapi_vault`, can seal and unseal small **synthetic standalone byte blobs** under the logged-in Windows user's DPAPI context. It writes a newly encrypted file without replacing existing files and refuses tampered envelopes. There are no external dependencies.
+
+```python
+from varyn.dpapi_vault import write_sealed, read_sealed
+write_sealed("demo.sealed", b"synthetic only")
+assert read_sealed("demo.sealed") == b"synthetic only"
+```
+
+**Not a security-ready memory store:** it does **not** encrypt the existing SQLite memory tables, context index, backup/restore files or decision journal. It is NOT application-level authentication and does not protect data from someone who can run code as the unlocked Windows account. DPAPI keys may not transfer across machines/user profiles; recovery must be designed and tested. Do not put real secrets, personal chat histories or client data into the prototype.
