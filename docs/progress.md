@@ -121,5 +121,5 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 ## Checkpoint 11D-2: Recovery verification and unsaved-change guard
 - Added read-only-in-memory portable recovery verifier: authenticated decrypt, SQLite integrity, minimum schema, owner-label consistency and metadata-only counts.
 - Added opt-in `has_unsaved_changes` and `close_checked()` to help avoid silently discarding API-level writes on normal closure.
-- Twelve additional tests (seven cross-platform recovery inspection, five Windows-only dirty-state). CI pending.
+- Twelve additional tests (seven cross-platform recovery inspection, five Windows-only dirty-state). [GitHub Actions #41627317120](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41627317120) passed 129 discovered tests per OS and benchmark/CLI checks; Windows-only cases passed natively.
 - Not automatic autosave, OS-level process-crash protection, FTS deep validation, secure identity, or verified real-device disaster recovery.
