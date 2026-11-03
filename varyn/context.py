@@ -5,17 +5,13 @@ All returned memory text is untrusted user content.
 """
 import argparse
 import json
-import re
-from collections import Counter
 
 from varyn.decisions import DecisionJournal
 from varyn.memory import MemoryStore
-
-_WORDS = re.compile(r"[^\W_]+", re.UNICODE)
-
+from varyn.lexicon import canonical_terms
 
 def _terms(text):
-    return Counter(_WORDS.findall(text.casefold()))
+    return canonical_terms(text)
 
 
 def _relevance(query_terms, text):
@@ -55,7 +51,7 @@ def build_context(db_path, owner_id, project, query, max_chars=4000, max_candida
         "owner_label_not_authenticated": True,
         "project": project,
         "query": query,
-        "retrieval": "lexical_overlap_recent_pool",
+        "retrieval": "bounded_bilingual_lexical_recent_pool",
         "items": [],
         "status": "matches_exceeded_budget",
         "duplicates_skipped": 0,
