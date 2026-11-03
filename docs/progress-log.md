@@ -67,3 +67,12 @@ Entries describe committed changes and verification separately. This is a histor
 - **Tests added:** eight regression checks for metrics, individual scenarios, and JSON output.
 - **Verification:** [GitHub Actions #41607148369](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41607148369) passed 43 unit tests (35 prior + 8 evaluation checks) and CLI smoke steps on Windows and Ubuntu at code commit `bef68fa6ca38f6b2f65fb22667aee7cde0bfc92e`.
 - **Next:** improve retrieval quality with a measured intervention and expand the evaluation set independently before any accuracy claim.
+
+
+## 2026-11-03 — Checkpoint 08: Lightweight bilingual retrieval pilot
+- **Intervention:** six explicit Indonesian/English canonical-term mappings in `varyn/lexicon.py`; `varyn/context.py` applies the same normalization to queries and stored text.
+- **Controlled comparison:** the existing six-case synthetic benchmark moves from 2/5 to an expected 3/5 positive hits (40% -> 60%, MRR 0.4 -> 0.6); one negative scenario remains correctly rejected (1/1). These are tiny hand-designed fixtures, **not** a real-world accuracy improvement estimate.
+- **Known unresolved misses:** candidate-pool exclusion and oversized evidence still fail in the benchmark. Unlisted synonyms such as `arsip` are not handled.
+- **Independent checks:** six additional positive/negative glossary tests, including cross-project/owner-label filtering.
+- **Verification:** pending Windows and Ubuntu CI at writing.
+- **Risks:** hardcoded aliases can create false positives; glossary is not semantic reasoning or machine translation. No authentication/encryption, and no model/provider calls.
