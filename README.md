@@ -49,3 +49,19 @@ See [development evidence and limitations](docs/progress.md). Automated tests ar
 VARYN is a distinct project from [RepoPilot AI](https://github.com/naraya07pedro-spec/repopilot-ai), which focuses on bounded issue-to-PR engineering work.
 
 **No production-readiness or full multi-model support is claimed.**
+
+### Experimental revisioned decision journal (Checkpoint 04)
+
+The separate `varyn.decisions.DecisionJournal` prototype records a **source reference** on each decision and retains all previous revisions. A caller must provide the last seen revision when updating a decision, so stale writes are rejected rather than silently replacing new instructions.
+
+```python
+from varyn.decisions import DecisionJournal
+journal = DecisionJournal("demo.sqlite3", "demo")
+v1 = journal.put("VARYN", "storage", "Store memory on D:", "decision:001")
+v2 = journal.put("VARYN", "storage", "Keep backups off-device", "decision:002", expected_revision=v1)
+print(journal.current("VARYN", "storage"))
+print(journal.history("VARYN", "storage"))
+journal.close()
+```
+
+**Not yet implemented:** trustworthy source authentication, conflict resolution, semantic retrieval, automated context assembly, secure identity, and encryption. A source reference is an unverified string entered by a caller, not proof that the source exists.
