@@ -5,6 +5,7 @@ Use only synthetic data until security and authorization are implemented.
 """
 import sqlite3
 from datetime import datetime, timezone
+from varyn.safety import assert_no_obvious_secrets
 
 
 class RevisionConflict(Exception):
@@ -50,6 +51,7 @@ class DecisionJournal:
         key = _required(key, "key", 120)
         content = _required(content, "content", 20000)
         source_ref = _required(source_ref, "source_ref", 2048)
+        assert_no_obvious_secrets(content, source_ref)
         if type(expected_revision) is not int or expected_revision < 0:
             raise ValueError("expected_revision must be a non-negative integer")
 
