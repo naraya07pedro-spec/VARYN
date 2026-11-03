@@ -20,7 +20,7 @@ def _terms(text):
 
 def _relevance(query_terms, text):
     terms = _terms(text)
-    return sum(min(terms[word], count) for word, count in query_terms.items())
+    return sum(min(terms[word], 3) * count for word, count in query_terms.items())
 
 
 def _encode(document):
