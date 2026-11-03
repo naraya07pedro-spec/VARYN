@@ -9,7 +9,7 @@ import urllib.error
 
 from varyn.providers import _validate, _RULES, _MAX_RESPONSE_BYTES, _post as openai_post, ProviderError
 from varyn.multi_provider import _post as multi_post, _context_text
-from varyn.native_tool_calls import stage_native_tool_call
+from varyn.native_tool_calls import parse_native_tool_call
 from varyn.usage_budget import UsageBudget
 
 _TOOLS = {
@@ -91,7 +91,7 @@ class NativeToolRequestClient:
         self.transport = transport
         self.budget = budget if budget is not None else UsageBudget()
 
-    def propose(self, provider, question, *, model, approval_controller,
+    def request_intent(self, provider, question, *, model,
                 max_output_tokens=256, timeout_seconds=10,
                 confirm_external_request=False, context=None):
         if provider not in _ENV:
@@ -117,7 +117,7 @@ class NativeToolRequestClient:
                 body = multi_post(provider, model, payload, key, timeout_seconds)
             if not isinstance(body, bytes) or not 0 < len(body) <= _MAX_RESPONSE_BYTES:
                 raise ProviderError("Invalid or oversized provider tool response")
-            preview = stage_native_tool_call(provider, body, approval_controller)
+            intent = parse_native_tool_call(provider, body)
         except (urllib.error.URLError, TimeoutError, OSError):
             self.budget.report_failure()
             raise ProviderError("Provider network request failed") from None
@@ -126,4 +126,16 @@ class NativeToolRequestClient:
             raise
         # Actual token usage is unknown in this early-stage tool response path.
         self.budget.report_success({})
-        return preview
+        return intent
+
+    def propose(self, provider, question, *, model, approval_controller,
+                max_output_tokens=256, timeout_seconds=10,
+                confirm_external_request=False, context=None):
+        """Compatibility interface: request and then stage a review-only proposal."""
+        intent = self.request_intent(
+            provider, question, model=model,
+            max_output_tokens=max_output_tokens,
+            timeout_seconds=timeout_seconds,
+            confirm_external_request=confirm_external_request, context=context,
+        )
+        return approval_controller.propose(intent.tool, intent.arguments)
