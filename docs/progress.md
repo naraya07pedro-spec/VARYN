@@ -183,3 +183,8 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 - Introduced a desktop approval bridge with exact proposal ID, digest, action summary and risk. The desktop `Demo agent approval` action opens a Yes/No dialog for a fixed synthetic in-RAM note only.
 - Tokens are one-use, consumed without appearing in the GUI; explicit rejection and close invalidate pending previews. Eleven headless tests; [GitHub Actions #41677185493](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41677185493) passed 250 tests per OS on Windows and Ubuntu. Physical desktop clicks remain unverified.
 - This is not authenticated authorization or model-to-tool access. Untrusted Python code can still bypass the demonstrative boundary, and graphical clicks remain untested on the user's laptop.
+
+## Checkpoint 14C: Untrusted structured model intent (proposal only)
+- Added `varyn.tool_protocol` exact `varyn.tool_intent.v1` JSON schema parser with duplicate-key rejection and strict allowed tool/argument validation.
+- Added Tkinter **Review structured tool intent** button: it reads untrusted JSON from the text input and stages a review via the 14B approval dialog; it never executes tool calls automatically.
+- Fourteen offline regression tests; Windows/Ubuntu CI pending. No live model-tool protocol, real actions, authenticated approvals or persistent agents.
