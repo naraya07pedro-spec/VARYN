@@ -304,3 +304,20 @@ print(reply.text)
 ```
 
 Anthropic uses `ANTHROPIC_API_KEY`; Gemini uses `GEMINI_API_KEY`; OpenAI uses `OPENAI_API_KEY`. Local context requires a separate `allow_context_upload=True` even after network access is enabled. Full API request/response shapes are mock-tested only, and opting into a live request can incur fees. Official model names, availability and any provider policies should be verified before use. Provider errors have no automatic fallback, and untrusted memory text is not promoted to system instructions. No real secrets or private client data.
+
+### Checkpoint 12C: Explicit in-process usage budget
+
+```python
+from varyn.multi_provider import ProviderRouter
+from varyn.usage_budget import BudgetedRouter, UsageBudget
+
+budget = UsageBudget(max_requests=2, max_reserved_output_tokens=64)
+router = BudgetedRouter(ProviderRouter(), budget)
+print(router.generate("fake", "Synthetic test", model="fake-test",
+                      max_output_tokens=32).text)
+print(budget.snapshot())  # aggregate counters, no conversation content
+```
+
+This wrapper reserves request count and **maximum output tokens** before dispatch. It does not retry, switch providers or upload local context without consent. Failed/uncertain calls are charged against the *local quota* conservatively even if remote billing is unknown.
+
+**Not a monetary cap:** input tokens are not pre-reserved; output-token ceilings do not represent actual pricing. These counters live in one Python process and reset after restart. Calling the raw router directly bypasses them. Do not rely on this for controlling paid API bills, production usage or sensitive data; provider-side billing limits must be configured independently.
