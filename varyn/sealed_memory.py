@@ -6,6 +6,8 @@ for legacy MemoryStore/backup/restore or real authenticated multi-user storage.
 """
 import os
 import sqlite3
+from pathlib import Path
+from uuid import uuid4
 
 from varyn.dpapi_vault import (
     UnsupportedPlatformError, SealedDataError, read_sealed, write_sealed,
@@ -26,7 +28,7 @@ def _require_windows():
 class SealedMemorySession:
     """Single-user, explicit-save memory prototype, without plaintext disk DB."""
 
-    def __init__(self, source=None, *, recovery_source=None, recovery_passphrase=None):
+    def __init__(self, source=None, *, recovery_source=None, recovery_passphrase=None, checkpoint_dir=None):
         _require_windows()
         if source is not None and recovery_source is not None:
             raise ValueError("Choose DPAPI source or recovery source, not both")
@@ -38,6 +40,13 @@ class SealedMemorySession:
         self._closed = False
         self._change_count = 0
         self._saved_change_count = 0
+        self._checkpoint_dir = None
+        self._last_checkpoint = None
+        if checkpoint_dir is not None:
+            directory = Path(checkpoint_dir)
+            if directory.is_symlink() or not directory.is_dir():
+                raise ValueError("Checkpoint directory must exist and not be a symlink")
+            self._checkpoint_dir = directory
         self.journal = None
         try:
             if source is not None or recovery_source is not None:
@@ -109,6 +118,7 @@ class SealedMemorySession:
         self._active()
         new_id = self.store.add(project, content)
         self._change_count += 1
+        self._checkpoint_after_write()
         return new_id
 
     def search(self, query, project=None, limit=20):
@@ -122,6 +132,7 @@ class SealedMemorySession:
             project, key, content, source_ref, expected_revision
         )
         self._change_count += 1
+        self._checkpoint_after_write()
         return revision
 
     def decision_history(self, project, key):
@@ -160,6 +171,24 @@ class SealedMemorySession:
         result = write_recovery(destination, image, passphrase)
         self._saved_change_count = self._change_count
         return result
+
+    def _checkpoint_after_write(self):
+        """Best-effort encrypted checkpoint immediately after each public write.
+
+        A successful return means a new encrypted snapshot was published; an
+        exception leaves the in-memory write and earlier snapshots untouched.
+        Files are immutable and never silently rotated or deleted.
+        """
+        if self._checkpoint_dir is None:
+            return
+        destination = self._checkpoint_dir / ("checkpoint-" + uuid4().hex + ".varyn")
+        self.save_new(destination)
+        self._last_checkpoint = destination
+
+    @property
+    def last_checkpoint(self):
+        self._active()
+        return self._last_checkpoint
 
     @property
     def has_unsaved_changes(self):
