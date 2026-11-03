@@ -31,7 +31,7 @@
 ## Fifth checkpoint: bounded context retrieval
 - Context builder `varyn/context.py` creates a JSON package limited by serialized character count.
 - Retrieves keyword-matched memory and latest decision revisions for a specified project and caller-supplied owner label.
-- Eight synthetic retrieval tests added. CI verification is pending.
+- Eight synthetic retrieval tests added. [GitHub Actions #41603654276](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41603654276) passed 29 total tests plus CLI checks on Windows and Ubuntu.
 - This is **not semantic retrieval or LLM token counting**; no model connection or secure identity exists.
 
 ## Crucial limitations
