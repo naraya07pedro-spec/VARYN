@@ -21,8 +21,8 @@ class RetrievalEvaluationTests(unittest.TestCase):
         self.assertEqual(self.cases["other_project_excluded"]["returned"], [])
 
     def test_bilingual_glossary_recovers_storage_alias(self):
-        self.assertTrue(self.cases["no_lexical_match"]["hit"])
-        self.assertEqual(self.cases["no_lexical_match"]["status"], "matched")
+        self.assertTrue(self.cases["bilingual_storage_alias"]["hit"])
+        self.assertEqual(self.cases["bilingual_storage_alias"]["status"], "matched")
 
     def test_candidate_pool_failure_is_not_hidden(self):
         self.assertFalse(self.cases["candidate_pool_miss"]["hit"])
