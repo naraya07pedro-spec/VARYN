@@ -57,6 +57,8 @@ def build_context(db_path, owner_id, project, query, max_chars=4000, max_candida
         "query": query,
         "retrieval": "lexical_overlap_recent_pool",
         "items": [],
+        "status": "no_match_in_sample",
+        "duplicates_skipped": 0,
     }
     if len(_encode(result)) > max_chars:
         raise ValueError("Budget too small even for context metadata")
@@ -99,10 +101,33 @@ def build_context(db_path, owner_id, project, query, max_chars=4000, max_candida
                 }))
         # Highest lexical score first; equal scores favor decisions, then newest ID.
         scored.sort(key=lambda item: (item[0], item[1], item[2]), reverse=True)
+        seen_memory_text = set()
+        decision_text = {
+            " ".join(entry[3]["content"].casefold().split())
+            for entry in scored if entry[3]["type"] == "decision"
+        }
         for _, _, _, item in scored:
+            # Only exact case/whitespace-normalized repeats are merged. Different
+            # decision keys remain separate even if their wording is identical.
+            if item["type"] == "memory":
+                normalized = " ".join(item["content"].casefold().split())
+                if normalized in seen_memory_text or normalized in decision_text:
+                    result["duplicates_skipped"] += 1
+                    continue
+                seen_memory_text.add(normalized)
             result["items"].append(item)
             if len(_encode(result)) > max_chars:
                 result["items"].pop()
+        # Status distinguishes no lexical match from evidence that simply cannot
+        # fit in the requested character budget. Neither means "no facts exist".
+        result["status"] = (
+            "matched" if result["items"] else
+            "matches_exceeded_budget" if scored else "no_match_in_sample"
+        )
+        # Diagnostics themselves take space. Fail closed rather than exceeding
+        # the requested serialized-document budget.
+        if len(_encode(result)) > max_chars:
+            raise ValueError("Budget too small for retrieval diagnostics")
         return result
     finally:
         journal.close()
