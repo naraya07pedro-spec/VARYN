@@ -43,5 +43,10 @@ Entries describe committed changes and verification separately. This is a histor
 - **Scope:** candidate pool is recent records (default 500 each from memory and decision tables), not an exhaustive semantic search over all historical context.
 - **Provenance:** decision source labels are returned with `source_verified=false`; no claims of authoritative citations.
 - **Tests added:** eight synthetic scenarios for relevance, latest-only decisions, owner/project scoping, deterministic budget, oversized-record exclusion, invalid inputs, and persistence.
-- **Verification:** pending CI results for this checkpoint.
+- **Verification:** [GitHub Actions #41603654276](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41603654276) succeeded on Ubuntu and Windows at code commit `924588465a6eba43d11df70b49b955eda9c77762`: 29 unit tests (21 existing + 8 new), plus memory/backup/restore CLI checks.
 - **Risks:** character limits are **not token limits**; lexical matching can miss synonyms and older memories; owner labels are not authentication; text is untrusted and must never be treated as model instructions.
+
+### Checkpoint 05 validation repair
+- First GitHub run failed because a synthetic oversized test record had 20,008 characters, exceeding the existing 20,000-character `MemoryStore.add` validation. Production input validation behaved correctly.
+- Corrected the fixture to remain within the store limit; no validation restrictions were removed.
+- The next CI run passed on both operating systems.
