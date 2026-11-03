@@ -321,3 +321,15 @@ print(budget.snapshot())  # aggregate counters, no conversation content
 This wrapper reserves request count and **maximum output tokens** before dispatch. It does not retry, switch providers or upload local context without consent. Failed/uncertain calls are charged against the *local quota* conservatively even if remote billing is unknown.
 
 **Not a monetary cap:** input tokens are not pre-reserved; output-token ceilings do not represent actual pricing. These counters live in one Python process and reset after restart. Calling the raw router directly bypasses them. Do not rely on this for controlling paid API bills, production usage or sensitive data; provider-side billing limits must be configured independently.
+
+### Checkpoint 13A: VARYN Desktop MVP (offline simulation)
+
+Launch from the repository root on a Windows computer with Python 3.12 and Tkinter:
+
+```powershell
+python -m varyn.desktop
+```
+
+The lightweight Tkinter window shows a transcript, text input, a provider/model dropdown, two permission switches and request/token-reservation counters. **Only FakeProvider responds in this stage.** The OpenAI, Anthropic and Gemini options are *UI previews* and are hard-blocked, including when the network permission checkbox is selected. This is not a paid chatbot or a live API connection yet.
+
+No history is saved by the desktop; everything in the session is held in RAM and lost when the window closes. The app never loads local memory automatically and does not request API keys. Use synthetic data only. `python -m unittest discover -s tests -v` runs controller tests without needing a display. Running Tkinter in a graphical Windows session and measuring actual UI responsiveness/RAM on the target laptop are still outstanding checks. No installer, account login, agent execution or real provider chat has been built.
