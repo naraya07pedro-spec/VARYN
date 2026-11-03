@@ -283,3 +283,24 @@ print(reply.text)  # deterministic test reply; no paid inference
 To attach bounded, retrieved VARYN context, pass `context=session.context("VARYN","storage")` together with **`allow_context_upload=True`**. Without that second flag, uploading local memory is refused. The context text is labeled *untrusted* and placed in the user input, never a developer/system instruction; this does **not** make model prompt injection impossible. The adapter requests `store=False`, disallows tool calls and redirects, and uses fixed request/response caps. Generic errors do not echo raw API responses.
 
 **Honest boundaries:** there is no completed live API integration test, no automatic provider routing, no streaming, no cost accounting, no integrated UI, no agent action loop, and no verified private-data security. A live opt-in request can cost money and transmit your input to a third party; please do **not** use real secrets or private client data yet.
+
+### Checkpoint 12B: Explicit multi-provider routing
+
+`varyn.multi_provider.ProviderRouter` selects exactly one provider (fake, openai, anthropic, gemini) for each request. It never silently fails over, so an API outage cannot automatically move your memory to another company.
+
+```python
+from varyn.multi_provider import ProviderRouter, MessagesProvider
+
+router = ProviderRouter()
+reply = router.generate("fake", "Synthetic demo", model="fake-test")
+print(reply.text)
+
+# To explicitly opt in to a real provider, configure its API key in your
+# environment and use a router with one opted-in adapter:
+# router = ProviderRouter(providers={
+#     "anthropic": MessagesProvider("anthropic", allow_network=True)
+# })
+# result = router.generate("anthropic", "Synthetic demo", model="YOUR_MODEL")
+```
+
+Anthropic uses `ANTHROPIC_API_KEY`; Gemini uses `GEMINI_API_KEY`; OpenAI uses `OPENAI_API_KEY`. Local context requires a separate `allow_context_upload=True` even after network access is enabled. Full API request/response shapes are mock-tested only, and opting into a live request can incur fees. Official model names, availability and any provider policies should be verified before use. Provider errors have no automatic fallback, and untrusted memory text is not promoted to system instructions. No real secrets or private client data.
