@@ -411,3 +411,17 @@ For a strictly synthetic manual UI test, paste this exact JSON into the desktop 
 The parser checks format, tool allowlist, argument shape, duplicate keys and size. It only **stages** a proposal for the desktop approval dialog; it does not automatically execute, query a provider, use tools, or grant approval. A user decision on the exact proposal ID and digest is needed before any synthetic RAM note is written. All read-only tool proposals also require an explicit UI decision in this workflow. Fields such as `approved`, `approval_token` and `execute` are refused.
 
 This does **not** yet parse or connect native function-call envelopes from live OpenAI, Claude or Gemini APIs. It provides no authenticated human permission boundary, external automation, real files/network tools, persistent agent state or production security. Use synthetic data only.
+
+### Checkpoint 14D: Opt-in crash/restart journal (metadata only)
+
+To turn on durable **metadata-only** agent recovery, from an existing writable folder launch:
+
+```powershell
+python -m varyn.desktop --agent-journal agent_recovery.sqlite3
+```
+
+The app records proposal ID, tool, SHA-256 digest, state and timestamp in a local SQLite journal. It **does not** store tool arguments, messages, synthetic note contents, API credentials, responses, approval tokens or conversations. Without `--agent-journal`, desktop approvals are still RAM-only.
+
+On process restart, unresolved proposals become `needs_review` and uncertain dispatched actions become `needs_reconciliation`. A startup note reports these counts. **Nothing is resumed, dispatched, approved or retried automatically.** If an external action is uncertain, verify its effect manually before attempting a new proposal; the old pending proposal cannot be resumed from metadata alone.
+
+The SQLite file contains unencrypted metadata, including digests and tool names. Use a private local folder, **synthetic data only**, and never treat it as secure storage for customer information. Real power-cut durability and graphical laptop acceptance are not yet proven.
