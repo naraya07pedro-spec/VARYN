@@ -131,3 +131,21 @@ assert read_sealed("demo.sealed") == b"synthetic only"
 ```
 
 **Not a security-ready memory store:** it does **not** encrypt the existing SQLite memory tables, context index, backup/restore files or decision journal. It is NOT application-level authentication and does not protect data from someone who can run code as the unlocked Windows account. DPAPI keys may not transfer across machines/user profiles; recovery must be designed and tested. Do not put real secrets, personal chat histories or client data into the prototype.
+
+### Checkpoint 11C-2: Experimental in-memory SQLite with encrypted snapshots
+
+```python
+from varyn.sealed_memory import SealedMemorySession
+
+# Windows only, synthetic records only. Explicit save to a new file.
+with SealedMemorySession() as memory:
+    memory.add("VARYN", "synthetic storage decision")
+    memory.save_new("first-snapshot.varyn")
+
+with SealedMemorySession("first-snapshot.varyn") as memory:
+    print(memory.search("storage", project="VARYN"))
+```
+
+Unlike the legacy SQLite-on-disk module, this **separate opt-in prototype** operates on an in-memory SQLite database with its FTS index and encrypts the *whole serialized image* with Windows DPAPI before publishing a new file. It never silently migrates or overwrites legacy data.
+
+**Important limitations:** saves are manual, DPAPI sealed plaintext is limited to 1 MiB, and a lost Windows profile or device may make files unrecoverable. Windows DPAPI does not protect plaintext in memory from the logged-in Windows user or compromised processes. No app login, cross-device key recovery, multi-user access, normal context/decision integration or protected export exists. Do not store real credentials or private chat records yet.
