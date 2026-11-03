@@ -375,3 +375,21 @@ Build a new deterministic desktop source archive from the repository root (desti
 python -m varyn.package_desktop --output varyn-desktop.zip
 ```
 The ZIP contains only Python source files, README and launcher. No Python interpreter, installed dependencies, API credentials, local model, SQLite data or installer is included. Windows GitHub Actions publishes the same source ZIP as a short-retention artifact when CI succeeds. **Do not enter real client data** while encryption/authentication acceptance remains incomplete.
+
+### Checkpoint 14A: Synthetic bounded agent (no live actions)
+
+```python
+from varyn.agent_runtime import BoundedAgent
+
+agent = BoundedAgent(max_steps=3)
+status = agent.propose("inspect_status", {})
+print(agent.execute(status.proposal_id))
+
+note = agent.propose("stage_note", {"text": "synthetic demo only"})
+# Simulation of explicit approval; not proof of user identity:
+approved_token = agent.approve(note.proposal_id)
+print(agent.execute(note.proposal_id, approval_token=approved_token))
+print(agent.snapshot())
+```
+
+This prototype **does not accept automatic AI-generated tool calls**, execute shell commands, access local files or network, install arbitrary plugins, or write persistent data. Only a fixed read-only status tool and an in-memory synthetic note tool exist. Its `approve()` call is not authenticated and is not yet wired to a real desktop confirmation, so the current behavior is **not a production-grade human-approval boundary**. Never use real client data, credentials, or destructive tasks in this agent.
