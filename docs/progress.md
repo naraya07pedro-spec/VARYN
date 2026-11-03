@@ -15,10 +15,17 @@
 - Four backup tests passed in a local Python environment on 3 November 2026; GitHub Actions and Windows-specific execution remain to be verified.
 - Backups are **unencrypted** and currently intended for synthetic data only. Backups on the same physical disk do not protect against hardware loss.
 
+## Third checkpoint: fail-closed restore (3 November 2026)
+- Added `varyn/restore.py`: validates the SQLite database and VARYN memory table before copying.
+- Restores to a **new destination only**; existing files are never overwritten, including concurrent creation.
+- Added 6 tests covering round-trip data, invalid source, corruption, conflicting destination, missing paths, and owner-label scoping.
+- Verification is pending for this checkpoint until the new GitHub Actions run completes.
+- Windows/filesystem-specific acceptance, true authentication, encryption, and off-device disaster recovery are **not** implemented.
+
 ## Crucial limitations
 - `--owner` is a user-provided label, **not authentication**. Any person with database access can impersonate another label. This is a logical scoping prototype, not security isolation.
 - No encryption at rest, provenance tracking, semantic search, token budgeting, conflict resolution, provider login, model calls, agents, or user interface yet.
-- Tests are included but **not yet independently verified as passing**. A real test run and CI must precede any completion claim.
+- Tests and CI are provided; checkpoint-specific results must be checked against the latest commit before any completion claim.
 - Do not store secrets, actual private user conversations, or customer data in this experimental database.
 
 ## Local smoke test
@@ -31,4 +38,4 @@ python -m varyn.memory --db demo.sqlite3 --owner demo search --query "verified"
 ```
 
 ## Next gate
-Verify tests, then add non-sensitive synthetic memory records, export/backup testing, and provenance, and restore/Windows-specific tests before attempting real provider integrations.
+Verify the restore tests in CI, then test real Windows filesystem behavior and add provenance/versioned context using synthetic data. Provider access and multi-agent work remain deferred.
