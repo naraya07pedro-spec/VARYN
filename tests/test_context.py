@@ -86,5 +86,48 @@ class ContextTests(unittest.TestCase):
         self.assertFalse(build_context(self.path, "bob", "VARYN", "storage")["items"])
 
 
+    def test_equivalent_notes_are_deduplicated(self):
+        self.mem.add("VARYN", "storage on D")
+        self.mem.add("VARYN", " STORAGE  on   d ")
+        result = self.build()
+        self.assertEqual(len(result["items"]), 1)
+        self.assertEqual(result["duplicates_skipped"], 1)
+        self.assertEqual(result["status"], "matched")
+
+    def test_current_decision_wins_over_duplicate_note(self):
+        self.mem.add("VARYN", "storage on D")
+        self.dec.put("VARYN", "location", "Storage on D", "decision:fixture")
+        result = self.build()
+        self.assertEqual([x["type"] for x in result["items"]], ["decision"])
+        self.assertEqual(result["duplicates_skipped"], 1)
+
+    def test_same_content_different_decisions_kept(self):
+        self.dec.put("VARYN", "disk", "storage on D", "fixture:disk")
+        self.dec.put("VARYN", "path", "storage on D", "fixture:path")
+        result = self.build()
+        self.assertEqual(len(result["items"]), 2)
+        self.assertTrue(all(x["type"] == "decision" for x in result["items"]))
+
+    def test_no_match_reports_sample_limit_not_absence(self):
+        self.mem.add("VARYN", "unrelated")
+        result = self.build("storage")
+        self.assertEqual(result["items"], [])
+        self.assertEqual(result["status"], "no_match_in_sample")
+
+    def test_budget_miss_is_not_claimed_as_no_evidence(self):
+        self.mem.add("VARYN", "storage " + "z" * 18000)
+        result = self.build(max_chars=350)
+        self.assertEqual(result["items"], [])
+        self.assertEqual(result["status"], "matches_exceeded_budget")
+
+    def test_diagnostic_stays_within_character_budget(self):
+        for _ in range(50):
+            self.mem.add("VARYN", "storage repeated")
+        result = self.build(max_chars=360)
+        encoded = json.dumps(result, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        self.assertLessEqual(len(encoded), 360)
+        self.assertEqual(len(result["items"]), 1)
+        self.assertEqual(result["duplicates_skipped"], 49)
+
 if __name__ == "__main__":
     unittest.main()
