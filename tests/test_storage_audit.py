@@ -64,7 +64,7 @@ class StorageAuditTests(unittest.TestCase):
         self.assertFalse(report["ready_for_sensitive_data"])
 
     def test_windows_acl_is_not_inferred_from_posix_bits(self):
-        with patch("varyn.storage_audit.os.name", "nt"):
+        with patch("varyn.storage_audit._is_windows", return_value=True):
             # Pure read-only reporting behavior, independent of Windows privileges.
             report = audit_storage(self.path)
         self.assertIn("windows_acl_not_inspected", report["checks"])
