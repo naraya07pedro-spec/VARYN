@@ -89,3 +89,9 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 - Added deterministic credential-pattern refusal to memory and decision writes, using a generic error message.
 - Six synthetic tests passed along with prior tests in GitHub Actions run #41614839681 on Windows and Ubuntu (68 tests total per OS).
 - **Not encryption, authentication, comprehensive secret detection, or historical data cleanup.** Do not store actual credentials or private conversations.
+
+## Checkpoint 11B: Read-only storage exposure audit
+- Added diagnostics for unsafe/missing/symlink file paths and POSIX permission bits.
+- Windows ACL security is intentionally reported as **unknown/uninspected**.
+- Audits always return `ready_for_sensitive_data=false` because encryption and authentication are still absent.
+- Eight tests added; CI verification pending. Audit does not modify files or grant authorization.
