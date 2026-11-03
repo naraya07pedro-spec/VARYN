@@ -28,6 +28,12 @@
 - Seven synthetic tests added. [GitHub Actions #41601099846](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41601099846) passed 21 total unit tests plus CLI smoke checks on Windows and Ubuntu.
 - Provenance is **recorded, not independently verified**, and no user identity/authentication exists.
 
+## Fifth checkpoint: bounded context retrieval
+- Context builder `varyn/context.py` creates a JSON package limited by serialized character count.
+- Retrieves keyword-matched memory and latest decision revisions for a specified project and caller-supplied owner label.
+- Eight synthetic retrieval tests added. CI verification is pending.
+- This is **not semantic retrieval or LLM token counting**; no model connection or secure identity exists.
+
 ## Crucial limitations
 - `--owner` is a user-provided label, **not authentication**. Any person with database access can impersonate another label. This is a logical scoping prototype, not security isolation.
 - No encryption at rest, verified provenance, semantic search, token budgeting, semantic conflict resolution, provider login, model calls, agents, or user interface yet.
