@@ -146,7 +146,10 @@ class AgentRecoveryTests(unittest.TestCase):
         with AgentRecoveryJournal(self.path) as j:
             p = DesktopApprovalController(journal=j).propose(
                 "stage_note", {"text": "synthetic example"})
-        with sqlite3.connect(self.path) as raw:
+        from contextlib import closing
+        # sqlite3.Connection.__exit__ commits/rolls back but DOES NOT close.
+        # Windows locks the DB until close, breaking temp-dir cleanup.
+        with closing(sqlite3.connect(self.path)) as raw:
             columns = [x[1] for x in raw.execute("PRAGMA table_info(agent_events)")]
         self.assertEqual(columns, [
             "proposal_id", "tool", "digest", "state", "changed_at"
