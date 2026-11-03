@@ -203,3 +203,7 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 - Added OpenAI, Anthropic and Gemini request builders for the exact two synthetic local tools, plus an opt-in client using existing bounded HTTPS transports, per-call confirmation, env-based credentials and a session quota.
 - Response envelopes are staged for existing proposal review, **never automatically dispatched**. Fifteen synthetic transport tests added; [GitHub Actions #41683887775](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41683887775) passed **308 tests per OS** on Windows and Ubuntu.
 - Native tools are **not enabled in the desktop chat UI** and no real API compatibility or paid call has been tested. No encrypted private-task persistence or real-world tools.
+
+## Checkpoint 15C: Desktop native proposal review
+- Desktop has a separate native-tool proposal action. A worker parses the selected provider response; only the UI thread may stage the current proposal after request identity verification.
+- No memory export, automatic tool execution or model-issued approval. Ten new headless tests. CI pending; vendor accounts and GUI interaction untested.
