@@ -128,3 +128,9 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 - A Windows sealed-memory session may now create a NEW DPAPI-encrypted snapshot immediately after each API-level memory or decision write using `checkpoint_dir`. The last successful snapshot is exposed as `last_checkpoint`.
 - A failed checkpoint does not overwrite the previous snapshot; it raises and leaves the in-RAM write pending/dirty. Six new Windows-only tests. [GitHub Actions #41630117495](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41630117495) passed 135 discovered tests per OS; native checkpoint tests passed on Windows and were skipped on Ubuntu by design.
 - Risk: full-image encryption on every write increases disk use, CPU and I/O; no retention policy, actual power-loss qualification or process-crash guarantee. Default behavior remains manual save.
+
+## Checkpoint 11E: Safe checkpoint inventory and count cap
+- Read-only inventory and no-delete retention advice; exact managed filenames only, no user data disclosed.
+- Opt-in Windows auto-checkpoint sessions refuse new public writes before mutation when the configured snapshot count cap is reached (default 100).
+- 11 additional regression tests (9 portable, 2 Windows-native); CI pending.
+- Not storage cleanup, validated recovery, disk-space guarantee or production data-security assurance.
