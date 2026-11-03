@@ -138,5 +138,5 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 ## Checkpoint 12A: Model provider foundation
 - Added `FakeProvider` (fully offline) and an opt-in OpenAI Responses API adapter with bounded payloads and generic errors.
 - Network disabled by default; local context upload requires separate explicit opt-in. Context remains untrusted user-role data.
-- 13 new regression/integration tests with synthetic fixtures; CI pending. No actual API call or cost was incurred.
+- 13 new regression/integration tests with synthetic fixtures; [GitHub Actions #41633484562](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41633484562) passed 159 discovered tests per OS (Windows and Ubuntu), including prior benchmark/CLI checks. No actual API call or cost was incurred.
 - Existing provider support is not a production credential vault, prompt-injection guarantee or live API compatibility certification.
