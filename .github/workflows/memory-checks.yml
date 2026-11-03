@@ -1,0 +1,25 @@
+name: Memory prototype checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Unit tests (standard library only)
+        run: python -m unittest discover -s tests -v
+      - name: Check memory CLI
+        run: |
+          python -m varyn.memory --db smoke.sqlite3 --owner demo add --project VARYN --content "checkpoint verified"
+          python -m varyn.memory --db smoke.sqlite3 --owner demo search --query "checkpoint"
