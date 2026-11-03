@@ -333,3 +333,13 @@ python -m varyn.desktop
 The lightweight Tkinter window shows a transcript, text input, a provider/model dropdown, two permission switches and request/token-reservation counters. **Only FakeProvider responds in this stage.** The OpenAI, Anthropic and Gemini options are *UI previews* and are hard-blocked, including when the network permission checkbox is selected. This is not a paid chatbot or a live API connection yet.
 
 No history is saved by the desktop; everything in the session is held in RAM and lost when the window closes. The app never loads local memory automatically and does not request API keys. Use synthetic data only. `python -m unittest discover -s tests -v` runs controller tests without needing a display. Running Tkinter in a graphical Windows session and measuring actual UI responsiveness/RAM on the target laptop are still outstanding checks. No installer, account login, agent execution or real provider chat has been built.
+
+### Checkpoint 13B: Optional live desktop chat
+
+Run `python -m varyn.desktop` on a Windows graphical desktop. Safe startup stays in FakeProvider mode with networking unchecked.
+
+For an explicit live request, choose OpenAI, Anthropic or Gemini, provide a supported model ID, enable network consent and approve the separate confirmation dialog for **each** request. API keys are read from the respective `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` or `GEMINI_API_KEY` environment variable. No keys are entered into the desktop.
+
+Tkinter stays on the main thread; a background worker performs the selected provider request and the window polls a result queue. No local memory/context is read or attached automatically. Calls run through in-process quota, **not** a money spending cap. Closing the window cannot cancel an already dispatched remote request, which may still be billed.
+
+**Not production-ready:** live endpoints and keys have not been verified against real accounts, GUI rendering and laptop RAM are untested, transcript remains volatile, and storage security is incomplete. Use only synthetic prompts; never paste client secrets.
