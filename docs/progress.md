@@ -160,5 +160,5 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 ## Checkpoint 13B: Opt-in live provider chat with nonblocking UI
 - Desktop controller supports real-provider adapters when explicitly opted in, while the default controller remains offline. Network consent and a separate per-request confirmation are required before live calls; memory context still has its own gate.
 - Tkinter requests run in a worker thread, results are delivered to UI via a queue and Tk-only polling, and the Send button is disabled during an in-flight request.
-- Nine headless live-flow tests added, CI pending. Real provider API access, display interaction and laptop RAM remain unverified.
+- Nine headless live-flow tests added. [GitHub Actions #41640350647](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41640350647) passed 206 tests per OS on Windows and Ubuntu, plus desktop compilation and Windows Tkinter import checks. Real provider API access, display interaction and laptop RAM remain unverified.
 - Closing UI cannot cancel an already dispatched remote API call and may not prevent billing. Quota is not a monetary guarantee.
