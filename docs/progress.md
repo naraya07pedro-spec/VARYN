@@ -132,5 +132,5 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 ## Checkpoint 11E: Safe checkpoint inventory and count cap
 - Read-only inventory and no-delete retention advice; exact managed filenames only, no user data disclosed.
 - Opt-in Windows auto-checkpoint sessions refuse new public writes before mutation when the configured snapshot count cap is reached (default 100).
-- 11 additional regression tests (9 portable, 2 Windows-native); CI pending.
+- 11 additional regression tests (9 portable, 2 Windows-native); [GitHub Actions #41632086742](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41632086742) passed 146 discovered tests per OS with benchmark and CLI checks. Windows-specific guard tests passed natively.
 - Not storage cleanup, validated recovery, disk-space guarantee or production data-security assurance.
