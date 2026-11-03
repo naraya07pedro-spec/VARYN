@@ -393,3 +393,9 @@ print(agent.snapshot())
 ```
 
 This prototype **does not accept automatic AI-generated tool calls**, execute shell commands, access local files or network, install arbitrary plugins, or write persistent data. Only a fixed read-only status tool and an in-memory synthetic note tool exist. Its `approve()` call is not authenticated and is not yet wired to a real desktop confirmation, so the current behavior is **not a production-grade human-approval boundary**. Never use real client data, credentials, or destructive tasks in this agent.
+
+### Checkpoint 14B: Desktop demonstration of agent approval
+
+In the Tkinter desktop, click **Demo agent approval**. A dialog shows the exact tool, proposal ID, SHA-256 digest, action summary and risk before asking for a Yes/No decision. Yes approves and executes the fixed synthetic `stage_note` action in RAM, and No rejects it without executing. Closing the UI rejects any pending previews. No model output is used to create this action, and there is no shell, filesystem or internet tool.
+
+The dialog is a **demonstration of the human-decision flow**, not real user authentication or protection from a malicious Python caller. The underlying `BoundedAgent.approve()` method is still callable in code. Neither approval nor the agent's synthetic notes survive restart. Do not rely on this for privileged actions, real secrets or customer data.
