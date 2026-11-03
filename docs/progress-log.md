@@ -50,3 +50,11 @@ Entries describe committed changes and verification separately. This is a histor
 - First GitHub run failed because a synthetic oversized test record had 20,008 characters, exceeding the existing 20,000-character `MemoryStore.add` validation. Production input validation behaved correctly.
 - Corrected the fixture to remain within the store limit; no validation restrictions were removed.
 - The next CI run passed on both operating systems.
+
+## 2026-11-03 — Checkpoint 06: Context quality and missing-evidence signals
+- **Implemented:** exact case/whitespace-normalized duplicate suppression for note records; identical latest decision evidence takes priority over duplicate notes. Distinct decision keys remain separate.
+- **Diagnostics:** `matched`, `no_match_in_sample`, or `matches_exceeded_budget`. These are retrieval outcomes, **not** proof that a fact is absent.
+- **Budget:** continues enforcing serialized JSON character limits, including diagnostic fields. No token counter is claimed.
+- **Tests added:** six synthetic regressions for duplicate notes, decision precedence, distinct decisions, no-match diagnostics, over-budget matching evidence, and diagnostic length.
+- **Verification:** Windows and Ubuntu CI pending at time of commit.
+- **Caveats:** deduplication is exact normalization only, not semantic similarity. Data scoping still uses untrusted caller owner labels, not authentication.
