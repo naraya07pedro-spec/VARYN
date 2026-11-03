@@ -95,3 +95,8 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 - Windows ACL security is intentionally reported as **unknown/uninspected**.
 - Audits always return `ready_for_sensitive_data=false` because encryption and authentication are still absent.
 - Eight tests added; [GitHub Actions #41616816340](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41616816340) passed **76 tests per OS** on Ubuntu and Windows, plus benchmark/CLI checks. Audit does not modify files or grant authorization.
+
+## Checkpoint 11C-1: Windows DPAPI sealed-file experiment
+- Added separate Windows-current-user DPAPI envelope for standalone byte blobs, with no-overwrite encrypted file publication.
+- Eight synthetic tests added, including Windows-specific native roundtrip and tamper checks; CI pending.
+- **This does not encrypt the SQLite memory database or its backups and does not implement application authentication.** Windows account binding affects recovery/portability and does not prevent access from an already-compromised Windows session.
