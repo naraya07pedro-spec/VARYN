@@ -62,3 +62,9 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 - Six labeled synthetic scenarios with explicit successes, misses and denominators.
 - Expected baseline: 2/5 positive hits, 1/1 negative correctly rejected; benchmark intentionally exposes three known misses.
 - Eight tests added. [CI #41607148369](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41607148369) passed on Windows and Ubuntu. Not representative of real user queries.
+
+## Checkpoint 08: bilingual lexical pilot (3 November 2026)
+- Added a narrow bilingual glossary, preserving all prior owner/project scoping and character budgeting.
+- On the existing synthetic benchmark the expected positive hit rate is 3/5, compared with 2/5 before the change. CI verification pending.
+- Added six independent glossary tests, including false-positive and isolation checks.
+- This is not general multilingual semantic search and does not establish real-world quality.
