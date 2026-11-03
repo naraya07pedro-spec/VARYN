@@ -8,6 +8,7 @@ import argparse
 import json
 import sqlite3
 from datetime import datetime, timezone
+from varyn.safety import assert_no_obvious_secrets
 
 class MemoryStore:
     def __init__(self, path, owner_id):
@@ -33,6 +34,7 @@ class MemoryStore:
         project, content = project.strip(), content.strip()
         if not (1 <= len(project) <= 120 and 1 <= len(content) <= 20000):
             raise ValueError("Invalid project or content length")
+        assert_no_obvious_secrets(content)
         with self.db:
             cursor = self.db.execute(
                 "INSERT INTO memories(owner_id,project,content,created_at) VALUES(?,?,?,?)",
