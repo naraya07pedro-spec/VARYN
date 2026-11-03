@@ -149,3 +149,22 @@ with SealedMemorySession("first-snapshot.varyn") as memory:
 Unlike the legacy SQLite-on-disk module, this **separate opt-in prototype** operates on an in-memory SQLite database with its FTS index and encrypts the *whole serialized image* with Windows DPAPI before publishing a new file. It never silently migrates or overwrites legacy data.
 
 **Important limitations:** saves are manual, DPAPI sealed plaintext is limited to 1 MiB, and a lost Windows profile or device may make files unrecoverable. Windows DPAPI does not protect plaintext in memory from the logged-in Windows user or compromised processes. No app login, cross-device key recovery, multi-user access, normal context/decision integration or protected export exists. Do not store real credentials or private chat records yet.
+
+### Checkpoint 11C-3: Encrypted decision history and context
+
+Windows-only opt-in example, synthetic data:
+
+```python
+from varyn.sealed_memory import SealedMemorySession
+
+with SealedMemorySession() as varyn:
+    varyn.add("VARYN", "storage index kept in memory")
+    varyn.put_decision("VARYN", "location", "storage on drive D", "fixture:example")
+    print(varyn.context("VARYN", "storage", max_chars=4000))
+    varyn.save_new("snapshot-01.varyn")
+
+with SealedMemorySession("snapshot-01.varyn") as varyn:
+    print(varyn.current_decision("VARYN", "location"))
+```
+
+The session uses one in-memory SQLite database for memory, FTS5 search and revisioned decisions. The *entire image* is serialized and encrypted by Windows DPAPI for explicit new-file snapshots; no legacy plaintext DB is migrated. Context values remain **untrusted data** and source labels are not independently verified. Snapshots require the original Windows DPAPI user context, and a lost user profile may make them unrecoverable. This does not implement application authentication, automatic save, key recovery, or private-data readiness.
