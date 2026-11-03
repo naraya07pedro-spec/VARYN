@@ -17,6 +17,7 @@ from varyn.desktop_approval import DesktopApprovalController
 from varyn.agent_recovery import AgentRecoveryJournal
 from varyn.agent_runtime import AgentRejected, AgentLimitReached
 from varyn.tool_protocol import stage_tool_intent
+from varyn.native_tool_requests import NativeToolRequestClient
 
 
 class VarynDesktop(tk.Tk):
@@ -36,6 +37,7 @@ class VarynDesktop(tk.Tk):
         self._lifecycle = DesktopRequestState()
         self._agent_journal = agent_journal
         self._approval = DesktopApprovalController(journal=agent_journal)
+        self._native_client = NativeToolRequestClient(allow_network=True)
         self._busy = False
         self._closing = False
         self._build()
@@ -122,6 +124,10 @@ class VarynDesktop(tk.Tk):
             controls, text="Demo agent approval", command=self._agent_demo,
         ).pack(side="left", padx=(8, 0))
         ttk.Button(
+            outer, text="Request native model tool proposal (live, may bill)",
+            command=self._request_native_tool,
+        ).pack(anchor="w", pady=(0, 8))
+        ttk.Button(
             outer, text="Review structured tool intent (untrusted JSON)",
             command=self._review_tool_intent,
         ).pack(anchor="w", pady=(0, 8))
@@ -151,6 +157,8 @@ class VarynDesktop(tk.Tk):
             f" | Requests {state['requests_used']}/{state['requests_limit']}"
             f" | Reserved output {state['output_tokens_reserved']}/"
             f"{state['output_tokens_limit']} tokens"
+            f" | Native requests {self._native_client.budget.snapshot()['requests_reserved']}/"
+            f"{self._native_client.budget.snapshot()['max_requests']}"
             f"{' | REQUEST IN FLIGHT' if self._busy else ''}"
         )
 
@@ -199,6 +207,53 @@ class VarynDesktop(tk.Tk):
         worker.start()
         self.after(75, self._poll_result)
 
+    def _request_native_tool(self):
+        if self._busy:
+            return
+        provider = self.provider.get()
+        model = self.model.get()
+        question = self.prompt.get("1.0", "end-1c")
+        if provider == "fake":
+            self._append("AGENT", "Choose an external provider for native tool proposals")
+            return
+        if not self.consent_network.get():
+            self._append("AGENT", "Enable the network permission checkbox first")
+            return
+        if not question.strip() or not model.strip():
+            self._append("AGENT", "A message and an exact model ID are required")
+            return
+        if not messagebox.askyesno(
+            "Confirm native tool request",
+            f"Send ONLY this typed message to {provider} using model {model}?\n\n"
+            "This may incur API charges. No saved context is included. "
+            "A returned tool call will ONLY become a review proposal; "
+            "no tool will execute automatically. Proceed?", parent=self,
+        ):
+            return
+        request_id = self._lifecycle.begin()
+        self._busy = True
+        self.send_button.configure(state="disabled")
+        self._refresh_status()
+        threading.Thread(
+            target=self._native_tool_worker,
+            args=(request_id, question, provider, model), daemon=True,
+        ).start()
+        self.after(75, self._poll_result)
+
+    def _native_tool_worker(self, request_id, question, provider, model):
+        # Parse only in worker; staging and approval belong on the Tk main thread.
+        try:
+            intent = self._native_client.request_intent(
+                provider, question, model=model, confirm_external_request=True,
+            )
+            self._results.put((request_id, "native_intent", "", intent))
+        except (ValueError, PermissionError, ProviderError, AgentRejected,
+                AgentLimitReached) as error:
+            self._results.put((request_id, "error", "", str(error)))
+        except Exception:
+            self._results.put((request_id, "error", "",
+                               "Native request failed; no automatic retry"))
+
     def _send_worker(self, request_id, question, provider, model, live):
         # No Tk widget access from the worker thread.
         try:
@@ -225,7 +280,14 @@ class VarynDesktop(tk.Tk):
             if self._lifecycle.busy:
                 self.after(75, self._poll_result)
             return
-        if kind == "ok":
+        if kind == "native_intent":
+            # Only now, after the stale/close guard, create a pending proposal.
+            try:
+                preview = self._approval.propose(message.tool, message.arguments)
+                self._confirm_agent_proposal(preview)
+            except (AgentRejected, AgentLimitReached, ValueError, RuntimeError):
+                self._append("AGENT", "Native proposal could not be staged or reviewed")
+        elif kind == "ok":
             self._append("YOU", question.strip())
             self._append("VARYN", message)
             self.prompt.delete("1.0", "end")
