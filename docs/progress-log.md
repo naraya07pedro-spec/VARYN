@@ -89,6 +89,22 @@ Entries describe committed changes and verification separately. This is a histor
 - **Implemented:** `varyn/performance.py` builds a bounded synthetic dataset, times first-time FTS5 index creation, then runs repeated retrieval operations.
 - **Measurements:** index build milliseconds; min/median/max query milliseconds; SQLite main-file byte sizes; Python `tracemalloc` peak bytes for index build and queries. Also asserts an old indexed note is retrievable.
 - **CI:** runs the same synthetic benchmark on Windows and Ubuntu using 300 records and five retrieval repetitions per OS. Four small instrumentation regression tests added. No arbitrary speed threshold in the build gate.
-- **Verification:** CI pending at this checkpoint's initial commit. Real numbers will be recorded after jobs complete.
+- **Verification:** [GitHub Actions #41614154173](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41614154173) passed 62 unit tests (58 prior + 4 new), the synthetic benchmark, and CLI smoke checks on Ubuntu and Windows at code commit `c532fb7942dedf7f7aefa188e069eedd9dd793a1`.
 - **Critical limitation:** `tracemalloc` does **not** measure total process RSS, SQLite's native allocation, other process activity, or Windows OS page cache. Synthetic CI runners do not represent the owner's own computer or available disk space. Disk numbers are for the SQLite main file only.
 - **Safety:** does not modify or inspect the user's local files, does not download models, and consumes no paid API. Timing is informational, not a production performance guarantee.
+
+### Checkpoint 10 CI performance observations (2026-11-03)
+Dataset: 300 synthetic records, five retrieval repetitions; GitHub-hosted VMs, not the owner's laptop.
+
+| Measure | Ubuntu hosted | Windows hosted |
+| --- | ---: | ---: |
+| First FTS5 index build, ms | 4.334 | 94.605 |
+| Minimum query time, ms | 4.384 | 6.715 |
+| Median query time, ms | 4.492 | 7.184 |
+| Maximum query time, ms | 6.896 | 38.749 |
+| Main SQLite file bytes before index | 86,016 | 86,016 |
+| Main SQLite file bytes after index | 114,688 | 114,688 |
+| Python-traced peak bytes during index build | 1,584 | 1,680 |
+| Python-traced peak bytes during queries | 25,699 | 26,476 |
+
+**Interpretation guardrails:** this sample does not measure process RSS, native SQLite memory, sustained throughput, CPU percentages, or warm/cold filesystem-cache effects. One run per OS with five repeats is not a statistically robust performance comparison. Runner CPU, SQLite versions, storage, and load differ. Not a promise of owner laptop speed or low RAM consumption.
