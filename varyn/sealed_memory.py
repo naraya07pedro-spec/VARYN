@@ -14,6 +14,7 @@ from varyn.index import ensure_memory_index
 from varyn.decisions import DecisionJournal
 from varyn.context import build_context
 from varyn.memory import MemoryStore
+from varyn.recovery import read_recovery, write_recovery
 
 _OWNER = "local-windows-session"
 
@@ -26,16 +27,21 @@ def _require_windows():
 class SealedMemorySession:
     """Single-user, explicit-save memory prototype, without plaintext disk DB."""
 
-    def __init__(self, source=None):
+    def __init__(self, source=None, *, recovery_source=None, recovery_passphrase=None):
         _require_windows()
+        if source is not None and recovery_source is not None:
+            raise ValueError("Choose DPAPI source or recovery source, not both")
+        if (recovery_source is None) != (recovery_passphrase is None):
+            raise ValueError("Recovery source and passphrase must be supplied together")
         if not hasattr(sqlite3.Connection, "serialize") or not hasattr(sqlite3.Connection, "deserialize"):
             raise RuntimeError("This Python SQLite build lacks serialize/deserialize")
         self.store = MemoryStore(":memory:", _OWNER)
         self._closed = False
         self.journal = None
         try:
-            if source is not None:
-                image = read_sealed(source)
+            if source is not None or recovery_source is not None:
+                image = (read_sealed(source) if source is not None else
+                         read_recovery(recovery_source, recovery_passphrase))
                 if not image.startswith(b"SQLite format 3\x00"):
                     raise SealedDataError("Invalid encrypted SQLite image")
                 try:
@@ -133,6 +139,13 @@ class SealedMemorySession:
         # write_sealed enforces the DPAPI 1-MiB plaintext size limit and never
         # publishes a plaintext intermediate database file.
         return write_sealed(destination, image)
+
+    def export_recovery(self, destination, passphrase):
+        """Portable password-encrypted NEW snapshot. Never emit plaintext SQLite."""
+        self._active()
+        self.store.db.commit()
+        image = self.store.db.serialize()
+        return write_recovery(destination, image, passphrase)
 
     def close(self):
         if not self._closed:
