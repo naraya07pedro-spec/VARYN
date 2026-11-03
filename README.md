@@ -17,6 +17,16 @@ python -m varyn.memory --db demo.sqlite3 --owner demo search --query "decision"
 python -m varyn.memory --db demo.sqlite3 --owner demo delete --id 1
 ```
 
+### Local memory backup (unencrypted)
+
+Create a non-overwriting, internally consistent SQLite snapshot:
+
+```powershell
+python -m varyn.backup --db "D:\\VARYN\\data\\memory.sqlite3" --output "D:\\VARYN\\backups\\memory-2026-11-03.sqlite3"
+```
+
+Both the source database and destination folder must already exist. This backup contains the same sensitive content as the database and **is not encrypted**; do not publish it or sync it to public storage. A backup on the same physical SSD protects against some software accidents, **not** SSD failure. Restore and Windows-specific behavior still need acceptance tests.
+
 **Safety:** The `--owner` value is NOT authentication. Anyone with database access can read records or impersonate another owner. Do not store real secrets, personal conversations, or customer information until identity verification, authorization and data protection have been implemented and tested.
 
 See [development evidence and limitations](docs/progress.md). Automated tests are provided and GitHub Actions is configured; do not assume they pass until CI reports results.
