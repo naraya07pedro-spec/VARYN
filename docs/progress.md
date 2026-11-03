@@ -98,5 +98,5 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 
 ## Checkpoint 11C-1: Windows DPAPI sealed-file experiment
 - Added separate Windows-current-user DPAPI envelope for standalone byte blobs, with no-overwrite encrypted file publication.
-- Eight synthetic tests added, including Windows-specific native roundtrip and tamper checks; CI pending.
+- Eight synthetic tests added. [GitHub Actions #41621003228](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41621003228) succeeded on Windows and Ubuntu; native DPAPI tests passed on Windows and were skipped on Ubuntu as intended. 84 tests discovered per OS.
 - **This does not encrypt the SQLite memory database or its backups and does not implement application authentication.** Windows account binding affects recovery/portability and does not prevent access from an already-compromised Windows session.
