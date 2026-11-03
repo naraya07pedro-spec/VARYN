@@ -188,3 +188,8 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 - Added `varyn.tool_protocol` exact `varyn.tool_intent.v1` JSON schema parser with duplicate-key rejection and strict allowed tool/argument validation.
 - Added Tkinter **Review structured tool intent** button: it reads untrusted JSON from the text input and stages a review via the 14B approval dialog; it never executes tool calls automatically.
 - Fourteen offline regression tests; [GitHub Actions #41678798880](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41678798880) passed **264 tests per OS** on Windows and Ubuntu. No native live provider tool-calling, real actions, authenticated approvals or persistent agents.
+
+## Checkpoint 14D: Durable metadata-only recovery
+- Optional SQLite journal records proposal identity, digest, tool, status and timestamp. Crash recovery marks pending proposals for new review and uncertain dispatched actions for reconciliation; **zero automatic replay**.
+- Integrated into the desktop approval bridge, and the Tk app accepts `--agent-journal PATH`. Default is still RAM-only unless opted in.
+- 14 synthetic cross-platform tests added; CI pending. No persisted note contents, approvals, executable arguments, encrypted journal or automatic task resumption.
