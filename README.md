@@ -103,3 +103,9 @@ python -m varyn.performance --rows 300 --repeats 5
 ```
 
 The tool reports first-index-build timing, min/median/max context query timing, SQLite **main database file** byte counts, and Python-tracked peak allocations via `tracemalloc`. It is intentionally informational: no arbitrary speed promise, third-party package, model download, or API bill. **Tracemalloc excludes native SQLite allocations and process RSS**, and GitHub's runner is not a substitute for an acceptance test on the owner's PC. First use of FTS5 can still temporarily require meaningful CPU/disk resources.
+
+### Checkpoint 11A: Heuristic credential write guard
+
+VARYN refuses some **recognizable** secrets (such as common API-key/token syntax and private-key headers) before a new memory or decision revision is saved. Errors never repeat the rejected input. This uses only the Python standard library.
+
+**Important:** pattern matching is fallible. It does not protect an existing database, encrypt data, prevent reading another owner's records, or detect every credential. Backup files are still unencrypted. Real sensitive conversations, API keys and client data must **not** be stored in this prototype. This is an incremental guard, **not proof that VARYN is secure**.
