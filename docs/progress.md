@@ -115,5 +115,5 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 ## Checkpoint 11D-1: Password-encrypted portable recovery (prototype)
 - Added optional `cryptography` dependency for vetted scrypt + AES-256-GCM portable SQLite image recovery.
 - Windows encrypted session can export a separate NEW recovery file and reopen it into RAM using a passphrase independent of its old DPAPI account.
-- 13 synthetic regression methods added. CI verification pending.
+- 13 synthetic regression methods added. [GitHub Actions #41626491782](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41626491782) passed 117 discovered tests on Windows and Ubuntu; Windows-native integration passed on Windows.
 - Backup placement, passphrase strength/custody, device-migration acceptance, app authentication and secure data migration remain unverified. Still not ready for sensitive data.
