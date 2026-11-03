@@ -177,4 +177,4 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 ## Checkpoint 14A: Bounded synthetic agent runtime
 - Fixed in-process tool registry: `inspect_status` (read only) and `stage_note` (mutates synthetic RAM notes). Untrusted proposals cannot invoke shell/files/browser/network or install tools.
 - One-time approval token required for mutation; steps, pending proposals and note count capped; audit omits note contents and token.
-- 14 offline regression tests; CI pending. Token issuer is callable from Python and **not authenticated** as a human. No model-to-agent execution or GUI approvals yet.
+- 14 offline regression tests; [GitHub Actions #41674800510](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41674800510) passed **239 tests per OS** on Windows and Ubuntu. Token issuer is callable from Python and **not authenticated** as a human. No model-to-agent execution or GUI approvals yet.
