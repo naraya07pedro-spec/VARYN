@@ -19,9 +19,10 @@ def _required(value, name, limit):
 
 
 class DecisionJournal:
-    def __init__(self, path, owner_id):
+    def __init__(self, path, owner_id, *, connection=None):
         self.owner_id = _required(owner_id, "owner_id", 128)
-        self.db = sqlite3.connect(path, timeout=10)
+        self._owns_connection = connection is None
+        self.db = sqlite3.connect(path, timeout=10) if connection is None else connection
         self.db.row_factory = sqlite3.Row
         self.db.execute("""CREATE TABLE IF NOT EXISTS decision_revisions (
             id INTEGER PRIMARY KEY,
@@ -39,7 +40,8 @@ class DecisionJournal:
         self.db.commit()
 
     def close(self):
-        self.db.close()
+        if self._owns_connection:
+            self.db.close()
 
     def put(self, project, key, content, source_ref, expected_revision=0):
         """Append a revision only if the caller saw the current revision.
