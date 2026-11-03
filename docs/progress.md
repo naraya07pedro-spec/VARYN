@@ -51,3 +51,9 @@ python -m varyn.memory --db demo.sqlite3 --owner demo search --query "verified"
 
 ## Next gate
 Verify the restore tests in CI, then test real Windows filesystem behavior and add provenance/versioned context using synthetic data. Provider access and multi-agent work remain deferred.
+
+## Checkpoint 06: context quality (3 November 2026)
+- Added suppression of whitespace/case-equivalent repeated notes without combining distinct decision keys.
+- Added explicit retrieval status to distinguish no lexical match from budget-excluded evidence.
+- Added six targeted synthetic tests; CI verification pending.
+- Did not add semantic matching, true citations, authentication, encryption, provider calls, or model token budgets.
