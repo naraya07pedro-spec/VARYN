@@ -17,7 +17,7 @@ _PATTERNS = (
     re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
     re.compile(r"\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\b"),
     re.compile(r"\bBearer\s+[A-Za-z0-9._~+/-]{16,}", re.I),
-    re.compile(r"\b(?:password|passwd|api[_-]?key|access[_-]?token|secret[_-]?key)\s*[:=]\s*[\"']?[^\s,\"']{8,}", re.I),
+    re.compile(r"\b(?:password|passwd|api[_-]?key|access[_-]?token|secret[_-]?key)\s*[:=]\s*\S{8,}", re.I),
 )
 
 
