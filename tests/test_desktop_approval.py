@@ -12,7 +12,7 @@ class DesktopApprovalTests(unittest.TestCase):
         p = desk.propose("stage_note", {"text": "synthetic fixture"})
         self.assertTrue(p.mutates)
         self.assertIn("synthetic fixture", p.summary)
-        self.assertIn("RAM", p.risk)
+        self.assertIn("in-memory", p.risk)
         outcome = desk.decide(p.proposal_id, p.digest, approved=True)
         self.assertEqual(outcome["status"], "completed")
         self.assertEqual(desk.status()["stored_synthetic_notes"], 1)
