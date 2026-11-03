@@ -16,6 +16,7 @@ from varyn.index import ensure_memory_index
 from varyn.decisions import DecisionJournal
 from varyn.context import build_context
 from varyn.memory import MemoryStore
+from varyn.checkpoint_lifecycle import require_checkpoint_capacity
 
 _OWNER = "local-windows-session"
 
@@ -28,7 +29,7 @@ def _require_windows():
 class SealedMemorySession:
     """Single-user, explicit-save memory prototype, without plaintext disk DB."""
 
-    def __init__(self, source=None, *, recovery_source=None, recovery_passphrase=None, checkpoint_dir=None):
+    def __init__(self, source=None, *, recovery_source=None, recovery_passphrase=None, checkpoint_dir=None, max_checkpoints=100):
         _require_windows()
         if source is not None and recovery_source is not None:
             raise ValueError("Choose DPAPI source or recovery source, not both")
@@ -36,6 +37,8 @@ class SealedMemorySession:
             raise ValueError("Recovery source and passphrase must be supplied together")
         if not hasattr(sqlite3.Connection, "serialize") or not hasattr(sqlite3.Connection, "deserialize"):
             raise RuntimeError("This Python SQLite build lacks serialize/deserialize")
+        if type(max_checkpoints) is not int or not 2 <= max_checkpoints <= 10000:
+            raise ValueError("max_checkpoints must be an integer from 2 to 10000")
         directory = None
         if checkpoint_dir is not None:
             directory = Path(checkpoint_dir)
@@ -46,6 +49,7 @@ class SealedMemorySession:
         self._change_count = 0
         self._saved_change_count = 0
         self._checkpoint_dir = directory
+        self._max_checkpoints = max_checkpoints
         self._last_checkpoint = None
         self.journal = None
         try:
@@ -116,6 +120,8 @@ class SealedMemorySession:
 
     def add(self, project, content):
         self._active()
+        if self._checkpoint_dir is not None:
+            require_checkpoint_capacity(self._checkpoint_dir, max_checkpoints=self._max_checkpoints)
         new_id = self.store.add(project, content)
         self._change_count += 1
         self._checkpoint_after_write()
@@ -128,6 +134,8 @@ class SealedMemorySession:
     def put_decision(self, project, key, content, source_ref, expected_revision=0):
         """Append a revision to the SAME in-memory encrypted snapshot."""
         self._active()
+        if self._checkpoint_dir is not None:
+            require_checkpoint_capacity(self._checkpoint_dir, max_checkpoints=self._max_checkpoints)
         revision = self.journal.put(
             project, key, content, source_ref, expected_revision
         )
