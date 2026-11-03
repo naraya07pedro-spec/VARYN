@@ -168,3 +168,32 @@ with SealedMemorySession("snapshot-01.varyn") as varyn:
 ```
 
 The session uses one in-memory SQLite database for memory, FTS5 search and revisioned decisions. The *entire image* is serialized and encrypted by Windows DPAPI for explicit new-file snapshots; no legacy plaintext DB is migrated. Context values remain **untrusted data** and source labels are not independently verified. Snapshots require the original Windows DPAPI user context, and a lost user profile may make them unrecoverable. This does not implement application authentication, automatic save, key recovery, or private-data readiness.
+
+### Checkpoint 11D-1: Portable recovery (optional audited dependency)
+
+Install optional dependency from repository root:
+
+```powershell
+python -m pip install -r requirements-recovery.txt
+```
+
+Create two **separate**, encrypted files using synthetic test data on Windows:
+
+```python
+from varyn.sealed_memory import SealedMemorySession
+
+phrase = "a long unique sample recovery phrase 2026"  # DEMO ONLY
+with SealedMemorySession() as session:
+    session.add("VARYN", "storage synthetic history")
+    session.put_decision("VARYN", "location", "storage on drive D", "fixture:demo")
+    session.save_new("windows-only.varyn")  # DPAPI current-user snapshot
+    session.export_recovery("portable.varyn-recovery", phrase)  # independent recovery file
+
+with SealedMemorySession(
+    recovery_source="portable.varyn-recovery", recovery_passphrase=phrase
+) as recovered:
+    print(recovered.context("VARYN", "storage"))
+    recovered.save_new("restored-windows.varyn")  # NEW DPAPI-protected file
+```
+
+Portable exports use scrypt and AES-256-GCM via the audited `cryptography` library, and can be decrypted on another supported OS with the correct passphrase. Never embed a **real** recovery phrase in source, command-line arguments, terminal history or logs; use a trusted passphrase manager and keep an off-device copy. Losing the phrase means the portable file cannot be recovered. Attackers with the encrypted file can attempt offline password guessing, so the minimum length requirement is not enough: use a high-entropy phrase. The KDF uses roughly 32 MiB of working memory. **This is not automatic backup, production authentication, verified cross-device migration, or a replacement for the old unencrypted database.** Snapshot size remains 1 MiB. Only synthetic data.
