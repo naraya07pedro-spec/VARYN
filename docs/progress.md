@@ -166,5 +166,5 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 ## Checkpoint 13C: UI lifecycle hardening
 - Added request-generation lifecycle protection for stale replies and separate RAM-history invalidation upon clear/discard/close.
 - Added user-visible "Discard pending reply" and close-with-request warnings. These **do not cancel the external request or prevent its billing**.
-- Added bounded offline desktop Python allocation probe; CI pending. Tests cover slow provider completion and stale response exclusion.
+- Added bounded offline desktop Python allocation probe; [GitHub Actions #41668489358](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41668489358) passed **215 discovered tests per OS** with lifecycle tests and probe. Probe does not cover full process RAM or GUI rendering.
 - Native GUI acceptance and real Windows laptop RAM measurements remain open.
