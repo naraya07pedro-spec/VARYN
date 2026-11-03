@@ -144,5 +144,5 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 ## Checkpoint 12B: Multi-provider routing (mock-tested)
 - Added explicit Anthropic Messages and Gemini generateContent adapters plus a fail-closed router for fake, OpenAI, Anthropic and Gemini.
 - Network remains disabled by default; a second opt-in is mandatory before retrieved local context is sent to an external model. No retry/fallback to alternate providers.
-- Added 14 fully offline regression cases; Windows/Ubuntu CI pending. No live provider inference or API charge.
+- Added 14 fully offline regression cases; [GitHub Actions #41634252271](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41634252271) passed 173 discovered tests per OS plus existing benchmark/CLI checks. No live provider inference or API charge.
 - Model names remain caller-provided and actual provider availability/eligibility are not verified.
