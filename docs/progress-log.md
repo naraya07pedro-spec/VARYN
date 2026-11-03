@@ -116,3 +116,11 @@ Dataset: 300 synthetic records, five retrieval repetitions; GitHub-hosted VMs, n
 - **Tests added:** six synthetic safety tests for detection, zero-write behavior, decision-source checks, ordinary content, deliberate false negative, and invalid types.
 - **Verification:** [GitHub Actions #41614839681](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41614839681) passed **68 unit tests** on each of Windows and Ubuntu (62 previous + 6 new), plus synthetic performance and CLI checks, at code commit `f7b5e82baee6ba09aacab164ff0542d860b7b1f7`. Subsequent changes only update documentation and PR description.
 - **Critical limitations:** heuristic checks can miss disguised or unknown secrets and can reject innocent text. Existing stored data is NOT scanned, erased, encrypted, or migrated. The database and backups remain plaintext, and caller-selected `owner_id` is NOT authentication. This is not a secure personal-data readiness gate.
+
+## 2026-11-03 — Checkpoint 11B: Read-only storage exposure audit
+- **Implemented:** `varyn/storage_audit.py` checks that a supplied path is an existing regular file, rejects symbolic-link paths, and inspects group/other POSIX file mode exposure.
+- **Windows guardrail:** portable Python stat bits do not prove Windows ACL security. The audit explicitly reports `windows_acl_not_inspected` rather than inventing a successful ACL check.
+- **Unconditional readiness gate:** `ready_for_sensitive_data=false` even when POSIX file mode is restricted. Encryption, real authentication, and a verified off-device backup policy remain absent.
+- **Privacy:** report lists diagnostic codes only and never includes the local filename or file contents. Audit does not open/modify SQLite data or change file permissions.
+- **Tests added:** eight synthetic regressions for existing/missing/non-file/symlink paths, privacy, POSIX permissions, and Windows ACL uncertainty. CI verification pending.
+- **Limitations:** checks are advisory; hardlinks, parent directory ACLs, Windows DACLs, symlink parent directories, and races are not fully assessed. Not safe for confidential data.
