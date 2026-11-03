@@ -61,4 +61,4 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 ## Checkpoint 07: retrieval evaluation
 - Six labeled synthetic scenarios with explicit successes, misses and denominators.
 - Expected baseline: 2/5 positive hits, 1/1 negative correctly rejected; benchmark intentionally exposes three known misses.
-- Eight tests added. CI pending. Not representative of real user queries.
+- Eight tests added. [CI #41607148369](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41607148369) passed on Windows and Ubuntu. Not representative of real user queries.
