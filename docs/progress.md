@@ -19,8 +19,8 @@
 - Added `varyn/restore.py`: validates the SQLite database and VARYN memory table before copying.
 - Restores to a **new destination only**; existing files are never overwritten, including concurrent creation.
 - Added 6 tests covering round-trip data, invalid source, corruption, conflicting destination, missing paths, and owner-label scoping.
-- Verification is pending for this checkpoint until the new GitHub Actions run completes.
-- Windows/filesystem-specific acceptance, true authentication, encryption, and off-device disaster recovery are **not** implemented.
+- Verification: [GitHub Actions #41597987846](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41597987846) passed 14 tests and CLI smoke on both Ubuntu and Windows at code commit `72871996734c18f4d1bfb2c448a7bede89a309a9`.
+- Owner-device acceptance, true authentication, encryption, and off-device disaster recovery are **not** implemented. Tests passed on a hosted Windows runner, not yet the owner's PC.
 
 ## Crucial limitations
 - `--owner` is a user-provided label, **not authentication**. Any person with database access can impersonate another label. This is a logical scoping prototype, not security isolation.
