@@ -111,3 +111,9 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 - Explicit DPAPI snapshot persists notes, decisions, history and FTS5 index together, with source labels still unverified.
 - Added 10 targeted tests, including use-after-close, owner/project scoping and immutable revisions. [GitHub Actions #41624859520](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41624859520) passed 104 discovered tests per OS, including Windows-native DPAPI integration tests (skipped on Ubuntu by design).
 - This does not migrate or secure the older plaintext database, provide identity authentication, or enable key recovery.
+
+## Checkpoint 11D-1: Password-encrypted portable recovery (prototype)
+- Added optional `cryptography` dependency for vetted scrypt + AES-256-GCM portable SQLite image recovery.
+- Windows encrypted session can export a separate NEW recovery file and reopen it into RAM using a passphrase independent of its old DPAPI account.
+- 13 synthetic regression methods added. CI verification pending.
+- Backup placement, passphrase strength/custody, device-migration acceptance, app authentication and secure data migration remain unverified. Still not ready for sensitive data.
