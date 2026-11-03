@@ -399,3 +399,15 @@ This prototype **does not accept automatic AI-generated tool calls**, execute sh
 In the Tkinter desktop, click **Demo agent approval**. A dialog shows the exact tool, proposal ID, SHA-256 digest, action summary and risk before asking for a Yes/No decision. Yes approves and executes the fixed synthetic `stage_note` action in RAM, and No rejects it without executing. Closing the UI rejects any pending previews. No model output is used to create this action, and there is no shell, filesystem or internet tool.
 
 The dialog is a **demonstration of the human-decision flow**, not real user authentication or protection from a malicious Python caller. The underlying `BoundedAgent.approve()` method is still callable in code. Neither approval nor the agent's synthetic notes survive restart. Do not rely on this for privileged actions, real secrets or customer data.
+
+### Checkpoint 14C: Structured tool intent review (offline, proposal-only)
+
+For a strictly synthetic manual UI test, paste this exact JSON into the desktop message box, then click **Review structured tool intent (untrusted JSON)**:
+
+```json
+{"format":"varyn.tool_intent.v1","tool":"stage_note","arguments":{"text":"Synthetic agent proposal demo"}}
+```
+
+The parser checks format, tool allowlist, argument shape, duplicate keys and size. It only **stages** a proposal for the desktop approval dialog; it does not automatically execute, query a provider, use tools, or grant approval. A user decision on the exact proposal ID and digest is needed before any synthetic RAM note is written. All read-only tool proposals also require an explicit UI decision in this workflow. Fields such as `approved`, `approval_token` and `execute` are refused.
+
+This does **not** yet parse or connect native function-call envelopes from live OpenAI, Claude or Gemini APIs. It provides no authenticated human permission boundary, external automation, real files/network tools, persistent agent state or production security. Use synthetic data only.
