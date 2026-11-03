@@ -57,7 +57,7 @@ def build_context(db_path, owner_id, project, query, max_chars=4000, max_candida
         "query": query,
         "retrieval": "lexical_overlap_recent_pool",
         "items": [],
-        "status": "no_match_in_sample",
+        "status": "matches_exceeded_budget",
         "duplicates_skipped": 0,
     }
     if len(_encode(result)) > max_chars:
