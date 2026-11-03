@@ -343,3 +343,15 @@ For an explicit live request, choose OpenAI, Anthropic or Gemini, provide a supp
 Tkinter stays on the main thread; a background worker performs the selected provider request and the window polls a result queue. No local memory/context is read or attached automatically. Calls run through in-process quota, **not** a money spending cap. Closing the window cannot cancel an already dispatched remote request, which may still be billed.
 
 **Not production-ready:** live endpoints and keys have not been verified against real accounts, GUI rendering and laptop RAM are untested, transcript remains volatile, and storage security is incomplete. Use only synthetic prompts; never paste client secrets.
+
+### Checkpoint 13C: Desktop lifecycle and RAM probe
+
+The desktop now supports **Discard pending reply** while a provider call is running. This hides its later response and prevents that response from repopulating in-process history. Closing the window with a pending request shows a warning. Neither action can cancel a request already delivered to a third-party model, and API charges can still apply.
+
+For an entirely offline, bounded Python allocation probe:
+
+```powershell
+python -m varyn.desktop_perf
+```
+
+This uses FakeProvider and `tracemalloc` and prints current/peak Python allocation bytes for the sample workload. It does **not** measure process RSS, native Tkinter memory, device-wide RAM, or GUI render responsiveness. Actual acceptance on the target Windows PC is still required. No API calls are made during the probe.
