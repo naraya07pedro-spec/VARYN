@@ -233,6 +233,7 @@ class VarynDesktop(tk.Tk):
             parent=self,
         ):
             return
+        self.controller.discard_pending_history()
         self._lifecycle.discard_visible()
         self._busy = False
         self.send_button.configure(state="normal")
@@ -246,6 +247,7 @@ class VarynDesktop(tk.Tk):
             parent=self,
         ):
             return
+        self.controller.discard_pending_history()
         self._lifecycle.close()
         self._closing = True
         self.destroy()
