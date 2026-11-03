@@ -155,4 +155,4 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 ## Checkpoint 13A: Lightweight offline desktop MVP
 - Built `varyn.desktop` (Tkinter) with offline fake chat, provider/model selection, network/context permission indicators and in-process usage status.
 - `varyn.desktop_controller` denies all live-provider calls even if consent switches are on; no automatic upload, no persisted history, no API usage.
-- 13 headless regression tests added; CI pending. UI rendering and actual laptop resource performance are not yet acceptance-tested.
+- 13 headless regression tests added. [GitHub Actions #41636463939](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41636463939) passed 197 tests per OS with desktop compilation and Windows Tkinter import smoke. Actual graphical UI rendering and laptop performance remain unverified.
