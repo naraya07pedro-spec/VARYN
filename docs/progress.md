@@ -57,3 +57,8 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 - Added explicit retrieval status to distinguish no lexical match from budget-excluded evidence.
 - Added six targeted synthetic tests. [GitHub Actions #41604448473](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41604448473) passed 35 total unit tests plus CLI smoke checks on Windows and Ubuntu.
 - Did not add semantic matching, true citations, authentication, encryption, provider calls, or model token budgets.
+
+## Checkpoint 07: retrieval evaluation
+- Six labeled synthetic scenarios with explicit successes, misses and denominators.
+- Expected baseline: 2/5 positive hits, 1/1 negative correctly rejected; benchmark intentionally exposes three known misses.
+- Eight tests added. CI pending. Not representative of real user queries.
