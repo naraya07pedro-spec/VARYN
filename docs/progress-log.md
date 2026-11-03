@@ -36,3 +36,12 @@ Entries describe committed changes and verification separately. This is a histor
 - **Tests added:** seven synthetic unit tests for persistence, isolation, required sources, revision history, list-current, and stale-write rejection.
 - **Verification:** [GitHub Actions #41601099846](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41601099846) passed on **Windows and Ubuntu**, covering **21 unit tests** (14 existing + 7 new), plus memory/backup/restore CLI smoke checks, at code commit `f1d8536c513a388db30c4faf1715e8308623ca8b`.
 - **Limitations:** source references are user-provided labels (not verifiable citations); owner labels are not authentication. No semantic retrieval or automated inference of which source is correct.
+
+## 2026-11-03 — Checkpoint 05: Bounded context retrieval
+- **Implemented:** `varyn/context.py` selects memory notes and the latest decision revision with lexical relevance scores, strictly filtered by owner label and project.
+- **Budget:** limits the serialized JSON context by character count, skipping oversized records instead of truncating evidence invisibly.
+- **Scope:** candidate pool is recent records (default 500 each from memory and decision tables), not an exhaustive semantic search over all historical context.
+- **Provenance:** decision source labels are returned with `source_verified=false`; no claims of authoritative citations.
+- **Tests added:** eight synthetic scenarios for relevance, latest-only decisions, owner/project scoping, deterministic budget, oversized-record exclusion, invalid inputs, and persistence.
+- **Verification:** pending CI results for this checkpoint.
+- **Risks:** character limits are **not token limits**; lexical matching can miss synonyms and older memories; owner labels are not authentication; text is untrusted and must never be treated as model instructions.
