@@ -24,7 +24,7 @@ def _encode(document):
     return json.dumps(document, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
-def build_context(db_path, owner_id, project, query, max_chars=4000, max_candidates=500):
+def build_context(db_path, owner_id, project, query, max_chars=4000, max_candidates=500, *, connection=None):
     """Return a JSON-compatible package no longer than max_chars when encoded.
 
     Only records for the caller-specified owner label and project are considered.
@@ -60,8 +60,14 @@ def build_context(db_path, owner_id, project, query, max_chars=4000, max_candida
     if len(_encode(result)) > max_chars:
         raise ValueError("Budget too small even for context metadata")
 
-    memories = MemoryStore(db_path, owner_id)
-    journal = DecisionJournal(db_path, owner_id)
+    # An injected connection lets the encrypted session reuse the exact same
+    # in-memory SQLite image. Borrowed connections must never be closed here.
+    memories = MemoryStore(db_path, owner_id, connection=connection)
+    try:
+        journal = DecisionJournal(db_path, owner_id, connection=memories.db)
+    except BaseException:
+        memories.close()
+        raise
     try:
         memory_rows = retrieve_indexed_memories(
             memories.db, memories.owner_id, project, query, max_candidates
