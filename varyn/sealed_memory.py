@@ -36,6 +36,8 @@ class SealedMemorySession:
             raise RuntimeError("This Python SQLite build lacks serialize/deserialize")
         self.store = MemoryStore(":memory:", _OWNER)
         self._closed = False
+        self._change_count = 0
+        self._saved_change_count = 0
         self.journal = None
         try:
             if source is not None or recovery_source is not None:
@@ -105,7 +107,9 @@ class SealedMemorySession:
 
     def add(self, project, content):
         self._active()
-        return self.store.add(project, content)
+        new_id = self.store.add(project, content)
+        self._change_count += 1
+        return new_id
 
     def search(self, query, project=None, limit=20):
         self._active()
@@ -114,9 +118,11 @@ class SealedMemorySession:
     def put_decision(self, project, key, content, source_ref, expected_revision=0):
         """Append a revision to the SAME in-memory encrypted snapshot."""
         self._active()
-        return self.journal.put(
+        revision = self.journal.put(
             project, key, content, source_ref, expected_revision
         )
+        self._change_count += 1
+        return revision
 
     def decision_history(self, project, key):
         self._active()
@@ -141,7 +147,9 @@ class SealedMemorySession:
         image = self.store.db.serialize()
         # write_sealed enforces the DPAPI 1-MiB plaintext size limit and never
         # publishes a plaintext intermediate database file.
-        return write_sealed(destination, image)
+        result = write_sealed(destination, image)
+        self._saved_change_count = self._change_count
+        return result
 
     def export_recovery(self, destination, passphrase):
         """Portable password-encrypted NEW snapshot. Never emit plaintext SQLite."""
@@ -149,7 +157,26 @@ class SealedMemorySession:
         self.store.db.commit()
         from varyn.recovery import write_recovery
         image = self.store.db.serialize()
-        return write_recovery(destination, image, passphrase)
+        result = write_recovery(destination, image, passphrase)
+        self._saved_change_count = self._change_count
+        return result
+
+    @property
+    def has_unsaved_changes(self):
+        """Only changes made through this session's public add/put methods."""
+        self._active()
+        return self._change_count != self._saved_change_count
+
+    def close_checked(self):
+        """Refuse to discard tracked changes; session remains usable on error.
+
+        This strict opt-in gate does not protect against sudden process death,
+        memory exhaustion or direct writes through .store.db.
+        """
+        self._active()
+        if self.has_unsaved_changes:
+            raise RuntimeError("Unsaved changes: publish a new snapshot before closing")
+        self.close()
 
     def close(self):
         if not self._closed:
