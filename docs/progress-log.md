@@ -29,3 +29,10 @@ Entries describe committed changes and verification separately. This is a histor
 - Provider authentication/model routing and quota policy.
 - Multi-agent orchestration, computer use, isolation/sandbox, rich UI.
 - Real user data until secure identity, storage protection, and backup recovery gates are verified.
+
+## 2026-11-03 — Checkpoint 04: Decision provenance and revisions
+- **Implemented:** `varyn/decisions.py`, an append-only experimental decision journal separate from legacy memory records.
+- **Behavior:** requires a nonempty source reference, retains revision history, exposes latest revision per key, and rejects writes based on outdated expected revisions inside an immediate SQLite transaction.
+- **Tests added:** seven synthetic unit tests for persistence, isolation, required sources, revision history, list-current, and stale-write rejection.
+- **Verification:** pending this checkpoint's Windows and Ubuntu GitHub Actions run.
+- **Limitations:** source references are user-provided labels (not verifiable citations); owner labels are not authentication. No semantic retrieval or automated inference of which source is correct.
