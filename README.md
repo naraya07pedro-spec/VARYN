@@ -355,3 +355,23 @@ python -m varyn.desktop_perf
 ```
 
 This uses FakeProvider and `tracemalloc` and prints current/peak Python allocation bytes for the sample workload. It does **not** measure process RSS, native Tkinter memory, device-wide RAM, or GUI render responsiveness. Actual acceptance on the target Windows PC is still required. No API calls are made during the probe.
+
+### Checkpoint 13D: Windows launcher and offline preflight
+
+Windows now has a root `Launch-VARYN.cmd` double-click launcher. It starts from its own folder, preferring `py -3` and falling back to `python`. No administrator access, Ollama, VPS or paid API is needed for offline FakeProvider mode. Python with Tkinter must already be installed; this is a **source launcher**, not a packaged EXE.
+
+Offline environment diagnostic (no API keys read, no networking):
+```powershell
+python -m varyn.doctor --json
+```
+Run the **actual GUI smoke test only in an interactive desktop session**:
+```powershell
+python -m varyn.doctor --gui-smoke --json
+```
+The doctor reports resident memory of the **doctor process**, not the main desktop application. It cannot certify the 8GB laptop's real-world GUI RAM footprint or responsiveness.
+
+Build a new deterministic desktop source archive from the repository root (destination must not already exist):
+```powershell
+python -m varyn.package_desktop --output varyn-desktop.zip
+```
+The ZIP contains only Python source files, README and launcher. No Python interpreter, installed dependencies, API credentials, local model, SQLite data or installer is included. Windows GitHub Actions publishes the same source ZIP as a short-retention artifact when CI succeeds. **Do not enter real client data** while encryption/authentication acceptance remains incomplete.
