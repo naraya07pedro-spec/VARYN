@@ -74,5 +74,5 @@ Entries describe committed changes and verification separately. This is a histor
 - **Controlled comparison:** the existing six-case synthetic benchmark moves from 2/5 to an expected 3/5 positive hits (40% -> 60%, MRR 0.4 -> 0.6); one negative scenario remains correctly rejected (1/1). These are tiny hand-designed fixtures, **not** a real-world accuracy improvement estimate.
 - **Known unresolved misses:** candidate-pool exclusion and oversized evidence still fail in the benchmark. Unlisted synonyms such as `arsip` are not handled.
 - **Independent checks:** six additional positive/negative glossary tests, including cross-project/owner-label filtering.
-- **Verification:** pending Windows and Ubuntu CI at writing.
+- **Verification:** [GitHub Actions #41611678899](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41611678899) passed Windows and Ubuntu on code commit `08dd2502dcbc50d1f23acd5d979dbaac78c36423`: 49 unit tests (43 previous + 6 new) and existing CLI smoke steps.
 - **Risks:** hardcoded aliases can create false positives; glossary is not semantic reasoning or machine translation. No authentication/encryption, and no model/provider calls.
