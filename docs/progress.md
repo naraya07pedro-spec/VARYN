@@ -105,3 +105,9 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 - New Windows-only in-memory SQLite store can save all its contents and FTS index as a DPAPI-encrypted immutable snapshot; no plaintext SQLite file is intentionally written.
 - Does not touch or automatically migrate the legacy plaintext store, backup, restore, or decision journal. Explicit saves, limited to 1 MiB before encryption.
 - Ten additional test methods; [GitHub Actions #41623353748](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41623353748) passed with 94 discovered tests on each of Windows and Ubuntu, with native-only tests skipped on Ubuntu. Not ready for private/secret data, Windows profile recovery, or production usage.
+
+## Checkpoint 11C-3: Encrypted context and decision journal
+- One in-memory SQLite connection is now shared by encrypted-session memory, revisioned decisions, and the existing context retrieval engine.
+- Explicit DPAPI snapshot persists notes, decisions, history and FTS5 index together, with source labels still unverified.
+- Added 10 targeted tests, including use-after-close, owner/project scoping and immutable revisions. CI pending.
+- This does not migrate or secure the older plaintext database, provide identity authentication, or enable key recovery.
