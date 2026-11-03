@@ -156,3 +156,9 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 - Built `varyn.desktop` (Tkinter) with offline fake chat, provider/model selection, network/context permission indicators and in-process usage status.
 - `varyn.desktop_controller` denies all live-provider calls even if consent switches are on; no automatic upload, no persisted history, no API usage.
 - 13 headless regression tests added. [GitHub Actions #41636463939](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41636463939) passed 197 tests per OS with desktop compilation and Windows Tkinter import smoke. Actual graphical UI rendering and laptop performance remain unverified.
+
+## Checkpoint 13B: Opt-in live provider chat with nonblocking UI
+- Desktop controller supports real-provider adapters when explicitly opted in, while the default controller remains offline. Network consent and a separate per-request confirmation are required before live calls; memory context still has its own gate.
+- Tkinter requests run in a worker thread, results are delivered to UI via a queue and Tk-only polling, and the Send button is disabled during an in-flight request.
+- Nine headless live-flow tests added, CI pending. Real provider API access, display interaction and laptop RAM remain unverified.
+- Closing UI cannot cancel an already dispatched remote API call and may not prevent billing. Quota is not a monetary guarantee.
