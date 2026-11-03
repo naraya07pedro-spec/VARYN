@@ -162,3 +162,9 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 - Tkinter requests run in a worker thread, results are delivered to UI via a queue and Tk-only polling, and the Send button is disabled during an in-flight request.
 - Nine headless live-flow tests added. [GitHub Actions #41640350647](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41640350647) passed 206 tests per OS on Windows and Ubuntu, plus desktop compilation and Windows Tkinter import checks. Real provider API access, display interaction and laptop RAM remain unverified.
 - Closing UI cannot cancel an already dispatched remote API call and may not prevent billing. Quota is not a monetary guarantee.
+
+## Checkpoint 13C: UI lifecycle hardening
+- Added request-generation lifecycle protection for stale replies and separate RAM-history invalidation upon clear/discard/close.
+- Added user-visible "Discard pending reply" and close-with-request warnings. These **do not cancel the external request or prevent its billing**.
+- Added bounded offline desktop Python allocation probe; CI pending. Tests cover slow provider completion and stale response exclusion.
+- Native GUI acceptance and real Windows laptop RAM measurements remain open.
