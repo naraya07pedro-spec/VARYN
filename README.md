@@ -425,3 +425,9 @@ The app records proposal ID, tool, SHA-256 digest, state and timestamp in a loca
 On process restart, unresolved proposals become `needs_review` and uncertain dispatched actions become `needs_reconciliation`. A startup note reports these counts. **Nothing is resumed, dispatched, approved or retried automatically.** If an external action is uncertain, verify its effect manually before attempting a new proposal; the old pending proposal cannot be resumed from metadata alone.
 
 The SQLite file contains unencrypted metadata, including digests and tool names. Use a private local folder, **synthetic data only**, and never treat it as secure storage for customer information. Real power-cut durability and graphical laptop acceptance are not yet proven.
+
+### Checkpoint 15A: Provider-native tool-call response normalization (offline only)
+
+`varyn.native_tool_calls.parse_native_tool_call(provider, response)` accepts one completed function/tool-call in the **native response shapes** of OpenAI Responses, Anthropic Messages and Gemini generateContent. `stage_native_tool_call(provider, response, approval_controller)` stages the validated intent into the existing desktop approval controller, **without executing, approving, calling a live provider or loading local memory**. Exactly one registered synthetic tool call is permitted per response. Multiple tool calls, Markdown, text-only responses, unknown tools and forged approval fields are rejected.
+
+This checkpoint does **not** configure the live network adapters to advertise tools or receive native function-call responses from real services. Those are subsequent tasks, as are real tool permissions and a UI that reviews actual model-originated proposals. The mock payloads validate parser behavior, not vendor compatibility or end-to-end safety. Keep all tests synthetic.
