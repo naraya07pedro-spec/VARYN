@@ -9,6 +9,7 @@ import json
 from varyn.decisions import DecisionJournal
 from varyn.memory import MemoryStore
 from varyn.lexicon import canonical_terms
+from varyn.index import retrieve_indexed_memories
 
 def _terms(text):
     return canonical_terms(text)
@@ -28,7 +29,7 @@ def build_context(db_path, owner_id, project, query, max_chars=4000, max_candida
 
     Only records for the caller-specified owner label and project are considered.
     Decision history is reduced to its latest revision per key; raw memories are
-    selected from the latest max_candidates rows, ranked by lexical overlap.
+    selected from the latest max_candidates INDEX MATCHES, ranked by lexical overlap.
     A zero-overlap record is not included.
     """
     if not isinstance(project, str) or not 1 <= len(project.strip()) <= 120:
@@ -51,7 +52,7 @@ def build_context(db_path, owner_id, project, query, max_chars=4000, max_candida
         "owner_label_not_authenticated": True,
         "project": project,
         "query": query,
-        "retrieval": "bounded_bilingual_lexical_recent_pool",
+        "retrieval": "sqlite_fts5_bilingual_index",
         "items": [],
         "status": "matches_exceeded_budget",
         "duplicates_skipped": 0,
@@ -62,11 +63,9 @@ def build_context(db_path, owner_id, project, query, max_chars=4000, max_candida
     memories = MemoryStore(db_path, owner_id)
     journal = DecisionJournal(db_path, owner_id)
     try:
-        memory_rows = memories.db.execute(
-            """SELECT id, content, created_at FROM memories
-            WHERE owner_id=? AND project=? ORDER BY id DESC LIMIT ?""",
-            (memories.owner_id, project, max_candidates),
-        ).fetchall()
+        memory_rows = retrieve_indexed_memories(
+            memories.db, memories.owner_id, project, query, max_candidates
+        )
         decision_rows = journal.db.execute(
             """SELECT d.decision_key,d.revision,d.content,d.source_ref,d.created_at
             FROM decision_revisions d
