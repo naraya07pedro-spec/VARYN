@@ -85,3 +85,11 @@ This prints a JSON package with lexical matches from the local memory store and 
 The keyword retriever now understands a very small, explicitly reviewed glossary, including `penyimpanan/storage`, `memori/memory`, and `cadangan/backup`. There is no background model or embedding download.
 
 Use `python -m varyn.evaluation` to reproduce the six-case synthetic benchmark. Its positive hit rate is expected to move from 40% to 60% on these fixed synthetic fixtures. That is **not** a valid real-world accuracy claim; the older-record and budget-related misses still remain.
+
+### Checkpoint 09: SQLite FTS5 historical indexing
+
+An on-disk SQLite FTS5 index now retrieves matching older notes even if many unrelated notes were added later. Existing local databases are backfilled the first time the index is initialized; triggers maintain the index for new, changed, and deleted notes. Queries are built from quoted and parameterized lexical terms with the tiny bilingual glossary.
+
+**Operational warning:** first-time index creation can use CPU and disk space proportional to the notes stored. It needs a Python SQLite build with FTS5 and enough free disk space. No laptop-specific speed or RAM claim is made. If the index isn't available, retrieval raises an error rather than silently pretending it scanned all history.
+
+Run the existing synthetic evaluation using `python -m varyn.evaluation`. The small fixed benchmark expects 4/5 positive hits; the oversized-record case still fails. This is not a field accuracy measurement.
