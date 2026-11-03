@@ -109,5 +109,5 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 ## Checkpoint 11C-3: Encrypted context and decision journal
 - One in-memory SQLite connection is now shared by encrypted-session memory, revisioned decisions, and the existing context retrieval engine.
 - Explicit DPAPI snapshot persists notes, decisions, history and FTS5 index together, with source labels still unverified.
-- Added 10 targeted tests, including use-after-close, owner/project scoping and immutable revisions. CI pending.
+- Added 10 targeted tests, including use-after-close, owner/project scoping and immutable revisions. [GitHub Actions #41624859520](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41624859520) passed 104 discovered tests per OS, including Windows-native DPAPI integration tests (skipped on Ubuntu by design).
 - This does not migrate or secure the older plaintext database, provide identity authentication, or enable key recovery.
