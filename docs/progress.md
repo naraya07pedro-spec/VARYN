@@ -100,3 +100,8 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 - Added separate Windows-current-user DPAPI envelope for standalone byte blobs, with no-overwrite encrypted file publication.
 - Eight synthetic tests added. [GitHub Actions #41621003228](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41621003228) succeeded on Windows and Ubuntu; native DPAPI tests passed on Windows and were skipped on Ubuntu as intended. 84 tests discovered per OS.
 - **This does not encrypt the SQLite memory database or its backups and does not implement application authentication.** Windows account binding affects recovery/portability and does not prevent access from an already-compromised Windows session.
+
+## Checkpoint 11C-2: Opt-in encrypted SQLite image
+- New Windows-only in-memory SQLite store can save all its contents and FTS index as a DPAPI-encrypted immutable snapshot; no plaintext SQLite file is intentionally written.
+- Does not touch or automatically migrate the legacy plaintext store, backup, restore, or decision journal. Explicit saves, limited to 1 MiB before encryption.
+- Ten additional test methods, Windows-native run pending. Not ready for private/secret data, Windows profile recovery, or production usage.
