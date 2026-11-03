@@ -197,3 +197,29 @@ with SealedMemorySession(
 ```
 
 Portable exports use scrypt and AES-256-GCM via the audited `cryptography` library, and can be decrypted on another supported OS with the correct passphrase. Never embed a **real** recovery phrase in source, command-line arguments, terminal history or logs; use a trusted passphrase manager and keep an off-device copy. Losing the phrase means the portable file cannot be recovered. Attackers with the encrypted file can attempt offline password guessing, so the minimum length requirement is not enough: use a high-entropy phrase. The KDF uses roughly 32 MiB of working memory. **This is not automatic backup, production authentication, verified cross-device migration, or a replacement for the old unencrypted database.** Snapshot size remains 1 MiB. Only synthetic data.
+
+### Checkpoint 11D-2: Inspect recoverability and guard unsaved changes
+
+To inspect an existing **synthetic** encrypted portable recovery without writing plaintext to disk:
+
+```python
+from varyn.recovery_verify import inspect_recovery
+report = inspect_recovery("portable.varyn-recovery", "synthetic phrase from test")
+print(report)  # status/count metadata only; never record contents
+```
+
+To deliberately prevent ordinary code from closing a Windows session with unsaved API writes:
+
+```python
+from varyn.sealed_memory import SealedMemorySession
+session = SealedMemorySession()
+try:
+    session.add("VARYN", "synthetic note")
+    if session.has_unsaved_changes:
+        session.save_new("synthetic-new-snapshot.varyn")
+    session.close_checked()  # raises without closing if changes remain
+finally:
+    session.close()
+```
+
+**Limits:** `close_checked()` is opt-in and does not handle hard crashes, OS shutdowns, direct SQLite updates, or a default context-manager exit. The recovery verifier checks minimum database integrity and structure, **not** guaranteed ability to recover on another person's account or different hardware. Snapshot size is still limited to 1 MiB, no automated redundant backup exists, and sensitive information remains prohibited.
