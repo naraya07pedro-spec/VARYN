@@ -1,0 +1,3 @@
+# Optional vetted cryptographic dependency for portable recovery only.
+# No models, GPU, paid APIs or background services required.
+cryptography>=45,<48
