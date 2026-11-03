@@ -109,3 +109,13 @@ The tool reports first-index-build timing, min/median/max context query timing, 
 VARYN refuses some **recognizable** secrets (such as common API-key/token syntax and private-key headers) before a new memory or decision revision is saved. Errors never repeat the rejected input. This uses only the Python standard library.
 
 **Important:** pattern matching is fallible. It does not protect an existing database, encrypt data, prevent reading another owner's records, or detect every credential. Backup files are still unencrypted. Real sensitive conversations, API keys and client data must **not** be stored in this prototype. This is an incremental guard, **not proof that VARYN is secure**.
+
+### Checkpoint 11B: Read-only storage exposure audit
+
+```powershell
+python -m varyn.storage_audit --db "D:\\VARYN\\data\\memory.sqlite3"
+```
+
+The command returns diagnostic JSON **without exposing local path or contents**. It rejects missing files and symbolic-link file paths. On POSIX systems it checks whether group/other bits allow access. On Windows it reports that Windows ACLs **have not been inspected**, because POSIX mode bits cannot establish Windows file security. It never repairs permissions or enables access.
+
+**The audit always reports `ready_for_sensitive_data=false`.** Encryption, trusted identity, comprehensive ACL auditing, and backup protection are still unfinished. Neither a successful test nor a clean file-mode check makes this prototype suitable for private data.
