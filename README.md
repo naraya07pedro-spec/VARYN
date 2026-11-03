@@ -223,3 +223,23 @@ finally:
 ```
 
 **Limits:** `close_checked()` is opt-in and does not handle hard crashes, OS shutdowns, direct SQLite updates, or a default context-manager exit. The recovery verifier checks minimum database integrity and structure, **not** guaranteed ability to recover on another person's account or different hardware. Snapshot size is still limited to 1 MiB, no automated redundant backup exists, and sensitive information remains prohibited.
+
+### Checkpoint 11D-3: Optional encrypted checkpoint after every write
+
+Windows-only experimental synthetic-data example:
+
+```python
+from pathlib import Path
+from varyn.sealed_memory import SealedMemorySession
+
+directory = Path("D:/VARYN/synthetic-checkpoints")  # create manually first
+with SealedMemorySession(checkpoint_dir=directory) as session:
+    session.add("VARYN", "storage synthetic checkpoint test")
+    print(session.last_checkpoint)  # new DPAPI-encrypted snapshot
+    session.put_decision("VARYN", "drive", "storage on D", "fixture:example")
+    print(session.last_checkpoint)  # another new encrypted snapshot
+```
+
+This is **opt-in**: previous manual saving remains unchanged. Each public write triggers full SQLite-image serialization and DPAPI encryption into a fresh file; prior files remain immutable. If a save fails, the public write raises an error but is **already present in RAM** and remains unsaved, so blind retries may duplicate records or create a revision conflict. Inspect `has_unsaved_changes` and retry *saving* to a new path instead.
+
+**Not zero-data-loss:** file publication and OS caches cannot guarantee survival of abrupt electrical power loss. Disk growth is unbounded without a retention policy, and full-image encryption on every write adds CPU/I/O; no actual laptop power-loss acceptance test has occurred. Use only synthetic data, not private client data.
