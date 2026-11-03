@@ -31,6 +31,20 @@ jobs:
         run: python -c "import tkinter; print('Tkinter module available')"
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
+      - name: Offline desktop preflight and process RSS (doctor process only)
+        run: python -m varyn.doctor --json
+      - name: Build deterministic desktop source ZIP
+        run: python -m varyn.package_desktop --output varyn-desktop-ci.zip
+      - name: Inspect source ZIP entries (no DB, key, or executable)
+        run: python -c "import zipfile; z=zipfile.ZipFile('varyn-desktop-ci.zip'); names=z.namelist(); assert 'VARYN/Launch-VARYN.cmd' in names; assert all(n.endswith('.py') or n.endswith('.cmd') or n.endswith('.md') for n in names)"
+      - name: Publish source-only Windows launcher ZIP as CI artifact
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: varyn-windows-source-launcher
+          path: varyn-desktop-ci.zip
+          if-no-files-found: error
+          retention-days: 7
       - name: Synthetic offline desktop Python memory probe (not process RSS)
         run: python -m varyn.desktop_perf
       - name: Synthetic performance benchmark (informational, no speed gate)
