@@ -87,5 +87,5 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 
 ## Checkpoint 11A: secret write guard (3 November 2026)
 - Added deterministic credential-pattern refusal to memory and decision writes, using a generic error message.
-- Six synthetic tests cover common detectable shapes and some security boundaries; CI pending.
+- Six synthetic tests passed along with prior tests in GitHub Actions run #41614839681 on Windows and Ubuntu (68 tests total per OS).
 - **Not encryption, authentication, comprehensive secret detection, or historical data cleanup.** Do not store actual credentials or private conversations.
