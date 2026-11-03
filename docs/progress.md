@@ -94,4 +94,4 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 - Added diagnostics for unsafe/missing/symlink file paths and POSIX permission bits.
 - Windows ACL security is intentionally reported as **unknown/uninspected**.
 - Audits always return `ready_for_sensitive_data=false` because encryption and authentication are still absent.
-- Eight tests added; CI verification pending. Audit does not modify files or grant authorization.
+- Eight tests added; [GitHub Actions #41616816340](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41616816340) passed **76 tests per OS** on Ubuntu and Windows, plus benchmark/CLI checks. Audit does not modify files or grant authorization.
