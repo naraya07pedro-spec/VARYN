@@ -1,21 +1,24 @@
-"""Lightweight standard-library Tkinter VARYN desktop window.
+"""VARYN Tkinter MVP: offline chat and explicitly confirmed optional live calls.
 
 Run: python -m varyn.desktop
-This stage is OFFLINE ONLY. Provider dropdown options are previews, not live
-integrations. No web server, account, local model, persistent chat or API calls.
+The UI never touches Tk widgets from worker threads, never reads local memory,
+and never persists a transcript. Real providers require account API credentials.
 """
+import queue
+import threading
 import tkinter as tk
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
 from varyn.desktop_controller import DesktopController, DEFAULT_MODELS, PROVIDERS
+from varyn.providers import ProviderError
 
 
 class VarynDesktop(tk.Tk):
     def __init__(self, controller=None):
         super().__init__()
-        self.controller = controller or DesktopController()
-        self.title("VARYN  |  Local AI Workspace (Offline MVP)")
-        self.geometry("760x620")
+        self.controller = controller or DesktopController(allow_live_providers=True)
+        self.title("VARYN  |  Local AI Workspace (Opt-in Live MVP)")
+        self.geometry("760x650")
         self.minsize(540, 480)
         self.configure(bg="#111827")
         self.provider = tk.StringVar(value="fake")
@@ -23,7 +26,11 @@ class VarynDesktop(tk.Tk):
         self.consent_network = tk.BooleanVar(value=False)
         self.consent_context = tk.BooleanVar(value=False)
         self.status_line = tk.StringVar(value="")
+        self._results = queue.Queue()
+        self._busy = False
+        self._closing = False
         self._build()
+        self.protocol("WM_DELETE_WINDOW", self._close)
         self._refresh_status()
 
     def _build(self):
@@ -38,11 +45,9 @@ class VarynDesktop(tk.Tk):
         outer.pack(fill="both", expand=True)
         ttk.Label(outer, text="VARYN", style="Title.V.TLabel").pack(anchor="w")
         ttk.Label(
-            outer,
-            text="LOCAL-FIRST   |   OFFLINE SIMULATION ONLY   |   NO API REQUESTS",
+            outer, text="LOCAL-FIRST  |  OFFLINE BY DEFAULT  |  API LIVE IS OPT-IN",
             style="V.TLabel",
         ).pack(anchor="w", pady=(0, 14))
-
         settings = ttk.Frame(outer, style="V.TFrame")
         settings.pack(fill="x", pady=(0, 8))
         ttk.Label(settings, text="Provider", style="V.TLabel").grid(
@@ -54,23 +59,21 @@ class VarynDesktop(tk.Tk):
         )
         provider_menu.grid(row=1, column=0, sticky="w", padx=(0, 12), pady=4)
         provider_menu.bind("<<ComboboxSelected>>", self._provider_changed)
-        ttk.Label(settings, text="Model (not connected)", style="V.TLabel").grid(
+        ttk.Label(settings, text="Model (exact provider model ID)", style="V.TLabel").grid(
             row=0, column=1, sticky="w"
         )
         ttk.Entry(settings, textvariable=self.model, width=27).grid(
             row=1, column=1, sticky="we", pady=4
         )
         settings.columnconfigure(1, weight=1)
-
         ttk.Checkbutton(
-            outer, text="Network permission requested (live mode still disabled)",
+            outer, text="Allow a confirmed API request to selected provider",
             variable=self.consent_network, command=self._permissions_changed,
         ).pack(anchor="w", pady=(6, 0))
         ttk.Checkbutton(
-            outer, text="Allow reference context (not loaded automatically)",
+            outer, text="Allow context sharing (not loaded automatically)",
             variable=self.consent_context, command=self._permissions_changed,
         ).pack(anchor="w", pady=(2, 8))
-
         ttk.Label(outer, textvariable=self.status_line, style="V.TLabel").pack(
             anchor="w", pady=(0, 10)
         )
@@ -88,19 +91,21 @@ class VarynDesktop(tk.Tk):
             relief="flat", padx=8, pady=6, font=("Segoe UI", 10),
         )
         self.prompt.pack(fill="x")
-        buttons = ttk.Frame(outer, style="V.TFrame")
-        buttons.pack(fill="x", pady=10)
-        ttk.Button(buttons, text="Send offline", command=self._send).pack(side="left")
-        ttk.Button(buttons, text="Clear RAM chat", command=self._clear).pack(
+        controls = ttk.Frame(outer, style="V.TFrame")
+        controls.pack(fill="x", pady=10)
+        self.send_button = ttk.Button(controls, text="Send", command=self._send)
+        self.send_button.pack(side="left")
+        ttk.Button(controls, text="Clear RAM chat", command=self._clear).pack(
             side="left", padx=8
         )
         ttk.Label(
-            outer, text="No history saved. Quota resets when the application restarts.",
+            outer, text="History and usage counters reset on restart. Live APIs may bill.",
             style="V.TLabel",
         ).pack(anchor="w")
         self._append(
-            "SYSTEM", "This is a synthetic, offline UI test. Select fake to send. "
-            "OpenAI, Anthropic and Gemini entries are previews only."
+            "SYSTEM", "Only fake mode is free and offline. Live mode requires an "
+            "API key set outside this app, network consent, and confirmation "
+            "of each individual request. Do not input private data."
         )
 
     def _provider_changed(self, _event=None):
@@ -115,9 +120,11 @@ class VarynDesktop(tk.Tk):
     def _refresh_status(self):
         state = self.controller.status()
         self.status_line.set(
-            f"NETWORK OFF  |  Requests {state['requests_used']}/{state['requests_limit']}  "
-            f"| Reserved output {state['output_tokens_reserved']}/"
+            f"{'LIVE ENABLED' if state['network_enabled'] else 'NETWORK OFF'}"
+            f" | Requests {state['requests_used']}/{state['requests_limit']}"
+            f" | Reserved output {state['output_tokens_reserved']}/"
             f"{state['output_tokens_limit']} tokens"
+            f"{' | REQUEST IN FLIGHT' if self._busy else ''}"
         )
 
     def _append(self, who, message):
@@ -127,28 +134,88 @@ class VarynDesktop(tk.Tk):
         self.transcript.configure(state="disabled")
 
     def _send(self):
-        message = self.prompt.get("1.0", "end-1c")
-        try:
-            reply = self.controller.send(
-                message, provider=self.provider.get(), model=self.model.get(),
-            )
-        except (ValueError, PermissionError, RuntimeError) as error:
-            # The exceptions reaching UI are bounded generic messages; no
-            # raw HTTP or API exception is exposed in this offline stage.
-            self._append("NOTICE", str(error))
-            self._refresh_status()
+        if self._busy:
             return
-        self._append("YOU", message.strip())
-        self._append("VARYN", reply.answer)
-        self.prompt.delete("1.0", "end")
+        question = self.prompt.get("1.0", "end-1c")
+        selected_provider = self.provider.get()
+        selected_model = self.model.get()
+        if not question.strip():
+            self._append("NOTICE", "Type a message before sending")
+            return
+        live = selected_provider != "fake"
+        if live:
+            if not self.consent_network.get():
+                self._append("NOTICE", "Enable the network checkbox first")
+                return
+            if not selected_model.strip():
+                self._append("NOTICE", "Enter the exact provider model ID first")
+                return
+            # No context is attached by UI; consent alone never loads memory.
+            if not messagebox.askyesno(
+                "Confirm external API call",
+                f"Send this typed message to {selected_provider} using "
+                f"model {selected_model}?\n\n"
+                "This transmits your text to an external API and may cost money. "
+                "No local memory is attached.",
+                parent=self,
+            ):
+                return
+        self._busy = True
+        self.send_button.configure(state="disabled")
+        self._refresh_status()
+        worker = threading.Thread(
+            target=self._send_worker,
+            args=(question, selected_provider, selected_model, live),
+            daemon=True,
+        )
+        worker.start()
+        self.after(75, self._poll_result)
+
+    def _send_worker(self, question, provider, model, live):
+        # No Tk widget access from the worker thread.
+        try:
+            result = self.controller.send(
+                question, provider=provider, model=model,
+                confirm_live_request=live,
+            )
+            self._results.put(("ok", question, result.answer))
+        except (ValueError, PermissionError, ProviderError) as error:
+            self._results.put(("error", "", str(error)))
+        except Exception:
+            # Don't echo potentially sensitive raw exception details in UI.
+            self._results.put(("error", "", "Request failed; retry not automatic"))
+
+    def _poll_result(self):
+        if self._closing:
+            return
+        try:
+            kind, question, message = self._results.get_nowait()
+        except queue.Empty:
+            self.after(75, self._poll_result)
+            return
+        if kind == "ok":
+            self._append("YOU", question.strip())
+            self._append("VARYN", message)
+            self.prompt.delete("1.0", "end")
+        else:
+            self._append("NOTICE", message)
+        self._busy = False
+        self.send_button.configure(state="normal")
         self._refresh_status()
 
     def _clear(self):
+        if self._busy:
+            self._append("NOTICE", "Cannot clear while a request is in flight")
+            return
         self.controller.clear_history()
         self.transcript.configure(state="normal")
         self.transcript.delete("1.0", "end")
         self.transcript.configure(state="disabled")
         self._refresh_status()
+
+    def _close(self):
+        self._closing = True
+        self.destroy()
 
 
 def main():
