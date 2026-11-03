@@ -149,5 +149,5 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 
 ## Checkpoint 12C: In-process usage budget
 - Added opt-in wrapper `BudgetedRouter` using lock-protected `UsageBudget` with max requests, reserved output token ceiling, and aggregate usage reports without content.
-- Failed or ambiguous requests keep their reserved quota, so no silent retry/fallback can evade the budget. Eleven new offline tests, CI pending.
+- Failed or ambiguous requests keep their reserved quota, so no silent retry/fallback can evade the budget. Eleven new offline tests; [GitHub Actions #41635271566](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41635271566) passed 184 tests per OS on Windows and Ubuntu, alongside existing benchmark/CLI steps.
 - **Not money/cost assurance**: no persistent or multi-process enforcement, automatic price tracking, direct-provider bypass prevention or reconciliation with provider billing.
