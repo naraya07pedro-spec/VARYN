@@ -21,8 +21,11 @@ class ApprovalPreview:
 class DesktopApprovalController:
     """Keeps model-untrusted proposal distinct from UI consent decision."""
 
-    def __init__(self, agent=None):
+    def __init__(self, agent=None, *, journal=None):
         self.agent = agent if agent is not None else BoundedAgent(max_steps=8)
+        self.journal = journal
+        # Restart never restores executable proposals or approval tokens.
+        self.recovered = journal.recover() if journal is not None else None
         self._waiting = {}
 
     def propose(self, tool, arguments):
@@ -38,6 +41,14 @@ class DesktopApprovalController:
             raise AgentRejected("Unregistered tool")
         preview = ApprovalPreview(proposal.proposal_id, proposal.tool,
                                   proposal.digest, risk, summary, proposal.mutates)
+        if self.journal is not None:
+            try:
+                self.journal.record_proposal(
+                    preview.proposal_id, preview.tool, preview.digest
+                )
+            except Exception:
+                self.agent.reject(preview.proposal_id)
+                raise
         self._waiting[proposal.proposal_id] = preview
         return preview
 
@@ -51,16 +62,38 @@ class DesktopApprovalController:
         if preview is None or preview.digest != displayed_digest:
             raise AgentRejected("Proposal preview mismatch or already resolved")
         # Remove from UI waiting list before dispatch to prevent duplicate clicks.
-        del self._waiting[proposal_id]
         if not approved:
+            # A crash between runtime reject and journal commit remains pending,
+            # which recovery will flag for fresh manual review, never replay.
             self.agent.reject(proposal_id)
+            if self.journal is not None:
+                self.journal.transition(proposal_id, preview.digest,
+                                        from_state="pending_review", to_state="rejected")
+            del self._waiting[proposal_id]
             return {"status": "rejected", "tool": preview.tool}
-        if preview.mutates:
-            token = self.agent.approve(proposal_id)
-            # The token is never returned, displayed or logged in the GUI.
-            result = self.agent.execute(proposal_id, approval_token=token)
-        else:
-            result = self.agent.execute(proposal_id)
+        # Persist ambiguous dispatch BEFORE calling the tool. On crash this
+        # becomes needs_reconciliation; never call tool again automatically.
+        if self.journal is not None:
+            self.journal.transition(proposal_id, preview.digest,
+                                    from_state="pending_review",
+                                    to_state="dispatch_uncertain")
+        del self._waiting[proposal_id]
+        try:
+            if preview.mutates:
+                token = self.agent.approve(proposal_id)
+                # Approval token lives only in process memory.
+                result = self.agent.execute(proposal_id, approval_token=token)
+            else:
+                result = self.agent.execute(proposal_id)
+        except BaseException:
+            if self.journal is not None:
+                self.journal.transition(proposal_id, preview.digest,
+                                        from_state="dispatch_uncertain",
+                                        to_state="failed_uncertain")
+            raise
+        if self.journal is not None:
+            self.journal.transition(proposal_id, preview.digest,
+                                    from_state="dispatch_uncertain", to_state="completed")
         return {"status": result.status, "tool": result.tool,
                 "output": result.output}
 
