@@ -84,3 +84,8 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 - Windows: index build 94.605 ms; median query 7.184 ms.
 - Both: 300 synthetic notes, five query repetitions; database main file 114,688 bytes after indexing.
 - Python-traced query peaks: 25,699 bytes (Ubuntu), 26,476 bytes (Windows). **Not total RAM or native SQLite allocations.** See chronological progress log for full measurement table and methodology.
+
+## Checkpoint 11A: secret write guard (3 November 2026)
+- Added deterministic credential-pattern refusal to memory and decision writes, using a generic error message.
+- Six synthetic tests cover common detectable shapes and some security boundaries; CI pending.
+- **Not encryption, authentication, comprehensive secret detection, or historical data cleanup.** Do not store actual credentials or private conversations.
