@@ -104,4 +104,4 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 ## Checkpoint 11C-2: Opt-in encrypted SQLite image
 - New Windows-only in-memory SQLite store can save all its contents and FTS index as a DPAPI-encrypted immutable snapshot; no plaintext SQLite file is intentionally written.
 - Does not touch or automatically migrate the legacy plaintext store, backup, restore, or decision journal. Explicit saves, limited to 1 MiB before encryption.
-- Ten additional test methods, Windows-native run pending. Not ready for private/secret data, Windows profile recovery, or production usage.
+- Ten additional test methods; [GitHub Actions #41623353748](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41623353748) passed with 94 discovered tests on each of Windows and Ubuntu, with native-only tests skipped on Ubuntu. Not ready for private/secret data, Windows profile recovery, or production usage.
