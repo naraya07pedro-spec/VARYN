@@ -36,17 +36,17 @@ class SealedMemorySession:
             raise ValueError("Recovery source and passphrase must be supplied together")
         if not hasattr(sqlite3.Connection, "serialize") or not hasattr(sqlite3.Connection, "deserialize"):
             raise RuntimeError("This Python SQLite build lacks serialize/deserialize")
-        self.store = MemoryStore(":memory:", _OWNER)
-        self._closed = False
-        self._change_count = 0
-        self._saved_change_count = 0
-        self._checkpoint_dir = None
-        self._last_checkpoint = None
+        directory = None
         if checkpoint_dir is not None:
             directory = Path(checkpoint_dir)
             if directory.is_symlink() or not directory.is_dir():
                 raise ValueError("Checkpoint directory must exist and not be a symlink")
-            self._checkpoint_dir = directory
+        self.store = MemoryStore(":memory:", _OWNER)
+        self._closed = False
+        self._change_count = 0
+        self._saved_change_count = 0
+        self._checkpoint_dir = directory
+        self._last_checkpoint = None
         self.journal = None
         try:
             if source is not None or recovery_source is not None:
