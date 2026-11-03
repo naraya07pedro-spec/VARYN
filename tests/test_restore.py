@@ -2,6 +2,7 @@
 import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
 
 from varyn.backup import backup_database
@@ -56,8 +57,9 @@ class RestoreTests(unittest.TestCase):
 
     def test_rejects_unrelated_sqlite_database(self):
         unrelated = self.base / "unrelated.sqlite3"
-        with sqlite3.connect(unrelated) as db:
+        with closing(sqlite3.connect(unrelated)) as db:
             db.execute("CREATE TABLE other (id INTEGER)")
+            db.commit()
         output = self.base / "restored.sqlite3"
         with self.assertRaises(ValueError):
             restore_database(unrelated, output)
