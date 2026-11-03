@@ -8,6 +8,7 @@ import os
 import shutil
 import sqlite3
 import tempfile
+from contextlib import closing
 from pathlib import Path
 from urllib.parse import quote
 
@@ -15,7 +16,7 @@ from urllib.parse import quote
 def _validate_varyn_database(path):
     # Open read-only: never create/modify a backup as a side effect of validation.
     uri = "file:" + quote(path.as_posix(), safe="/:") + "?mode=ro"
-    with sqlite3.connect(uri, uri=True) as db:
+    with closing(sqlite3.connect(uri, uri=True)) as db:
         if db.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
             raise sqlite3.DatabaseError("SQLite integrity check failed")
         columns = {
