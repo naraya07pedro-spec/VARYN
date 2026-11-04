@@ -4,6 +4,8 @@ No network, no owner documents, no inherited secret handles. Existing
 production tool stays disabled for private files until fully integrated.
 """
 import os
+import shutil
+import subprocess
 from pathlib import Path
 import sys
 from tempfile import TemporaryDirectory
@@ -50,7 +52,35 @@ class NativeWindowsRestrictedPrimaryTests(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0)
 
-    def _launch_probe(self, target):
+
+    def _prepare_synthetic_python_runtime(self, root):
+        """Copy only trusted Python runtime files; never edit source ACLs."""
+        original = Path(sys.executable).resolve()
+        dest = root / "trusted-runtime-copy"
+        dest.mkdir()
+        for item in original.parent.iterdir():
+            if (item.is_file() and
+                    (item.name.lower() == original.name.lower() or
+                     (item.suffix.lower() == ".dll" and
+                      item.name.lower().startswith(("python", "vcruntime"))))):
+                shutil.copy2(item, dest / item.name)
+        lib_src = Path(sys.base_prefix) / "Lib"
+        lib_dest = dest / "Lib"
+        lib_dest.mkdir()
+        shutil.copytree(lib_src / "encodings", lib_dest / "encodings")
+        for name in ("os.py", "codecs.py"):
+            if (lib_src / name).is_file():
+                shutil.copy2(lib_src / name, lib_dest / name)
+        exe_copy = dest / original.name
+        self.assertTrue(exe_copy.is_file())
+        # READ+EXECUTE on disposable copies ONLY. No owner files or OS ACLs.
+        result = subprocess.run(
+            ["icacls", str(dest), "/grant", "*S-1-5-12:(OI)(CI)RX", "/T"],
+            capture_output=True, text=True, timeout=15, check=False)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        return exe_copy
+
+    def _launch_probe(self, target, exe):
         # Restricted-primary token MUST exist before child starts (suspended),
         # then attach job + Low MIC before any untrusted argv executes.
         source = (
@@ -65,20 +95,23 @@ class NativeWindowsRestrictedPrimaryTests(unittest.TestCase):
             "except Exception:\n"
             " sys.exit(63)\n"
         )
-        command = (str(Path(sys.executable).resolve()), "-I", "-S",
-                   "-c", source, str(target))
-        return spawn_suspended_restricted_primary(
-            command, cwd=str(Path(sys.executable).resolve().parent))
+        command = (str(exe), "-I", "-S", "-c", source, str(target))
+        # Test scope: trusted interpreter is an exact copied executable.
+        with patch("varyn.windows_restricted_primary.sys.executable",
+                   str(exe)):
+            return spawn_suspended_restricted_primary(
+                command, cwd=str(exe.parent))
 
     def test_diagnostic_primary_token_without_low_mic_denies_synthetic_read(self):
         with TemporaryDirectory(prefix="varyn-primary-token-") as folder:
+            exe = self._prepare_synthetic_python_runtime(Path(folder))
             target = Path(folder) / "synthetic-private-only.txt"
             target.write_bytes(b"VARYN synthetic only")
             self.assertEqual(target.read_bytes(), b"VARYN synthetic only")
             proc = None
             guard = None
             try:
-                proc = self._launch_probe(target)
+                proc = self._launch_probe(target, exe)
                 self.assertIsNone(proc.poll())
                 self.assertFalse(proc._resumed)
                 # DIAGNOSTIC: no Low MIC or Job Object applied at startup.
@@ -101,11 +134,12 @@ class NativeWindowsRestrictedPrimaryTests(unittest.TestCase):
 
     def test_absent_file_cannot_be_counted_as_restricted_read_denial(self):
         with TemporaryDirectory(prefix="varyn-primary-absent-") as folder:
+            exe = self._prepare_synthetic_python_runtime(Path(folder))
             target = Path(folder) / "never-created.txt"
             proc = None
             guard = None
             try:
-                proc = self._launch_probe(target)
+                proc = self._launch_probe(target, exe)
                 # Same causal diagnostic without the Low MIC transition.
                 proc.resume()
                 observed = proc.wait(timeout=8)
