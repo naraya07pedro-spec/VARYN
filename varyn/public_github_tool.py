@@ -11,6 +11,7 @@ import json
 import re
 from secrets import token_urlsafe
 from threading import RLock
+from time import monotonic
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
@@ -140,12 +141,17 @@ class PublicGithubToolGateway:
     pending requests live only in RAM and disappear on close. Not OS auth.
     """
 
-    def __init__(self, *, fetcher=None, max_requests=MAX_REQUESTS):
+    def __init__(self, *, fetcher=None, max_requests=MAX_REQUESTS,
+                 clock=monotonic, review_ttl_seconds=120):
         if fetcher is not None and not callable(fetcher):
             raise TypeError("Trusted fetcher must be callable")
         if type(max_requests) is not int or not 1 <= max_requests <= 20:
             raise ValueError("Invalid request budget")
+        if not callable(clock) or type(review_ttl_seconds) is not int or not 1 <= review_ttl_seconds <= 600:
+            raise ValueError("Invalid review clock or expiry")
         self._fetch = fetcher or fetch_public_repo_metadata
+        self._clock = clock
+        self._ttl = review_ttl_seconds
         self._max_requests = max_requests
         self._used = 0
         self._pending = {}
@@ -164,7 +170,7 @@ class PublicGithubToolGateway:
             digest = sha256(
                 (proposal + ":" + token_urlsafe(24) + ":" + repository).encode()
             ).hexdigest()
-            self._pending[proposal] = (digest, repository)
+            self._pending[proposal] = (digest, repository, self._clock() + self._ttl)
             self._audit.append("proposed")
             return PublicToolReview(proposal, digest, repository)
 
@@ -177,6 +183,9 @@ class PublicGithubToolGateway:
             if pending is None or type(digest) is not str or pending[0] != digest:
                 raise PublicToolRejected("Unknown, stale or mismatched review")
             del self._pending[proposal_id]
+            if self._clock() >= pending[2]:
+                self._audit.append("expired")
+                raise PublicToolRejected("Review expired before dispatch")
             if approved is False:
                 self._audit.append("denied")
                 return {"status": "rejected", "network_dispatched": False}
