@@ -111,6 +111,14 @@ class PublicComparisonJournalTests(unittest.TestCase):
         self.assertEqual(len(records[0]), 4)
         self.assertNotIn("repo", repr(records).lower())
 
+    def test_corrupt_existing_file_refuses_to_open_not_reset(self):
+        self.journal.close()
+        self.path.write_bytes(b"this is not a SQLite database")
+        before = self.path.read_bytes()
+        with self.assertRaises(sqlite3.DatabaseError):
+            PublicComparisonJournal(self.path)
+        self.assertEqual(self.path.read_bytes(), before)
+
     def test_invalid_path_closed_and_recovery_are_rejected(self):
         with self.assertRaises(ValueError):
             PublicComparisonJournal(":memory:")
