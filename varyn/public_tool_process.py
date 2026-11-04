@@ -31,6 +31,8 @@ class ProcessRepoFetcher:
             raise ValueError("bounded child timeout required")
         if guard_factory is not None and not callable(guard_factory):
             raise TypeError("guard factory must be callable")
+        if guard_factory is not None and spawn is None:
+            raise ValueError("Native guard cannot be overridden for production spawner")
         self._spawn = spawn or subprocess.Popen
         # Production Windows always requires a native Job Object and same-user SID.
         # Custom guards exist solely for offline injected-process tests.
