@@ -194,6 +194,22 @@ class GatewayTests(unittest.TestCase):
                                 network_consent=True)
         self.assertEqual(self.calls, [])
 
+    def test_expired_review_cannot_dispatch_or_replay(self):
+        now = [100.0]
+        calls = []
+        gate = PublicGithubToolGateway(
+            clock=lambda: now[0], review_ttl_seconds=2,
+            fetcher=lambda repo: calls.append(repo) or metadata(repo),
+        )
+        p = gate.propose(intent(), network_consent=True)
+        now[0] += 2
+        with self.assertRaises(PublicToolRejected):
+            gate.decide(p.proposal_id, p.digest, approved=True, network_consent=True)
+        self.assertEqual(calls, [])
+        self.assertEqual(gate.status()["pending"], 0)
+        with self.assertRaises(PublicToolRejected):
+            gate.decide(p.proposal_id, p.digest, approved=True, network_consent=True)
+
     def test_audit_does_not_include_request_or_digest(self):
         p = self.propose()
         self.gateway.decide(p.proposal_id, p.digest, approved=True, network_consent=True)
