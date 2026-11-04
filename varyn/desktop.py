@@ -23,6 +23,7 @@ from varyn.file_grants import ScopedFileGrants
 from varyn.synthetic_fixture import SyntheticFixture
 from varyn.tool_gateway import SyntheticReadToolGateway, ToolGatewayRejected
 from varyn.public_github_tool import PublicGithubToolGateway, PublicToolRejected
+from varyn.public_tool_worker import PublicGithubToolWorker
 from varyn.desktop_collaboration import review_collaboration
 from varyn.desktop_memory import DesktopMemory
 from varyn.memory_handoff import parse_note_ids, selected_memory_context
@@ -57,6 +58,7 @@ class VarynDesktop(tk.Tk):
         self._file_grants = ScopedFileGrants(auto_expire=True)
         self._synthetic_tools = SyntheticReadToolGateway(self._file_grants)
         self._public_github_tools = PublicGithubToolGateway()
+        self._public_tool_worker = PublicGithubToolWorker(self._public_github_tools)
         self._file_grant_id = None
         self._file_fixture = None
         self._busy = False
@@ -126,6 +128,7 @@ class VarynDesktop(tk.Tk):
         ttk.Checkbutton(
             outer, text="Allow public GitHub metadata reads (separate from AI provider APIs)",
             variable=self.consent_public_tools,
+            command=self._public_tool_permission_changed,
         ).pack(anchor="w", pady=(2, 0))
         ttk.Checkbutton(
             outer, text="Allow context sharing (not loaded automatically)",
@@ -203,6 +206,10 @@ class VarynDesktop(tk.Tk):
         ttk.Button(
             outer, text="Review public GitHub tool intent (JSON, network)",
             command=self._review_public_github_intent,
+        ).pack(anchor="w", pady=(0, 8))
+        ttk.Button(
+            outer, text="Hide/cancel public GitHub tool result (cannot cancel sent GET)",
+            command=self._cancel_public_github_tool,
         ).pack(anchor="w", pady=(0, 8))
         self._build_memory_controls(outer)
         ttk.Label(
@@ -455,15 +462,46 @@ class VarynDesktop(tk.Tk):
             outcome["output"]["text"],
         )
 
-    def _review_public_github_intent(self):
-        """Review untrusted JSON before ONE anonymous GitHub public GET.
+    def _public_tool_permission_changed(self):
+        """Tk-thread-only explicit revocation; no assumptions about API consent."""
+        if self.consent_public_tools.get() is not True:
+            worker = getattr(self, "_public_tool_worker", None)
+            if worker is not None:
+                worker.revoke()
+            else:
+                self._public_github_tools.revoke_active()
+            self._append(
+                "GITHUB TOOL",
+                "GitHub permission revoked; any sent GET may finish, but its "
+                "result is suppressed. No new dispatch is authorized.",
+            )
 
-        No model output has authority to toggle consent or select an URL.
-        This synchronous 5-second-bounded beta can temporarily block Tk UI.
-        """
+    def _cancel_public_github_tool(self):
+        """Forget local result; never claim cancellation of a sent GET."""
+        worker = getattr(self, "_public_tool_worker", None)
+        if worker is None or not worker.busy:
+            self._append("GITHUB TOOL", "No public GitHub request to hide")
+            return
+        worker.revoke()
+        self._append(
+            "GITHUB TOOL",
+            "Result hidden and permission for this request revoked. An already "
+            "sent HTTP GET may still complete; no retry.",
+        )
+
+    def _review_public_github_intent(self):
+        """Review JSON on Tk main thread; dispatch approved GET in a worker."""
         if self._busy or self._closing:
             return
-        if not self.consent_public_tools.get():
+        worker = getattr(self, "_public_tool_worker", None)
+        if worker is None:
+            # Headless desktop tests use a minimal UI double.
+            worker = PublicGithubToolWorker(self._public_github_tools)
+            self._public_tool_worker = worker
+        if worker.busy:
+            self._append("GITHUB TOOL", "Previous GitHub request still finishing")
+            return
+        if self.consent_public_tools.get() is not True:
             self._append("GITHUB TOOL", "Network consent disabled; no request sent")
             return
         try:
@@ -483,29 +521,49 @@ class VarynDesktop(tk.Tk):
                 "\nReview digest: " + preview.digest +
                 "\n\nOne anonymous GET (up to 5 seconds), no GitHub token, "
                 "no writes, no retry, no provider context upload. "
-                "This spends one VARYN tool request from its in-RAM quota. Approve?",
+                "The request runs in a background worker. "
+                "Revocation can hide the result but cannot retract a sent GET. Approve?",
                 parent=self,
             )
-            result = self._public_github_tools.decide(
-                preview.proposal_id, preview.digest, approved=approved,
-                network_consent=self.consent_public_tools.get() is True,
-            )
-        except (PublicToolRejected, PermissionError, OSError):
+            current_permission = self.consent_public_tools.get() is True
+            if not approved:
+                self._public_github_tools.decide(
+                    preview.proposal_id, preview.digest,
+                    approved=False, network_consent=current_permission,
+                )
+                self._append("GITHUB TOOL", "Public GitHub request declined; no network dispatch")
+                return
+            worker.submit(preview, network_consent=current_permission)
+        except (PublicToolRejected, PermissionError, OSError, RuntimeError):
             self._public_github_tools.reject_all_pending()
-            self._append("GITHUB TOOL", "Public GitHub read failed or permission revoked; no retry")
+            self._append("GITHUB TOOL", "Public GitHub request not authorized or worker unavailable")
             return
-        if result["status"] == "rejected":
-            self._append("GITHUB TOOL", "Public GitHub request declined; no network dispatch")
+        self._append("GITHUB TOOL", "Approved public read started; UI remains responsive")
+        self.after(75, self._poll_public_github_tool)
+
+    def _poll_public_github_tool(self):
+        """Only the Tk thread renders approved results from the worker queue."""
+        if self._closing:
             return
-        repo = result["result"]
-        self._append(
-            "GITHUB TOOL",
-            "Public metadata, externally sourced/untrusted (local display only): "
-            + repo["repository"] + " | default branch " + repo["default_branch"]
-            + " | stars " + str(repo["stars"])
-            + " | open items (incl. PRs) " + str(repo["open_items_including_prs"])
-            + " | archived " + str(repo["archived"]),
-        )
+        worker = getattr(self, "_public_tool_worker", None)
+        if worker is None:
+            return
+        outcome = worker.poll()
+        if outcome is not None:
+            if outcome.status != "completed":
+                self._append("GITHUB TOOL", "Public read failed, expired or was revoked; no retry")
+            else:
+                repo = outcome.result
+                self._append(
+                    "GITHUB TOOL",
+                    "Public metadata, externally sourced/untrusted (local display only): "
+                    + repo["repository"] + " | default branch " + repo["default_branch"]
+                    + " | stars " + str(repo["stars"])
+                    + " | open items (incl. PRs) " + str(repo["open_items_including_prs"])
+                    + " | archived " + str(repo["archived"]),
+                )
+        if worker.busy:
+            self.after(75, self._poll_public_github_tool)
 
     def _revoke_synthetic_folder(self):
         gateway = getattr(self, "_synthetic_tools", None)
@@ -1032,6 +1090,13 @@ class VarynDesktop(tk.Tk):
         self._append("AGENT", "Synthetic action " + result["status"])
 
     def _close(self):
+        worker = getattr(self, "_public_tool_worker", None)
+        if worker is not None and worker.busy and not messagebox.askyesno(
+            "Close while GitHub public read may still be in flight?",
+            "Closing hides its result but CANNOT stop a GET already sent. Close anyway?",
+            parent=self,
+        ):
+            return
         if self._lifecycle.busy and not messagebox.askyesno(
             "Close without canceling remote API",
             "A request is in flight. Closing hides its result but cannot cancel remote processing or billing. Close anyway?",
@@ -1042,9 +1107,13 @@ class VarynDesktop(tk.Tk):
         gateway = getattr(self, "_synthetic_tools", None)
         if gateway is not None:
             gateway.reject_all_pending()
-        gateway = getattr(self, "_public_github_tools", None)
-        if gateway is not None:
-            gateway.reject_all_pending()
+        worker = getattr(self, "_public_tool_worker", None)
+        if worker is not None:
+            worker.close()
+        else:
+            gateway = getattr(self, "_public_github_tools", None)
+            if gateway is not None:
+                gateway.close()
         self._file_grants.revoke_all()
         self._file_grant_id = None
         VarynDesktop._discard_synthetic_fixture(self)
