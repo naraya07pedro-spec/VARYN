@@ -674,6 +674,8 @@ class VarynDesktop(tk.Tk):
         self._lifecycle.discard_visible()
         self._busy = False
         self.send_button.configure(state="normal")
+        if hasattr(self, "collaborate_button"):
+            self.collaborate_button.configure(state="normal")
         self._append("NOTICE", "Reply hidden; remote API request was not canceled")
         self._refresh_status()
 
