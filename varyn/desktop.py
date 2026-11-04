@@ -21,6 +21,7 @@ from varyn.tool_protocol import stage_tool_intent
 from varyn.native_tool_requests import NativeToolRequestClient
 from varyn.file_grants import ScopedFileGrants
 from varyn.synthetic_fixture import SyntheticFixture
+from varyn.tool_gateway import SyntheticReadToolGateway, ToolGatewayRejected
 from varyn.desktop_collaboration import review_collaboration
 from varyn.desktop_memory import DesktopMemory
 from varyn.memory_handoff import parse_note_ids, selected_memory_context
@@ -52,6 +53,7 @@ class VarynDesktop(tk.Tk):
         self._approval = DesktopApprovalController(journal=agent_journal)
         self._native_client = NativeToolRequestClient(allow_network=True)
         self._file_grants = ScopedFileGrants(auto_expire=True)
+        self._synthetic_tools = SyntheticReadToolGateway(self._file_grants)
         self._file_grant_id = None
         self._file_fixture = None
         self._busy = False
@@ -187,6 +189,10 @@ class VarynDesktop(tk.Tk):
             file_controls, text="Revoke test-folder grant",
             command=self._revoke_synthetic_folder,
         ).pack(side="left", padx=(8, 0))
+        ttk.Button(
+            outer, text="Review one VARYN synthetic file read (local only)",
+            command=self._read_reviewed_synthetic_sample,
+        ).pack(anchor="w", pady=(0, 8))
         self._build_memory_controls(outer)
         ttk.Label(
             outer, text="Chat RAM resets on restart. Local memory only with --memory-db; "
@@ -348,6 +354,9 @@ class VarynDesktop(tk.Tk):
                     self._append("FILES", "Synthetic sample cleanup incomplete")
             self._append("FILES", "Synthetic sample creation or grant denied")
             return
+        gateway = getattr(self, "_synthetic_tools", None)
+        if gateway is not None:
+            gateway.reject_all_pending()
         previous = self._file_grant_id
         old_fixture = self._file_fixture
         self._file_grant_id = preview.grant_id
@@ -396,7 +405,49 @@ class VarynDesktop(tk.Tk):
             + ". No filenames or file contents uploaded or recorded in chat.",
         )
 
+    def _read_reviewed_synthetic_sample(self):
+        """Review an exact local sample read before accessing VARYN's fixture."""
+        if self._busy or self._closing:
+            return
+        if self._file_grant_id is None or self._file_fixture is None:
+            self._append("TOOL 17S", "No active VARYN-generated test folder")
+            return
+        gateway = getattr(self, "_synthetic_tools", None)
+        if gateway is None:
+            gateway = SyntheticReadToolGateway(self._file_grants)
+            self._synthetic_tools = gateway
+        try:
+            preview = gateway.propose(
+                "read_generated_sample", {"name": "sample.txt"},
+                grant_id=self._file_grant_id,
+            )
+            approved = messagebox.askyesno(
+                "17S | Review local synthetic tool read",
+                preview.summary + "\nDigest: " + preview.digest +
+                "\n" + preview.risk +
+                "\n\nThis reads ONLY VARYN's temporary sample. "
+                "No personal files or AI API are accessed. Approve?",
+                parent=self,
+            )
+            outcome = gateway.decide(
+                preview.proposal_id, preview.digest, approved=approved,
+            )
+        except (ToolGatewayRejected, AgentRejected, PermissionError, OSError):
+            gateway.reject_all_pending()
+            self._append("TOOL 17S", "Synthetic read denied or expired; no retry")
+            return
+        if outcome["status"] == "rejected":
+            self._append("TOOL 17S", "Synthetic file read declined; nothing accessed")
+            return
+        self._append(
+            "TOOL 17S", "Approved local sample (never uploaded):\n" +
+            outcome["output"]["text"],
+        )
+
     def _revoke_synthetic_folder(self):
+        gateway = getattr(self, "_synthetic_tools", None)
+        if gateway is not None:
+            gateway.reject_all_pending()
         if self._file_grant_id is not None:
             try:
                 self._file_grants.revoke(self._file_grant_id)
@@ -925,6 +976,9 @@ class VarynDesktop(tk.Tk):
         ):
             return
         self._approval.reject_all_pending()
+        gateway = getattr(self, "_synthetic_tools", None)
+        if gateway is not None:
+            gateway.reject_all_pending()
         self._file_grants.revoke_all()
         self._file_grant_id = None
         VarynDesktop._discard_synthetic_fixture(self)
