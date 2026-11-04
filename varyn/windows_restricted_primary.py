@@ -16,10 +16,10 @@ import sys
 
 from varyn.public_github_tool import PublicToolRejected
 
-# Experimental compatibility token for runtime load. BUILTIN\\Users
-# is NOT a dedicated sandbox SID; it cannot certify broad private reads.
+# Diagnostic broad SID solely to isolate startup ACL failure.
+# Everyone is NOT a dedicated sandbox SID; no private-data read claim.
 # Production private-file access remains disabled pending dedicated ACL grants.
-_RESTRICTING_SID = "S-1-5-32-545"  # BUILTIN\\Users
+_RESTRICTING_SID = "S-1-1-0"  # BUILTIN\\Users
 _TOKEN_ASSIGN_PRIMARY = 0x0001
 _TOKEN_DUPLICATE = 0x0002
 _TOKEN_IMPERSONATE = 0x0004
@@ -140,8 +140,7 @@ def _os_restricted_token_verified(token, advapi):
             return False
         observed = ctypes.string_at(item.Sid, size)
         # Exact current restricting SID in canonical binary SID format.
-        expected = (bytes((1, 2, 0, 0, 0, 0, 0, 5)) +
-                    (32).to_bytes(4, "little") + (545).to_bytes(4, "little"))
+        expected = bytes((1, 1, 0, 0, 0, 0, 0, 1)) + (0).to_bytes(4, "little")
         if observed == expected:
             return True
     return False
