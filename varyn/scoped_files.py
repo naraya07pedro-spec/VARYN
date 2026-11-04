@@ -88,7 +88,10 @@ class ScopedLocalReader:
                         self._name(entry.name)
                         if entry.is_symlink() or not entry.is_file(follow_symlinks=False):
                             continue
-                        meta = entry.stat(follow_symlinks=False)
+                        # Windows DirEntry.stat may omit reliable link metadata.
+                        # Use the same lstat path as read_text before listing.
+                        meta = (Path(entry.path).lstat() if os.name == 'nt'
+                                else entry.stat(follow_symlinks=False))
                         if (not _unsafe_windows_metadata(meta)
                                 and 0 <= meta.st_size <= self._max_bytes):
                             found.append({"name": entry.name, "bytes": meta.st_size})
