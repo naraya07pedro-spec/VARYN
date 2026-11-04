@@ -16,10 +16,11 @@ import sys
 
 from varyn.public_github_tool import PublicToolRejected
 
-# Diagnostic broad SID solely to isolate startup ACL failure.
-# Everyone is NOT a dedicated sandbox SID; no private-data read claim.
-# Production private-file access remains disabled pending dedicated ACL grants.
-_RESTRICTING_SID = "S-1-1-0"  # BUILTIN\\Users
+# Strict NT AUTHORITY\\RESTRICTED SID: access needs BOTH caller and
+# restricting-SID permission. The test-only runtime copy grants RX to this
+# SID; the user's personal files and installed Python ACL are untouched.
+# Still NOT a complete production sandbox until real tool transport is gated.
+_RESTRICTING_SID = "S-1-5-12"  # NT AUTHORITY\\RESTRICTED
 _TOKEN_ASSIGN_PRIMARY = 0x0001
 _TOKEN_DUPLICATE = 0x0002
 _TOKEN_IMPERSONATE = 0x0004
@@ -162,7 +163,7 @@ def _os_restricted_token_verified(token, advapi):
             return False
         observed = ctypes.string_at(item.Sid, size)
         # Exact current restricting SID in canonical binary SID format.
-        expected = bytes((1, 1, 0, 0, 0, 0, 0, 1)) + (0).to_bytes(4, "little")
+        expected = bytes((1, 1, 0, 0, 0, 0, 0, 5)) + (12).to_bytes(4, "little")
         if observed == expected:
             return True
     return False
