@@ -8,7 +8,7 @@ import argparse
 import queue
 import threading
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import filedialog, messagebox, ttk
 
 from varyn.desktop_controller import DesktopController, DEFAULT_MODELS, PROVIDERS
 from varyn.providers import ProviderError
@@ -18,6 +18,7 @@ from varyn.agent_recovery import AgentRecoveryJournal
 from varyn.agent_runtime import AgentRejected, AgentLimitReached
 from varyn.tool_protocol import stage_tool_intent
 from varyn.native_tool_requests import NativeToolRequestClient
+from varyn.file_grants import ScopedFileGrants
 
 
 class VarynDesktop(tk.Tk):
@@ -38,6 +39,8 @@ class VarynDesktop(tk.Tk):
         self._agent_journal = agent_journal
         self._approval = DesktopApprovalController(journal=agent_journal)
         self._native_client = NativeToolRequestClient(allow_network=True)
+        self._file_grants = ScopedFileGrants()
+        self._file_grant_id = None
         self._busy = False
         self._closing = False
         self._build()
@@ -131,6 +134,20 @@ class VarynDesktop(tk.Tk):
             outer, text="Review structured tool intent (untrusted JSON)",
             command=self._review_tool_intent,
         ).pack(anchor="w", pady=(0, 8))
+        file_controls = ttk.Frame(outer, style="V.TFrame")
+        file_controls.pack(fill="x", pady=(2, 8))
+        ttk.Button(
+            file_controls, text="Grant synthetic test folder",
+            command=self._grant_synthetic_folder,
+        ).pack(side="left")
+        ttk.Button(
+            file_controls, text="Inspect test-folder count",
+            command=self._inspect_synthetic_folder,
+        ).pack(side="left", padx=(8, 0))
+        ttk.Button(
+            file_controls, text="Revoke test-folder grant",
+            command=self._revoke_synthetic_folder,
+        ).pack(side="left", padx=(8, 0))
         ttk.Label(
             outer, text="History and usage counters reset on restart. Live APIs may bill.",
             style="V.TLabel",
@@ -140,6 +157,76 @@ class VarynDesktop(tk.Tk):
             "API key set outside this app, network consent, and confirmation "
             "of each individual request. Do not input private data."
         )
+
+    def _grant_synthetic_folder(self):
+        """Trusted desktop-only consent; this NEVER grants AI tools file access."""
+        if self._busy or self._closing:
+            return
+        folder = filedialog.askdirectory(
+            title="Choose a synthetic test folder ONLY", mustexist=True, parent=self,
+        )
+        if not folder:
+            return
+        consent = messagebox.askyesno(
+            "Grant temporary read-only test access",
+            "Grant VARYN local-only access to top-level .txt/.md files in this "
+            "selected SYNTHETIC test folder for at most 5 minutes / 10 operations?\n\n"
+            "Do not select folders containing secrets, private, financial, or client "
+            "information. This feature only counts test filenames; it does not "
+            "read contents into chat or upload anything to an AI provider. "
+            "This is NOT an OS sandbox or authenticated security boundary.",
+            parent=self,
+        )
+        if not consent:
+            self._append("FILES", "Test-folder permission declined")
+            return
+        try:
+            preview = self._file_grants.grant(folder, user_confirmed=True)
+        except (PermissionError, ValueError, OSError, AgentRejected):
+            self._append("FILES", "Test-folder scope denied or could not be validated")
+            return
+        previous = self._file_grant_id
+        self._file_grant_id = preview.grant_id
+        if previous is not None:
+            try:
+                self._file_grants.revoke(previous)
+            except AgentRejected:
+                pass
+        self._append(
+            "FILES",
+            f"Temporary local test-folder access granted: "
+            f"{preview.duration_seconds}s, {preview.max_operations} operations; "
+            "read-only, not exposed to models. No folder path saved in transcript.",
+        )
+
+    def _inspect_synthetic_folder(self):
+        """Count only; neither filenames nor contents enter the transcript."""
+        if self._busy or self._closing:
+            return
+        if self._file_grant_id is None:
+            self._append("FILES", "No active synthetic test-folder grant")
+            return
+        try:
+            listing = self._file_grants.list_files(self._file_grant_id)
+        except (PermissionError, AgentRejected):
+            self._file_grant_id = None
+            self._append("FILES", "Test-folder access expired, revoked, or denied")
+            return
+        self._append(
+            "FILES",
+            f"Allowed top-level synthetic file count: {len(listing['files'])}"
+            + (" (truncated at listing cap)" if listing["truncated"] else "")
+            + ". No filenames or file contents uploaded or recorded in chat.",
+        )
+
+    def _revoke_synthetic_folder(self):
+        if self._file_grant_id is not None:
+            try:
+                self._file_grants.revoke(self._file_grant_id)
+            except AgentRejected:
+                pass
+            self._file_grant_id = None
+        self._append("FILES", "Synthetic test-folder grant revoked")
 
     def _provider_changed(self, _event=None):
         self.model.set(DEFAULT_MODELS[self.provider.get()])
@@ -393,6 +480,8 @@ class VarynDesktop(tk.Tk):
         ):
             return
         self._approval.reject_all_pending()
+        self._file_grants.revoke_all()
+        self._file_grant_id = None
         if self._agent_journal is not None:
             self._agent_journal.close()
         self.controller.discard_pending_history()
