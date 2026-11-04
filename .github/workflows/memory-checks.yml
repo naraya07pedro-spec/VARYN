@@ -126,6 +126,8 @@ jobs:
       - name: 17S-7 hosted Windows Tk two-step real button and no implicit approval
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_public_repo_plan_tk.py" -v
+      - name: 17S-8 crash-safe public comparison journal and no replay regressions
+        run: python -m unittest discover -s tests -p "test_public_comparison_journal.py" -v
       - name: Option C consumer-history proof gates stay blocked
         run: |
           python -m unittest discover -s tests -p "test_option_c_gate.py" -v
