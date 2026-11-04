@@ -104,6 +104,11 @@ jobs:
       - name: 17S-1 hosted Windows Tk button review and revoke (synthetic only)
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_tool_gateway_tk.py" -v
+      - name: 17S-2 public GitHub tool contract and consent regressions (no live network)
+        run: python -m unittest discover -s tests -p "test_public_github_tool.py" -v
+      - name: 17S-2 hosted Windows Tk network-consent/approval smoke
+        if: runner.os == 'Windows'
+        run: python -m unittest discover -s tests -p "test_public_github_tool_tk.py" -v
       - name: Option C consumer-history proof gates stay blocked
         run: |
           python -m unittest discover -s tests -p "test_option_c_gate.py" -v
