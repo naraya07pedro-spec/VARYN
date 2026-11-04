@@ -57,9 +57,24 @@ class MemoryStore:
         parameters.append(limit)
         return [dict(row) for row in self.db.execute(sql, parameters)]
 
-    def delete(self, memory_id):
+    def delete(self, memory_id, *, project=None):
+        """Delete exactly one owner-owned record, optionally scoped to a project.
+
+        Project-scoped deletion is atomic and does not rely on a prior search.
+        The owner_id label is not authentication: do not expose this publicly.
+        """
+        if type(memory_id) is not int or memory_id < 1:
+            raise ValueError("Invalid memory identifier")
+        if project is not None and (type(project) is not str or
+                                    not 1 <= len(project) <= 120):
+            raise ValueError("Invalid project")
+        sql = "DELETE FROM memories WHERE id=? AND owner_id=?"
+        args = [memory_id, self.owner_id]
+        if project is not None:
+            sql += " AND project=?"
+            args.append(project)
         with self.db:
-            cursor = self.db.execute("DELETE FROM memories WHERE id=? AND owner_id=?", (memory_id, self.owner_id))
+            cursor = self.db.execute(sql, args)
         return cursor.rowcount == 1
 
 def main():
