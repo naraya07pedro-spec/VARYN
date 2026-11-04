@@ -12,7 +12,10 @@ import zipfile
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parent.parent
-_ALLOWED_TOP = ("Launch-VARYN.cmd", "Verify-VARYN-Synthetic.cmd", "README.md")
+_ALLOWED_TOP = (
+    "Launch-VARYN.cmd", "Verify-VARYN-Synthetic.cmd",
+    "Record-VARYN-GUI-Checks.cmd", "README.md",
+)
 _FIXED_DATE = (2024, 1, 1, 0, 0, 0)
 
 
