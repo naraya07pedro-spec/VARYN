@@ -51,6 +51,12 @@ jobs:
           python -m varyn.official_sync --provider chatgpt
           python -m varyn.official_sync --provider claude
           python -m varyn.official_sync --provider gemini
+      - name: Verify source-backed official app evidence remains non-dispatchable
+        run: python -m unittest discover -s tests -p "test_official_app_evidence.py" -v
+      - name: Synthetic-only real handle and idle expiry acceptance (not GUI)
+        run: |
+          python -m unittest discover -s tests -p "test_desktop_acceptance.py" -v
+          python -m varyn.desktop_acceptance --synthetic-only --json
       - name: Offline desktop preflight and process RSS (doctor process only)
         run: python -m varyn.doctor --json
       - name: Build deterministic desktop source ZIP
