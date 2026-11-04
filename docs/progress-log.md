@@ -480,3 +480,8 @@ Dataset: 300 synthetic records, five retrieval repetitions; GitHub-hosted VMs, n
 
 ## 2026-11-04 — Checkpoint 17N
 Selected synthetic-only project note IDs now feed bounded analyst context after explicit desktop preview consent; later AI stages receive only model-produced handoffs. Source IDs are shown, not silently exported. See docs/progress-17n.md and docs/selected-memory-collaboration-17n.md. Initial CI failed on Python syntax, fixed; final CI still to verify. Draft PR only.
+
+## 2026-11-04 | Checkpoint 17O: bounded multi-step synthetic task execution
+- Implemented varyn/task_planner.py with explicit fixed JSON 1–6 step planning, whole-plan validation, shared agent step-budget checks, sequential execution, and separate digest-bound desktop approval of every mutating step. Allowed tools remain in-memory inspect_status and stage_note only; no shell, filesystem, network or external provider actions.
+- Desktop UI now offers Run reviewed synthetic task plan (JSON) and displays per-step results. Added tests/test_task_planner.py (15 test methods) and tests/test_task_planner_tk.py (Windows real-widget test), mandatory via CI workflow. See docs/task-plan-17o.md for the synthetic example, boundaries and limitations.
+- 17N's initial CI run 41809287501 failed on a syntax error, which was corrected. No green post-fix CI has yet been observed. 17N and 17O remain unverified until final Windows/Ubuntu CI passes. This is NOT autonomous LLM planning or a resumable agent. Draft PR #1 unmerged, main unchanged.
