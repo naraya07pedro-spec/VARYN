@@ -16,6 +16,7 @@ class DesktopPackagingTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         (self.root / "varyn").mkdir()
         (self.root / "Launch-VARYN.cmd").write_text("@echo off\n", encoding="utf-8")
+        (self.root / "Verify-VARYN-Synthetic.cmd").write_text("@echo off\n", encoding="utf-8")
         (self.root / "README.md").write_text("synthetic", encoding="utf-8")
         (self.root / "varyn" / "desktop.py").write_text("print('fake')\n", encoding="utf-8")
         (self.root / "varyn" / "providers.py").write_text("MODEL = 1\n", encoding="utf-8")
@@ -34,11 +35,17 @@ class DesktopPackagingTests(unittest.TestCase):
         with zipfile.ZipFile(self.output) as archive:
             names = archive.namelist()
             self.assertIn("VARYN/Launch-VARYN.cmd", names)
+            self.assertIn("VARYN/Verify-VARYN-Synthetic.cmd", names)
             self.assertIn("VARYN/varyn/desktop.py", names)
             self.assertNotIn("VARYN/.env", names)
             self.assertNotIn("VARYN/memory.sqlite3", names)
             self.assertFalse(any(name.endswith(".pyc") for name in names))
             self.assertNotIn(b"synthetic-key", archive.read("VARYN/README.md"))
+
+    def test_missing_required_synthetic_verifier_is_denied(self):
+        (self.root / "Verify-VARYN-Synthetic.cmd").unlink()
+        with self.assertRaises(ValueError):
+            archive_entries(self.root)
 
     def test_archive_deterministic_for_same_source(self):
         a = build_zip(self.output, root=self.root)
