@@ -153,6 +153,14 @@ class CollaborationEngine:
                 } for s in results
             ],
             "final_answer": results[-1].text,
+            "context_project": (
+                context.get("project") if context is not None else None
+            ),
+            "context_source_refs": (
+                [entry.get("ref") for entry in context.get("items", [])
+                 if isinstance(entry, dict) and type(entry.get("ref")) is str]
+                if context is not None else []
+            ),
             "distinct_provider_model_pairs": len({
                 (s.provider, s.model) for s in stages
             }),
