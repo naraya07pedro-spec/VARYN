@@ -260,6 +260,64 @@ class DesktopPlanTests(unittest.TestCase):
             release.set()
             ui._public_tool_worker.close()
 
+    def test_cancel_in_gap_before_second_modal_disables_stale_callback(self):
+        from varyn.desktop import VarynDesktop
+        calls = []
+        ui = FakeDesktop(fetcher=lambda r: calls.append(r) or metadata(r))
+        try:
+            with patch("varyn.desktop.messagebox.askyesno",
+                       side_effect=[True, True]) as ask:
+                VarynDesktop._review_public_comparison(ui)
+                deadline = time.monotonic() + 3
+                # Process only ONE scheduled UI callback at a time until
+                # the first result is committed and step-two is queued.
+                while time.monotonic() < deadline:
+                    if ui.scheduled:
+                        cb = ui.scheduled.pop(0)
+                        cb()
+                    plan = ui._public_comparison
+                    if plan is not None and plan.status()["steps_done"] == 1:
+                        break
+                    time.sleep(0.01)
+                self.assertIsNotNone(ui._public_comparison)
+                self.assertEqual(ui._public_comparison.status()["steps_done"], 1)
+                self.assertEqual(calls, [REPOS[0]])
+                self.assertTrue(ui.scheduled)
+                # No GET in progress, but there is still a scheduled next step.
+                self.assertFalse(ui._public_tool_worker.busy)
+                VarynDesktop._cancel_public_github_tool(ui)
+                self.assertIsNone(ui._public_comparison)
+                while ui.scheduled:
+                    ui.scheduled.pop(0)()
+            self.assertEqual(ask.call_count, 2)
+            self.assertEqual(calls, [REPOS[0]])
+            self.assertNotIn("GITHUB COMPARISON", repr(ui.messages))
+        finally:
+            ui._public_tool_worker.close()
+
+    def test_manual_single_tool_cannot_steal_active_comparison_worker(self):
+        from varyn.desktop import VarynDesktop
+        entered, release = Event(), Event()
+        calls = []
+        def fetch(repo):
+            entered.set()
+            calls.append(repo)
+            release.wait(3)
+            return metadata(repo)
+        ui = FakeDesktop(fetcher=fetch)
+        try:
+            with patch("varyn.desktop.messagebox.askyesno",
+                       side_effect=[True, True]) as ask:
+                VarynDesktop._review_public_comparison(ui)
+                self.assertTrue(entered.wait(2))
+                VarynDesktop._review_public_github_intent(ui)
+            self.assertEqual(ask.call_count, 2)
+            self.assertEqual(calls, [REPOS[0]])
+            self.assertIn("no parallel manual request", repr(ui.messages))
+        finally:
+            release.set()
+            ui._public_tool_worker.close()
+
     def test_stale_worker_gateway_mismatch_blocks_comparison(self):
         from varyn.desktop import VarynDesktop
         calls = []
