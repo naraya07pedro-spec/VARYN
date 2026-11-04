@@ -656,3 +656,12 @@ The desktop **Run reviewed synthetic task plan (JSON)** button executes a user-p
 The existing synthetic task runner supports **explicit opt-in** metadata-only SQLite checkpoints when VARYN Desktop is launched with `--task-journal ".\\varyn-task-checkpoints.sqlite3"` in an existing local folder. It records a random task ID, plan digest, step cursor and lifecycle state, never the task's JSON, arguments, note content or approval tokens. Every step gets an uncertain checkpoint before execution and a completed marker afterward. On restart, unfinished tasks become `needs_review` or `needs_reconciliation`, **never automatically restarted**. The demo agent's in-memory notes are NOT restored. This is crash-awareness groundwork, not autonomous durable execution. [17P contract and limitations](docs/task-journal-17p.md).
 
 CI additionally runs `tests/test_task_journal.py` on Windows and Ubuntu. A green final-commit CI result for 17N, 17O and 17P has not yet been confirmed through the available connector.
+
+
+### Checkpoint 17Q: Collaborative creative reasoning, with measurable limitations
+
+The three collaboration roles now use **divergence -> adversarial critique -> convergence**: propose materially distinct alternatives, steelman counterarguments and second-order failure modes, then choose a direction with an explicit falsification test. These are prompt protocols, NOT independently verified reasoning improvements.
+
+A new **Evaluate last collaboration** button uses a **local, user-authored literal rubric** to compare the current run's Analyst text against Synthesizer text. It reports exact required phrase coverage, prohibited-phrase mentions, and mentioned alternatives. **This is not a blinded controlled single-model-vs-multi-model trial, factual checking, semantic reasoning quality, or proof of originality.** The standalone `python -m varyn.reasoning_eval` runs three repeatable synthetic samples including a case where collaboration loses. It uses no model requests or APIs.
+
+See [17Q reasoning/creativity evaluation contract](docs/creative-reasoning-evaluation-17q.md) and [progress log](docs/progress-log.md). Automated official consumer-app history syncing (Option C) remains unverified and blocked.
