@@ -60,10 +60,15 @@ class TaskPlanRunner:
     thread, never in provider text, model output or a background process.
     """
 
-    def __init__(self, approvals):
+    def __init__(self, approvals, *, journal=None):
         if not isinstance(approvals, DesktopApprovalController):
             raise TypeError("VARYN DesktopApprovalController required")
+        if journal is not None:
+            from varyn.task_journal import TaskJournal
+            if not isinstance(journal, TaskJournal):
+                raise TypeError("Expected VARYN TaskJournal")
         self.approvals = approvals
+        self.journal = journal
 
     def run(self, plan, *, approve_mutation=None):
         if type(plan) is not tuple or not 1 <= len(plan) <= _MAX_TASK_STEPS:
@@ -79,8 +84,14 @@ class TaskPlanRunner:
             raise AgentLimitReached("Not enough remaining agent steps for task")
         if any(step.tool == "stage_note" for step in plan) and not callable(approve_mutation):
             raise PermissionError("Each mutating step requires GUI approval")
+        task_id = plan_digest = None
+        if self.journal is not None:
+            task_id, plan_digest = self.journal.create(plan)
         outcomes = []
         for index, step in enumerate(plan):
+            if self.journal is not None:
+                # Durable uncertain state BEFORE the first tool proposal.
+                self.journal.begin(task_id, plan_digest, index)
             preview = None
             try:
                 preview = self.approvals.propose(step.tool, dict(step.arguments))
@@ -93,6 +104,8 @@ class TaskPlanRunner:
                     self.approvals.decide(
                         preview.proposal_id, preview.digest, approved=False,
                     )
+                    if self.journal is not None:
+                        self.journal.stop(task_id, plan_digest, index, denied=True)
                     outcomes.append({"index": index, "tool": preview.tool, "status": "rejected"})
                     return {
                         "format": "varyn.task_run.v1",
@@ -100,6 +113,7 @@ class TaskPlanRunner:
                         "steps": outcomes, "next_step": None,
                         "auto_retried": False,
                         "external_actions": False,
+                        "task_journal_id": task_id,
                     }
                 result = self.approvals.decide(
                     preview.proposal_id, preview.digest, approved=True,
@@ -107,13 +121,19 @@ class TaskPlanRunner:
             except BaseException:
                 # Pending UI proposals must not be left to be approved later.
                 self.approvals.reject_all_pending()
+                if self.journal is not None:
+                    self.journal.stop(task_id, plan_digest, index)
                 raise
+            if self.journal is not None:
+                self.journal.complete(task_id, plan_digest, index)
             outcomes.append({
                 "index": index,
                 "tool": result["tool"],
                 "status": result["status"],
                 "output": dict(result["output"]),
             })
+        if self.journal is not None:
+            self.journal.finish(task_id, plan_digest, len(plan))
         return {
             "format": "varyn.task_run.v1",
             "status": "completed",
@@ -121,4 +141,5 @@ class TaskPlanRunner:
             "next_step": None,
             "auto_retried": False,
             "external_actions": False,
+            "task_journal_id": task_id,
         }
