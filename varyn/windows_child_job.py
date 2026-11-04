@@ -1,8 +1,8 @@
-"""17S-5 native Windows Job Object containment and OS token SID consistency.
+"""17S-5/6 native Windows child Job Object, SID and Low integrity gating.
 
-A Job Object enforces limited resources/process-tree cleanup. It is NOT a
-security sandbox, restricted access token, credential boundary, or human login.
-No third-party dependencies. Fail closed if native setup/assignment fails.
+Windows MIC low integrity prevents writes to ordinary medium-integrity objects.
+It does NOT prevent reads, revoke the user SID, or create an AppContainer.
+No third-party dependencies. Fail closed before sending tool input.
 """
 import ctypes
 import os
@@ -15,13 +15,28 @@ _JOB_OBJECT_LIMIT_PROCESS_MEMORY = 0x00000100
 _JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x00002000
 _EXTENDED_LIMIT_INFORMATION = 9
 _TOKEN_QUERY = 0x0008
+_TOKEN_ADJUST_DEFAULT = 0x0080
 _TOKEN_USER = 1
+_TOKEN_INTEGRITY_LEVEL = 25
+_SE_GROUP_INTEGRITY = 0x00000020
+_LOW_INTEGRITY_RID = 4096
+# Valid Windows integrity SID: revision 1, one subauthority,
+# SECURITY_MANDATORY_LABEL_AUTHORITY = {0,0,0,0,0,16}, RID=4096.
+_LOW_INTEGRITY_SID = bytes((1, 1, 0, 0, 0, 0, 0, 16)) + (
+    _LOW_INTEGRITY_RID.to_bytes(4, "little")
+)
 
 
 if os.name == "nt":
     _DWORD = ctypes.c_uint32
     _HANDLE = ctypes.c_void_p
     _SIZE_T = ctypes.c_size_t
+
+    class _SidAndAttributes(ctypes.Structure):
+        _fields_ = [("Sid", _HANDLE), ("Attributes", _DWORD)]
+
+    class _TokenMandatoryLabel(ctypes.Structure):
+        _fields_ = [("Label", _SidAndAttributes)]
 
     class _BasicLimit(ctypes.Structure):
         _fields_ = [
@@ -85,6 +100,12 @@ def _native_apis():
     advapi.GetTokenInformation.restype = ctypes.c_int
     advapi.GetLengthSid.argtypes = [_HANDLE]
     advapi.GetLengthSid.restype = _DWORD
+    advapi.IsValidSid.argtypes = [_HANDLE]
+    advapi.IsValidSid.restype = ctypes.c_int
+    advapi.SetTokenInformation.argtypes = [
+        _HANDLE, ctypes.c_int, ctypes.c_void_p, _DWORD,
+    ]
+    advapi.SetTokenInformation.restype = ctypes.c_int
     return kernel, advapi
 
 
@@ -112,6 +133,59 @@ def _token_user_sid(process_handle, kernel, advapi):
         if not 8 <= sid_length <= 68:
             raise PublicToolRejected("Invalid Windows SID length")
         return ctypes.string_at(sid_pointer, sid_length)
+    finally:
+        kernel.CloseHandle(token)
+
+
+def _enforce_child_low_integrity(process_handle, kernel, advapi):
+    """Use OS-issued *child* primary token; verify Low IL readback.
+
+    This guarantees a Low Mandatory Integrity Level, not a restricted token
+    with read-deny ACLs. The child has already started but is held on stdin;
+    caller MUST attach Job and apply this gate before sending tool intent.
+    """
+    if os.name != "nt":
+        raise PublicToolRejected("Windows MIC unavailable")
+    token = _HANDLE()
+    if not advapi.OpenProcessToken(
+            _HANDLE(process_handle), _TOKEN_QUERY | _TOKEN_ADJUST_DEFAULT,
+            ctypes.byref(token)):
+        raise PublicToolRejected("Cannot open child token for MIC reduction")
+    try:
+        sid_buffer = ctypes.create_string_buffer(_LOW_INTEGRITY_SID)
+        sid_ptr = ctypes.cast(sid_buffer, _HANDLE)
+        if not advapi.IsValidSid(sid_ptr):
+            raise PublicToolRejected("Low integrity SID failed native validation")
+        label = _TokenMandatoryLabel(
+            _SidAndAttributes(sid_ptr, _SE_GROUP_INTEGRITY),
+        )
+        # Windows requires sizeof(TOKEN_MANDATORY_LABEL) plus SID bytes.
+        # It is safe to set this on a child blocked on stdin.
+        size = ctypes.sizeof(label) + len(_LOW_INTEGRITY_SID)
+        if not advapi.SetTokenInformation(
+                token, _TOKEN_INTEGRITY_LEVEL,
+                ctypes.byref(label), size):
+            raise PublicToolRejected("Windows refused Low child integrity level")
+
+        needed = _DWORD()
+        advapi.GetTokenInformation(
+            token, _TOKEN_INTEGRITY_LEVEL, None, 0, ctypes.byref(needed))
+        if not ctypes.sizeof(_TokenMandatoryLabel) <= needed.value <= 65536:
+            raise PublicToolRejected("Unexpected child integrity query size")
+        output = ctypes.create_string_buffer(needed.value)
+        if not advapi.GetTokenInformation(
+                token, _TOKEN_INTEGRITY_LEVEL, output, needed,
+                ctypes.byref(needed)):
+            raise PublicToolRejected("Cannot verify child integrity level")
+        observed = ctypes.cast(output, ctypes.POINTER(_TokenMandatoryLabel)).contents
+        observed_sid = observed.Label.Sid
+        if not observed_sid or not advapi.IsValidSid(_HANDLE(observed_sid)):
+            raise PublicToolRejected("Invalid child integrity SID")
+        sid_len = advapi.GetLengthSid(_HANDLE(observed_sid))
+        if sid_len != len(_LOW_INTEGRITY_SID):
+            raise PublicToolRejected("Child integrity is not Low")
+        if ctypes.string_at(observed_sid, sid_len) != _LOW_INTEGRITY_SID:
+            raise PublicToolRejected("Child integrity readback is not Low")
     finally:
         kernel.CloseHandle(token)
 
@@ -178,10 +252,13 @@ class WindowsChildJob:
                     _HANDLE(int(process_handle)), _HANDLE(job),
                     ctypes.byref(confirmed)) or not confirmed.value:
                 raise PublicToolRejected("Windows job membership unverified")
+            # 17S-6: enforce MIC *after* Job membership and *before* stdin.
+            # Failure closes Job, killing the child. No downgrade/fallback.
+            _enforce_child_low_integrity(int(process_handle), self._kernel, advapi)
         except Exception:
             self.close()
             raise PublicToolRejected(
-                "Windows child OS identity or process limits not established"
+                "Windows child Job, SID or Low MIC not established"
             ) from None
 
     def close(self):
