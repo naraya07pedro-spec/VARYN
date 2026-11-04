@@ -34,6 +34,17 @@ class ScopedFileGrants:
         self._grants = {}
         self._audit = deque(maxlen=audit_limit)
 
+    def _sweep_expired(self, now):
+        """Release stale handles on trusted host activity; no background timer."""
+        stale = [key for key, entry in self._grants.items()
+                 if now >= entry["expiry"]]
+        for key in stale:
+            entry = self._grants.pop(key)
+            try:
+                entry["reader"].close()
+            finally:
+                self._audit.append(("expired", key[:8]))
+
     def grant(self, root, *, user_confirmed=False,
               duration_seconds=300, max_operations=10, max_bytes=16384):
         """Host passes directory; user confirmation is a caller assertion, not auth."""
@@ -45,10 +56,12 @@ class ScopedFileGrants:
             raise ValueError("Operation limit must be 1..100")
         reader = ScopedLocalReader(root, max_bytes=max_bytes)
         with self._lock:
+            now = self._clock()
+            self._sweep_expired(now)
             grant_id = token_urlsafe(32)
             self._grants[grant_id] = {
                 "reader": reader,
-                "expiry": self._clock() + duration_seconds,
+                "expiry": now + duration_seconds,
                 "remaining": max_operations,
             }
             self._audit.append(("granted", grant_id[:8]))
@@ -57,6 +70,7 @@ class ScopedFileGrants:
 
     def revoke(self, grant_id):
         with self._lock:
+            self._sweep_expired(self._clock())
             if not isinstance(grant_id, str) or grant_id not in self._grants:
                 raise AgentRejected("Unknown or revoked grant")
             entry = self._grants.pop(grant_id)
@@ -102,6 +116,7 @@ class ScopedFileGrants:
     def status(self):
         with self._lock:
             now = self._clock()
+            self._sweep_expired(now)
             return {
                 "format": "varyn.file_grants.v1",
                 "active": sum(entry["remaining"] > 0 and now < entry["expiry"]
