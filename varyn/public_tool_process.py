@@ -182,6 +182,9 @@ class ProcessRepoFetcher:
                 "credential_env_allowlist": True,
                 "windows_native_job_required": os.name == "nt",
                 "windows_same_user_sid_required": os.name == "nt",
+                "windows_child_low_mic_required": os.name == "nt",
+                "windows_mic_prevents_medium_integrity_writes": os.name == "nt",
+                "windows_mic_blocks_private_reads": False,
                 "windows_child_commit_cap_bytes": (192 * 1024 * 1024
                                                    if os.name == "nt" else None),
                 "os_sandbox": False,
