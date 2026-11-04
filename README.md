@@ -524,3 +524,20 @@ python -m unittest discover -s tests -p "test_windows_file_consistency.py" -v
 \`\`\`
 
 No filesystem write API, model file access, or provider-account history synchronization was introduced. Never select sensitive folders. See [17D security and test notes](docs/file-access-17d.md) and [progress log](docs/progress-log.md).
+
+
+### Checkpoint 17E: Idle-timeout closure for temporary synthetic folder grants
+
+The Tkinter desktop now opts into a **single cancellable in-process expiry timer** for local file grants. When the app stays idle, the timer attempts to close the approved directory handle when its time limit elapses, rather than keeping it open until someone presses Inspect/Revoke. The timer is daemonized, metadata-only and never uploads, reads or writes user files. Existing headless library callers remain default-off for deterministic testing.
+
+Generation-guarded callbacks cannot revoke newer permissions after a previous timer is cancelled. If an in-flight read or listing crosses its deadline, the manager **withholds the result**, even though a kernel read already underway cannot be interrupted. A failing/revoked/used-up grant cannot grant new access.
+
+This is a **best-effort process-local timer**, not a secure OS sandbox or hard-real-time lease. During Windows sleep or when an operation holds the manager lock, handle closure may be delayed. The grant checks and failed-result handling prevent an expired operation from returning its result through this library. Identity-authenticated consent, untrusted-process isolation, owner-laptop hardware acceptance, and official-app Option C synchronization remain unresolved.
+
+Synthetic test command:
+
+\`\`\`powershell
+python -m unittest discover -s tests -p "test_file_grant_idle_timer.py" -v
+\`\`\`
+
+See [17E scope/limitations](docs/file-grants-17e.md) and [running progress log](docs/progress-log.md). Never use sensitive folders with this experimental prototype.
