@@ -25,10 +25,11 @@ from varyn.desktop_collaboration import review_collaboration
 from varyn.desktop_memory import DesktopMemory
 from varyn.memory_handoff import parse_note_ids, selected_memory_context
 from varyn.task_planner import compile_plan, TaskPlanRunner
+from varyn.task_journal import TaskJournal
 
 
 class VarynDesktop(tk.Tk):
-    def __init__(self, controller=None, *, agent_journal=None, memory_db=None):
+    def __init__(self, controller=None, *, agent_journal=None, memory_db=None, task_journal=None):
         super().__init__()
         self.controller = controller or DesktopController(allow_live_providers=True)
         self.title("VARYN  |  Local AI Workspace (Opt-in Live MVP)")
@@ -43,6 +44,8 @@ class VarynDesktop(tk.Tk):
         self._results = queue.Queue()
         self._lifecycle = DesktopRequestState()
         self._agent_journal = agent_journal
+        self._task_journal = task_journal
+        self._task_recovery = task_journal.recover() if task_journal is not None else None
         self._memory = DesktopMemory(memory_db) if memory_db is not None else None
         self.memory_project = tk.StringVar(value="VARYN")
         self._approval = DesktopApprovalController(journal=agent_journal)
@@ -752,7 +755,7 @@ class VarynDesktop(tk.Tk):
         except (ValueError, AgentRejected, AgentLimitReached):
             self._append("TASK", "Invalid or oversized synthetic task plan; no action")
             return
-        runner = TaskPlanRunner(self._approval)
+        runner = TaskPlanRunner(self._approval, journal=getattr(self, '_task_journal', None))
 
         def approve_step(index, preview):
             return messagebox.askyesno(
@@ -860,6 +863,8 @@ class VarynDesktop(tk.Tk):
             self._agent_journal.close()
         if getattr(self, "_memory", None) is not None:
             self._memory.close()
+        if getattr(self, "_task_journal", None) is not None:
+            self._task_journal.close()
         self.controller.discard_pending_history()
         self._lifecycle.close()
         self._closing = True
@@ -872,20 +877,28 @@ def main():
                         help="Opt-in metadata-only SQLite recovery file")
     parser.add_argument("--memory-db", metavar="PATH",
                         help="Explicit opt-in UNENCRYPTED local SQLite for SYNTHETIC notes only")
+    parser.add_argument("--task-journal", metavar="PATH",
+                        help="Opt-in metadata-only durable task checkpoints; NEVER auto-resumes")
     args = parser.parse_args()
     journal = (AgentRecoveryJournal(args.agent_journal)
                if args.agent_journal else None)
+    task_journal = TaskJournal(args.task_journal) if args.task_journal else None
     try:
-        window = VarynDesktop(agent_journal=journal, memory_db=args.memory_db)
+        window = VarynDesktop(agent_journal=journal, memory_db=args.memory_db,
+                              task_journal=task_journal)
     except tk.TclError:
         if journal is not None:
             journal.close()
+        if task_journal is not None:
+            task_journal.close()
         raise SystemExit("A graphical desktop session is required")
     try:
         window.mainloop()
     finally:
         if journal is not None:
             journal.close()
+        if task_journal is not None:
+            task_journal.close()
 
 
 if __name__ == "__main__":
