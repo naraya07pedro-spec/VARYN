@@ -21,3 +21,8 @@ This is a genuine **local read of a temporary file created by VARYN**, not acces
 Mark 17S-1 verified only after the **final documentation/code commit** finishes Windows/Ubuntu CI and the exact head SHA is confirmed. Physical-owner GUI testing on the target Windows device is a separate acceptance gate; the hosted Windows Tk button tests do not prove human interaction. Keep PR #1 draft and main unchanged.
 
 Next: 17S-2 threat model for trusted user identity and app-scoped authorization, controlled safe tool extension, robust provenance, prompt-injection containment, end-to-end acceptance. Official consumer ChatGPT/Claude/Gemini app-history bidirectional synchronization remains externally blocked and is not replaced by an API aggregator.
+
+
+## Regression extensions
+
+The first Windows test failure was caused by platform-default CRLF translation in the generated fixture, while the tool gateway deliberately required the exact stored sample. The fixture writer now emits identical UTF-8 LF bytes on Windows and Ubuntu, verified by a raw-byte test; **the integrity comparison remains strict**. The in-memory tool audit is now bounded to 64 events, including after repeated abandoned proposals. An additional hosted Windows Tk test invokes the actual grant, review, deny, approve and revoke buttons using mock decisions and verifies zero model API requests. It does not prove physical human clicks or owner-device acceptance.
