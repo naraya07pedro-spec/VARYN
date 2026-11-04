@@ -213,11 +213,30 @@ class PublicGithubToolGateway:
         try:
             result = self._fetch(repository)
             if (type(result) is not dict or
+                    result.get("format") != "varyn.github_public_repo_metadata.v1" or
                     result.get("repository") != repository or
                     result.get("public") is not True or
                     result.get("read_only") is not True or
-                    result.get("provider_handoff") is not False):
+                    result.get("provider_handoff") is not False or
+                    result.get("untrusted_external_data") is not True or
+                    type(result.get("default_branch")) is not str or
+                    not _BRANCH.fullmatch(result["default_branch"]) or
+                    type(result.get("stars")) is not int or result["stars"] < 0 or
+                    type(result.get("open_items_including_prs")) is not int or
+                    result["open_items_including_prs"] < 0 or
+                    type(result.get("archived")) is not bool):
                 raise PublicToolRejected("Untrusted GitHub result rejected")
+            result = {
+                "format": "varyn.github_public_repo_metadata.v1",
+                "repository": repository,
+                "default_branch": result["default_branch"],
+                "stars": result["stars"],
+                "open_items_including_prs": result["open_items_including_prs"],
+                "archived": result["archived"],
+                "public": True, "read_only": True,
+                "untrusted_external_data": True,
+                "provider_handoff": False,
+            }
         except Exception:
             with self._lock:
                 self._in_flight -= 1
