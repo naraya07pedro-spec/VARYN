@@ -3,6 +3,7 @@
 All network interactions are mocked. No credentials or live API are used.
 """
 import json
+import time
 import unittest
 from email.message import Message
 from types import SimpleNamespace
@@ -316,8 +317,11 @@ class DesktopIntentTests(unittest.TestCase):
                 self._public_github_tools = PublicGithubToolGateway(
                     fetcher=lambda repo: calls.append(repo) or metadata(repo))
                 self.messages = []
+                self.scheduled = []
             def _append(self, title, message):
                 self.messages.append((title, message))
+            def after(self, ms, callback):
+                self.scheduled.append(callback)
         ui = Fake()
         with patch("varyn.desktop.messagebox.askyesno", return_value=False) as dialog:
             VarynDesktop._review_public_github_intent(ui)
@@ -325,9 +329,18 @@ class DesktopIntentTests(unittest.TestCase):
         self.assertEqual(calls, [])
         with patch("varyn.desktop.messagebox.askyesno", return_value=True):
             VarynDesktop._review_public_github_intent(ui)
+        self.assertEqual(len(ui.scheduled), 1)
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            VarynDesktop._poll_public_github_tool(ui)
+            if "default branch main" in repr(ui.messages):
+                break
+            time.sleep(0.01)
         self.assertEqual(calls, ["naraya07pedro-spec/VARYN"])
-        self.assertIn("main", repr(ui.messages))
+        self.assertIn("default branch main", repr(ui.messages))
         self.assertEqual(ui._public_github_tools.status()["pending"], 0)
+        self.assertFalse(ui._public_tool_worker.busy)
+        ui._public_tool_worker.close()
 
     def test_desktop_network_gate_cannot_prompt_when_disabled(self):
         from varyn.desktop import VarynDesktop
