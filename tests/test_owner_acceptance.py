@@ -101,8 +101,8 @@ class BoundedHumanAttestationTests(unittest.TestCase):
         self.assertNotIn("C:\\", serialized)
         self.assertEqual(result["owner_reported_checks"]["no_private_data"],
                          "not_checked")
-        self.assertEqual(result["provider_requests"], 0)
-        self.assertFalse(result["saved_to_disk"])
+        self.assertEqual(result["provider_requests_by_report_tool"], 0)
+        self.assertFalse(result["report_saved_to_disk_by_tool"])
 
     def test_cli_requires_opt_in_flags(self):
         for parameters in ([], ["--interactive"], ["--synthetic-only"],
