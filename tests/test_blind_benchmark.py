@@ -2,7 +2,7 @@
 import copy
 import unittest
 
-from varyn.blind_benchmark import prepare_blinded, score_blinded
+from varyn.blind_benchmark import prepare_blinded, score_blinded, synthetic_demo
 from varyn.reasoning_eval import EvaluationError
 
 SECRET = "organizer-controlled-private-seed"
@@ -48,6 +48,20 @@ def score_record(case_id, rater, a=4, b=3):
 
 
 class BlindBenchmarkTests(unittest.TestCase):
+    def test_synthetic_demo_exposes_positive_and_negative_cases(self):
+        a = synthetic_demo()
+        self.assertEqual(a, synthetic_demo())
+        self.assertTrue(a["synthetic_demo_only"])
+        self.assertFalse(a["real_model_outputs_used"])
+        self.assertEqual(a["cases"], 2)
+        self.assertFalse(a["performance_superiority_proven"])
+        deltas = [
+            x["collaboration_minus_single"]["accuracy"]
+            for x in a["results"]
+        ]
+        self.assertTrue(any(x > 0 for x in deltas))
+        self.assertTrue(any(x < 0 for x in deltas))
+
     def test_blind_packets_reveal_neither_model_identity_nor_mapping(self):
         packet, key = prepare_blinded([sample()], organizer_secret=SECRET)
         self.assertEqual(packet["format"], "varyn.blind_packet.v1")
