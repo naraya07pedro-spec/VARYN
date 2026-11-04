@@ -357,11 +357,15 @@ def spawn_suspended_restricted_primary(argv, *, cwd):
         result = SuspendedRestrictedProcess(pi.hProcess, pi.hThread, k)
         created = False
         return result
-    except Exception:
+    except Exception as exc:
         if created:
             k.TerminateProcess(pi.hProcess, 25)
             k.CloseHandle(pi.hThread)
             k.CloseHandle(pi.hProcess)
+        # Only our fixed source-authored rejection labels may be surfaced.
+        # Never include runtime paths, raw Windows errors or token payloads.
+        if isinstance(exc, PublicToolRejected):
+            raise PublicToolRejected(str(exc)) from None
         raise PublicToolRejected("Restricted primary process refused; no fallback") from None
     finally:
         if restricted:
