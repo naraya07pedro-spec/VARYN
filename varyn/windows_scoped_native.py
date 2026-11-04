@@ -19,6 +19,12 @@ from varyn.agent_runtime import AgentRejected
 
 _REPARSE = 0x400
 _DIRECTORY = 0x10
+_OFFLINE = 0x00001000
+_RECALL_ON_OPEN = 0x00040000
+_RECALL_ON_DATA_ACCESS = 0x00400000
+_UNSAFE_REMOTE_ATTRIBUTES = (_REPARSE | _OFFLINE |
+                             _RECALL_ON_OPEN | _RECALL_ON_DATA_ACCESS)
+_DRIVE_FIXED = 3
 _FILE_LIST_DIRECTORY = 0x0001
 _FILE_READ_DATA = 0x0001
 _FILE_READ_ATTRIBUTES = 0x0080
@@ -89,6 +95,8 @@ def _windows_apis():
     kernel.CreateFileW.restype = wintypes.HANDLE
     kernel.CloseHandle.argtypes = (wintypes.HANDLE,)
     kernel.CloseHandle.restype = wintypes.BOOL
+    kernel.GetDriveTypeW.argtypes = (wintypes.LPCWSTR,)
+    kernel.GetDriveTypeW.restype = wintypes.UINT
     kernel.GetFileInformationByHandle.argtypes = (
         wintypes.HANDLE, ctypes.POINTER(_ByHandleFileInformation),
     )
@@ -124,12 +132,33 @@ def _file_info(kernel, handle):
     return info, size, file_id
 
 
+def _require_fixed_local_volume(path, kernel):
+    """Reject UNC, mapped remote, removable, and unknown-volume paths."""
+    anchor = str(path.anchor)
+    if (len(anchor) != 3 or anchor[1:] != ":\\" or
+            not ("A" <= anchor[0].upper() <= "Z")):
+        raise AgentRejected("Windows scope requires a drive-letter root")
+    if kernel.GetDriveTypeW(anchor) != _DRIVE_FIXED:
+        raise AgentRejected("Windows scope requires a fixed local volume")
+
+
+def _content_signature(info, size, file_id):
+    """Best-effort same-handle change detector, NOT immutable snapshot proof."""
+    return (
+        info.dwVolumeSerialNumber, file_id, size,
+        info.dwFileAttributes, info.nNumberOfLinks,
+        info.ftLastWriteTime.dwHighDateTime,
+        info.ftLastWriteTime.dwLowDateTime,
+    )
+
+
 class WindowsScopedDirectory:
     """Single folder pin. ONLY caller-validated top-level basenames are accepted."""
 
     def __init__(self, path, expected_inode):
         self._handle = None
         self._kernel, self._ntdll = _windows_apis()
+        _require_fixed_local_volume(path, self._kernel)
         handle = self._kernel.CreateFileW(
             str(path),
             _FILE_LIST_DIRECTORY | _FILE_READ_ATTRIBUTES | _SYNCHRONIZE,
@@ -141,7 +170,7 @@ class WindowsScopedDirectory:
         try:
             info, _, identity = _file_info(self._kernel, handle)
             if (not info.dwFileAttributes & _DIRECTORY
-                    or info.dwFileAttributes & _REPARSE
+                    or info.dwFileAttributes & _UNSAFE_REMOTE_ATTRIBUTES
                     or info.nNumberOfLinks != 1
                     or (expected_inode and identity != expected_inode)):
                 raise AgentRejected("Approved Windows directory identity mismatch")
@@ -190,8 +219,8 @@ class WindowsScopedDirectory:
             raise AgentRejected("Windows file unavailable or unsafe")
         try:
             info, size, _ = _file_info(self._kernel, opened)
-            if (info.dwFileAttributes & (_DIRECTORY | _REPARSE) or
-                    info.nNumberOfLinks != 1):
+            if (info.dwFileAttributes & (_DIRECTORY | _UNSAFE_REMOTE_ATTRIBUTES)
+                    or info.nNumberOfLinks != 1):
                 raise AgentRejected("Windows file link or reparse point denied")
         except BaseException:
             self._kernel.CloseHandle(opened)
@@ -210,16 +239,22 @@ class WindowsScopedDirectory:
             raise AgentRejected("Invalid Windows file limit")
         handle, size = self._open_child(basename)
         try:
-            if size > max_bytes:
-                raise AgentRejected("Windows file size limit exceeded")
+            before, before_size, before_id = _file_info(self._kernel, handle)
+            if (before_size != size or before_size > max_bytes or
+                    before.dwFileAttributes & (_DIRECTORY | _UNSAFE_REMOTE_ATTRIBUTES)
+                    or before.nNumberOfLinks != 1):
+                raise AgentRejected("Windows file changed before read")
+            signature = _content_signature(before, before_size, before_id)
             buffer = ctypes.create_string_buffer(max_bytes + 1)
             received = wintypes.DWORD()
             if not self._kernel.ReadFile(
                 handle, buffer, max_bytes + 1, ctypes.byref(received), None,
             ):
                 raise AgentRejected("Windows file read failed")
-            if received.value > max_bytes:
-                raise AgentRejected("Windows file grew beyond read limit")
+            after, after_size, after_id = _file_info(self._kernel, handle)
+            if (received.value != before_size or received.value > max_bytes or
+                    _content_signature(after, after_size, after_id) != signature):
+                raise AgentRejected("Windows file changed during read")
             return buffer.raw[:received.value]
         finally:
             self._kernel.CloseHandle(handle)
