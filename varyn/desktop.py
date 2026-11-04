@@ -69,6 +69,8 @@ class VarynDesktop(tk.Tk):
         self._public_comparison = None
         self._public_comparison_request = None
         self._public_comparison_journal_ref = None
+        self._public_poll_after_id = None
+        self._public_step_after_id = None
         self._file_grant_id = None
         self._file_fixture = None
         self._busy = False
@@ -573,12 +575,55 @@ class VarynDesktop(tk.Tk):
             self._append("GITHUB TOOL", "Public GitHub request not authorized or worker unavailable")
             return
         self._append("GITHUB TOOL", "Approved public read started; UI remains responsive")
-        self.after(75, self._poll_public_github_tool)
+        VarynDesktop._schedule_public_poll(self)
+
+    def _cancel_public_scheduled_callbacks(self):
+        """Remove Tk-after callbacks before widget teardown or task revocation."""
+        for attribute in ("_public_poll_after_id", "_public_step_after_id"):
+            callback_id = getattr(self, attribute, None)
+            setattr(self, attribute, None)
+            if callback_id is not None:
+                cancel = getattr(self, "after_cancel", None)
+                if callable(cancel):
+                    try:
+                        cancel(callback_id)
+                    except tk.TclError:
+                        # Already executing or removed by Tk. Stale callbacks
+                        # also check _closing and the exact current plan.
+                        pass
+
+    def _schedule_public_poll(self):
+        """At most one outstanding Tk callback for the GitHub worker."""
+        if getattr(self, "_closing", False) or getattr(self, "_public_poll_after_id", None) is not None:
+            return
+        self._public_poll_after_id = self.after(
+            75, lambda: VarynDesktop._scheduled_public_poll(self),
+        )
+
+    def _scheduled_public_poll(self):
+        self._public_poll_after_id = None
+        if not getattr(self, "_closing", False):
+            VarynDesktop._poll_public_github_tool(self)
+
+    def _schedule_public_comparison_next(self, plan):
+        """Defer step two without permitting resurrection after cancellation."""
+        if getattr(self, "_closing", False) or getattr(self, "_public_step_after_id", None) is not None:
+            return
+        self._public_step_after_id = self.after(
+            0, lambda p=plan: VarynDesktop._scheduled_public_comparison_next(self, p),
+        )
+
+    def _scheduled_public_comparison_next(self, plan):
+        self._public_step_after_id = None
+        if (not getattr(self, "_closing", False) and
+                getattr(self, "_public_comparison", None) is plan):
+            VarynDesktop._run_public_comparison_step(self, plan)
 
     def _abort_public_comparison(self, reason):
         """Tk thread only; prevent stale callbacks from resuming a cancelled task."""
         plan = getattr(self, "_public_comparison", None)
         if plan is not None:
+            VarynDesktop._cancel_public_scheduled_callbacks(self)
             plan.cancel()
             journal = getattr(self, "_comparison_journal", None)
             ref = getattr(self, "_public_comparison_journal_ref", None)
@@ -718,7 +763,7 @@ class VarynDesktop(tk.Tk):
             return
         self._public_comparison_request = request_id
         self._append("GITHUB PLAN", "Approved step " + str(step) + "/2: " + preview.repository)
-        self.after(75, self._poll_public_github_tool)
+        VarynDesktop._schedule_public_poll(self)
 
     def _poll_public_github_tool(self):
         """Only the Tk thread renders approved results from the worker queue."""
@@ -768,8 +813,7 @@ class VarynDesktop(tk.Tk):
                             self._public_comparison = None
                             self._public_comparison_journal_ref = None
                         else:
-                            self.after(0, lambda p=plan:
-                                       VarynDesktop._run_public_comparison_step(self, p))
+                            VarynDesktop._schedule_public_comparison_next(self, plan)
                     except (PublicToolRejected, JournalConflict, SQLiteError, KeyError, TypeError, ValueError):
                         VarynDesktop._abort_public_comparison(self, "Comparison result or durable journal refused")
             elif outcome.status != "completed":
@@ -785,7 +829,7 @@ class VarynDesktop(tk.Tk):
                     + " | archived " + str(repo["archived"]),
                 )
         if worker.busy:
-            self.after(75, self._poll_public_github_tool)
+            VarynDesktop._schedule_public_poll(self)
 
     def _revoke_synthetic_folder(self):
         gateway = getattr(self, "_synthetic_tools", None)
@@ -1326,6 +1370,7 @@ class VarynDesktop(tk.Tk):
         ):
             return
         VarynDesktop._abort_public_comparison(self, "Desktop closing")
+        VarynDesktop._cancel_public_scheduled_callbacks(self)
         self._approval.reject_all_pending()
         gateway = getattr(self, "_synthetic_tools", None)
         if gateway is not None:
