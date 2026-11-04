@@ -157,6 +157,9 @@ class PublicGithubToolGateway:
         self._pending = {}
         self._audit = deque(maxlen=32)
         self._lock = RLock()
+        self._epoch = 0
+        self._closed = False
+        self._in_flight = 0
 
     def propose(self, raw, *, network_consent=False):
         """Parsing/proposing never dispatches. Consent is a host assertion."""
@@ -164,6 +167,8 @@ class PublicGithubToolGateway:
         if network_consent is not True:
             raise PermissionError("Explicit network consent required")
         with self._lock:
+            if self._closed:
+                raise PublicToolRejected("Public tool gateway closed")
             if self._used + len(self._pending) >= self._max_requests:
                 raise PublicToolRejected("Local GitHub tool budget reached")
             proposal = token_urlsafe(24)
@@ -175,10 +180,16 @@ class PublicGithubToolGateway:
             return PublicToolReview(proposal, digest, repository)
 
     def decide(self, proposal_id, digest, *, approved=False, network_consent=False):
-        """Consume before ANY network action. Every attempt counts once."""
+        """Consume once, reserve budget, and execute outside the gateway lock.
+
+        Revoking or closing during an in-flight GET cannot unsend it, but
+        invalidates its result and refuses to deliver it to the caller.
+        """
         if type(approved) is not bool or type(network_consent) is not bool:
             raise PublicToolRejected("Exact trusted boolean decisions required")
         with self._lock:
+            if self._closed:
+                raise PublicToolRejected("Public tool gateway closed")
             pending = self._pending.get(proposal_id) if type(proposal_id) is str else None
             if pending is None or type(digest) is not str or pending[0] != digest:
                 raise PublicToolRejected("Unknown, stale or mismatched review")
@@ -192,22 +203,58 @@ class PublicGithubToolGateway:
             if network_consent is not True:
                 self._audit.append("consent_revoked")
                 raise PermissionError("Network permission revoked before dispatch")
-            self._used += 1  # reserve before external call, even on failure
+            self._used += 1  # count even when HTTP fails or is later revoked
+            self._in_flight += 1
+            epoch = self._epoch
             repository = pending[1]
-            try:
-                result = self._fetch(repository)
-                if (type(result) is not dict or
-                        result.get("repository") != repository or
-                        result.get("public") is not True or
-                        result.get("read_only") is not True or
-                        result.get("provider_handoff") is not False):
-                    raise PublicToolRejected("Untrusted GitHub result rejected")
-            except Exception:
+
+        # The only outbound request is the bounded, fixed-host public GET.
+        # A trusted host may revoke while this call blocks: NEVER hold the lock.
+        try:
+            result = self._fetch(repository)
+            if (type(result) is not dict or
+                    result.get("repository") != repository or
+                    result.get("public") is not True or
+                    result.get("read_only") is not True or
+                    result.get("provider_handoff") is not False):
+                raise PublicToolRejected("Untrusted GitHub result rejected")
+        except Exception:
+            with self._lock:
+                self._in_flight -= 1
                 self._audit.append("failed")
-                raise PublicToolRejected("Approved GitHub public read failed") from None
+            raise PublicToolRejected("Approved GitHub public read failed") from None
+
+        with self._lock:
+            self._in_flight -= 1
+            if self._closed or self._epoch != epoch:
+                self._audit.append("result_suppressed")
+                raise PublicToolRejected("Public GitHub result revoked after dispatch")
             self._audit.append("completed")
             return {"status": "completed", "network_dispatched": True,
                     "result": result}
+
+    def revoke_active(self):
+        """Invalidate every pending review and all in-flight results instantly.
+
+        In-flight network transport can still finish; no retries or result
+        delivery are authorized after this call. This is not HTTP cancellation.
+        """
+        with self._lock:
+            if self._closed:
+                return
+            self._epoch += 1
+            self._pending.clear()
+            self._audit.append("revoked")
+
+    def close(self):
+        """Mark session closed without waiting for a potentially blocked GET."""
+        with self._lock:
+            if self._closed:
+                return
+            self._closed = True
+            self._epoch += 1
+            self._pending.clear()
+            self._audit.append("closed")
 
     def reject_all_pending(self):
         with self._lock:
@@ -222,7 +269,8 @@ class PublicGithubToolGateway:
         with self._lock:
             return {"format": "varyn.public_github_tool_gateway.v1",
                     "used": self._used, "limit": self._max_requests,
-                    "pending": len(self._pending), "audit": tuple(self._audit),
+                    "pending": len(self._pending), "in_flight": self._in_flight,
+                    "closed": self._closed, "audit": tuple(self._audit),
                     "authenticated_identity": False,
                     "network_default": False,
                     "model_autodispatch": False}
