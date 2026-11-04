@@ -125,8 +125,10 @@ def compare_outputs(case, baseline, collaborative):
 
 def compare_collaboration_report(case, report):
     """Within one run analyst-vs-synthesizer diagnostic, NOT a controlled A/B."""
-    if type(report) is not dict or report.get("format") != "varyn.collaboration.v1":
-        raise EvaluationError("Expected collaboration result")
+    if (type(report) is not dict or
+            report.get("format") != "varyn.collaboration.v1" or
+            report.get("status") != "completed"):
+        raise EvaluationError("Expected completed collaboration result")
     stages = report.get("stages")
     if (type(stages) is not list or len(stages) != 3 or
         any(type(s) is not dict for s in stages) or
@@ -156,6 +158,9 @@ def evaluate_fixture_suite(fixtures):
             "baseline", "collaboration"
         }:
             raise EvaluationError("Invalid fixture schema")
+        if any(type(item[key]) is not list for key in
+               ("required", "forbidden", "alternatives")):
+            raise EvaluationError("Fixture rubric criteria must be lists")
         case = EvaluationCase(
             item["case_id"], tuple(item["required"]),
             tuple(item["forbidden"]), tuple(item["alternatives"]),
