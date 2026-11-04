@@ -40,13 +40,17 @@ class ParserTests(unittest.TestCase):
 
     def test_unsafe_urls_paths_and_rogue_repos_denied(self):
         for bad in (
-            "https://github.com/a/b", "localhost/x", "a/../../etc",
+            "https://github.com/a/b", "http://localhost/x", "a/../../etc",
             "a/.", "a/..", "a/.git", "a/b.git", "a/b?token=secret",
             "a/b#f", "a/b\\child", "a/b c", "user@host/r",
             "127.0.0.1:443/r", "a/" + "x" * 101,
         ):
             with self.subTest(bad=bad), self.assertRaises(PublicToolRejected):
                 parse_public_tool_intent(intent(bad))
+
+    def test_owner_named_localhost_is_not_ssrf(self):
+        # This is a GitHub owner slug, not a user-controlled network host.
+        self.assertEqual(parse_public_tool_intent(intent("localhost/x")), "localhost/x")
 
     def test_bad_json_fields_and_duplicates_denied(self):
         bad = [
