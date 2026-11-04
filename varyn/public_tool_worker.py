@@ -35,6 +35,10 @@ class PublicGithubToolWorker:
         self._closed = False
         self._completed = Queue(maxsize=1)
 
+    def uses_gateway(self, gateway):
+        """Require the host-approved gateway and worker to be the SAME object."""
+        return gateway is self._gateway
+
     @property
     def busy(self):
         with self._lock:
