@@ -78,6 +78,20 @@ class NativeWindowsRestrictedPrimaryTests(unittest.TestCase):
             ["icacls", str(dest), "/grant", "*S-1-5-12:(OI)(CI)RX", "/T"],
             capture_output=True, text=True, timeout=15, check=False)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        # Positive control: a known-good copied Python must initialize with
+        # the SAME minimal environment before the restricted-token launch.
+        baseline = subprocess.run(
+            [str(exe_copy), "-I", "-S", "-c", "import sys; sys.exit(0)"],
+            cwd=str(dest), env={"SystemRoot": os.environ["SystemRoot"]},
+            stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, timeout=8, check=False,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        self.assertEqual(
+            baseline.returncode, 0,
+            "Trusted runtime COPY failed without restrictions: "
+            + str(baseline.returncode) + " "
+            + baseline.stderr.decode("utf-8", "replace")[-700:])
         return exe_copy
 
     def _launch_probe(self, target, exe):
