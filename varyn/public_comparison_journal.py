@@ -23,14 +23,21 @@ class PublicComparisonJournal:
             raise ValueError("Explicit on-disk metadata journal path required")
         self.db = sqlite3.connect(str(p), isolation_level=None)
         self._closed = False
-        self.db.execute("PRAGMA synchronous=FULL")
-        self.db.execute("PRAGMA journal_mode=DELETE")
-        self.db.execute(
-            "CREATE TABLE IF NOT EXISTS public_comparison_checkpoints ("
-            "task_id TEXT PRIMARY KEY, digest TEXT NOT NULL,"
-            "cursor INTEGER NOT NULL CHECK(cursor BETWEEN 0 AND 2),"
-            "status TEXT NOT NULL)"
-        )
+        try:
+            self.db.execute("PRAGMA synchronous=FULL")
+            self.db.execute("PRAGMA journal_mode=DELETE")
+            self.db.execute(
+                "CREATE TABLE IF NOT EXISTS public_comparison_checkpoints ("
+                "task_id TEXT PRIMARY KEY, digest TEXT NOT NULL,"
+                "cursor INTEGER NOT NULL CHECK(cursor BETWEEN 0 AND 2),"
+                "status TEXT NOT NULL)"
+            )
+        except Exception:
+            # On Windows an open SQLite connection locks a corrupt journal
+            # even after __init__ raises; always release it on failure.
+            self.db.close()
+            self._closed = True
+            raise
 
     def _check(self, task_id, digest):
         if self._closed:
