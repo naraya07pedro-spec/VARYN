@@ -6,6 +6,8 @@
 
 ## Safe executable self-check
 
+For convenience, the source ZIP now also contains **Verify-VARYN-Synthetic.cmd**. After inspecting and extracting the trusted source-only ZIP, double-click that file in an ordinary user session to run the exact offline synthetic probe and see its PASS/FAIL summary. **Do not use Run as Administrator.** The script never performs GUI clicking; after it finishes, press a key to close its command window. If Python is missing or the test fails, it reports failure and does not silently enable permissions.
+
 From an inspected VARYN repo checkout on its draft branch, open normal Windows PowerShell in the repo directory (NOT as Administrator). Run:
 
     py -3 -m varyn.desktop_acceptance --synthetic-only --json
