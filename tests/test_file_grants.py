@@ -108,6 +108,12 @@ class GrantTests(unittest.TestCase):
             self.grants.grant(self.folder / "missing", user_confirmed=True)
         self.assertEqual(self.grants.status()["active"], 0)
 
+    def test_reserved_windows_device_names_rejected(self):
+        grant = self.grant(max_operations=10)
+        for name in ("CON.txt", "nul.md", "COM1.txt", "LPT9.md"):
+            with self.subTest(name=name), self.assertRaises(AgentRejected):
+                self.grants.read_text(grant.grant_id, name)
+
     def test_windows_reparse_metadata_deny(self):
         fake = SimpleNamespace(st_file_attributes=0x400, st_nlink=1)
         with patch("varyn.scoped_files.os.name", "nt"):
