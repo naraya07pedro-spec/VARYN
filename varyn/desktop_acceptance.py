@@ -1,4 +1,4 @@
-"""Checkpoint 18A: SAFE offline synthetic-only desktop acceptance probe.
+"""Checkpoint 17H: SAFE offline synthetic-only desktop acceptance probe.
 
 Uses the real Windows native handle backend where available. Never accepts
 a path, reads user data, invokes AI APIs, contacts a provider, opens a browser,
