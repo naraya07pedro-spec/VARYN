@@ -488,10 +488,12 @@ class VarynDesktop(tk.Tk):
     def _cancel_public_github_tool(self):
         """Forget local result; never claim cancellation of a sent GET."""
         worker = getattr(self, "_public_tool_worker", None)
-        if worker is None or not worker.busy:
-            self._append("GITHUB TOOL", "No public GitHub request to hide")
+        plan = getattr(self, "_public_comparison", None)
+        if (worker is None or not worker.busy) and plan is None:
+            self._append("GITHUB TOOL", "No public GitHub request or comparison to cancel")
             return
-        worker.revoke()
+        if worker is not None:
+            worker.revoke()
         VarynDesktop._abort_public_comparison(self, "Comparison cancelled by owner")
         self._append(
             "GITHUB TOOL",
