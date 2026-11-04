@@ -39,7 +39,7 @@ class VarynDesktop(tk.Tk):
         self._agent_journal = agent_journal
         self._approval = DesktopApprovalController(journal=agent_journal)
         self._native_client = NativeToolRequestClient(allow_network=True)
-        self._file_grants = ScopedFileGrants()
+        self._file_grants = ScopedFileGrants(auto_expire=True)
         self._file_grant_id = None
         self._busy = False
         self._closing = False
