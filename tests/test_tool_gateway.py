@@ -123,6 +123,13 @@ class ToolGatewayTests(unittest.TestCase):
             gate.propose("read_generated_sample", {"name": "notes.md"},
                          grant_id=self.grant.grant_id)
 
+    def test_repeated_discard_cannot_grow_audit_without_bound(self):
+        for _ in range(100):
+            self.proposal()
+            self.gateway.reject_all_pending()
+        self.assertLessEqual(len(self.gateway._events), 64)
+        self.assertEqual(self.gateway.status()["pending"], 0)
+
     def test_manager_type_restricted(self):
         with self.assertRaises(TypeError):
             SyntheticReadToolGateway(object())
