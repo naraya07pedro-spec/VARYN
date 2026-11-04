@@ -547,9 +547,18 @@ See [17E scope/limitations](docs/file-grants-17e.md) and [running progress log](
 
 ### Checkpoint 17F: Desktop accepts only VARYN-generated synthetic fixtures
 
-The experimental desktop file-demo button now **creates a temporary directory containing exactly two fixed non-sensitive files** (`sample.txt` and `notes.md`) after explicit Yes/No consent. It **does not open a folder picker** and cannot choose Documents, Downloads or other user-selected folders through this UI. The original read-only, time-limited and quota-limited grant still applies. When revoked, replaced, inspected after expiry, or on normal desktop close, the granted handle is closed and the fixture is cleaned up. Ordinary expiry without another UI interaction closes the handle via 17E's timer, but the two harmless sample files may remain until the UI interacts or the app exits.
+The experimental desktop file-demo button now **creates a temporary directory containing exactly two fixed non-sensitive files** (`sample.txt` and `notes.md`) after explicit Yes/No consent. It **does not open a folder picker** and cannot choose Documents, Downloads or other user-selected folders through this UI. The original read-only, time-limited and quota-limited grant still applies. When revoked, replaced, inspected after expiry, or on normal desktop close, the granted handle is closed and the fixture is cleaned up. **Historical 17F limitation, superseded by 17G:** ordinary expiry originally closed only the directory handle. Checkpoint 17G now also requests cleanup of its VARYN-owned temporary samples directly through the grant release lifecycle. Python timers remain best-effort and abrupt crashes can still leave harmless sample files.
 
 This closes a meaningful gap between a *synthetic-only warning* and actual desktop behavior. It is **not** an OS process sandbox, authenticated Windows consent, or protection against same-user code. The trusted Python grant API remains experimental and callable by host code; it must not be exposed to model tool calls or sensitive inputs. Abnormal process death can leave benign temporary samples; physical laptop acceptance remains outstanding. No model or provider receives sample contents.
 
 See [17F security guard and test evidence](docs/desktop-synthetic-guard-17f.md) and [progress log](docs/progress-log.md).
 
+
+
+### Checkpoint 17G: Grant-owned cleanup for synthetic desktop sample files
+
+The temporary demo files are now coupled directly to the lifetime of the **specific host-approved scoped grant**. A trusted-only, optional on_release callback closes the fixture **after** the pinned folder handle is closed on idle timer expiry, explicit revoke, replacement, revoke_all, quota exhaustion, read crossing its time deadline, or failure to start the expiry timer. This callback is never model-authored and no agent/model receives a filesystem tool. A once-only release flag and existing grant lock prevent double cleanup across timer/UI races.
+
+SyntheticFixture.close() is protected by its own lock and retains its owner reference after a transient delete error so normal desktop shutdown can retry. The desktop no longer needs an Inspect or Revoke click to delete a sample after a successful idle-expiry callback. This is *best effort* during Windows sleep, process suspension or deletion failures, and **does not** clean up after sudden power loss or OS process death.
+
+Additional Windows and Ubuntu regression suites test real one-second idle cleanup, concurrent revoke/timer access, fail-closed scheduler, and idempotent temporary directory cleanup. No private file access or provider app-history synchronization was enabled. See [17G evidence and limitations](docs/grant-fixture-cleanup-17g.md) and [development log](docs/progress-log.md).
