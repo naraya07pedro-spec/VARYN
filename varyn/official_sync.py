@@ -9,6 +9,7 @@ reviewed connector must prove read + write authority and verify revision
 preconditions before any state-changing action is even considered.
 """
 from dataclasses import dataclass
+from varyn.official_app_evidence import official_app_evidence
 from types import MappingProxyType
 import argparse
 import json
@@ -48,6 +49,7 @@ def official_app_capability(provider):
         "export_documentation": _SYNC_REFS[provider],
         "model_api_is_app_sync": False,
         "can_dispatch": False,
+        "evidence": official_app_evidence(provider),
     }
 
 
