@@ -95,6 +95,17 @@ class ScopedLocalReader:
 
     def _check_root(self):
         self._active()
+        if os.name == "nt":
+            # Catch detectable parent junction/reparse changes on EACH access.
+            # Still subject to concurrent Windows path swaps between checks.
+            try:
+                for parent in (self._root, *self._root.parents):
+                    ancestor = parent.lstat()
+                    if (parent.is_symlink() or
+                            bool(getattr(ancestor, "st_file_attributes", 0) & _REPARSE)):
+                        raise AgentRejected("Approved directory ancestry changed")
+            except OSError:
+                raise AgentRejected("Approved directory ancestry unavailable") from None
         try:
             meta = self._root.lstat()
             if (not stat.S_ISDIR(meta.st_mode)
