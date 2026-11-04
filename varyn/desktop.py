@@ -512,6 +512,16 @@ class VarynDesktop(tk.Tk):
         if self._busy or self._closing:
             return False
         try:
+            # Check all stage identifiers BEFORE any sensitive note preview.
+            # The second full review still collects live-stage approvals.
+            from varyn.collaboration import Stage
+            if (type(selections) not in (tuple, list) or len(selections) != 3 or
+                    type(task) is not str or not 1 <= len(task.strip()) <= 1200):
+                raise ValueError("Invalid collaboration task or plan")
+            for role, pair in zip(("analyst", "critic", "synthesizer"), selections):
+                if type(pair) not in (tuple, list) or len(pair) != 2:
+                    raise ValueError("Invalid collaboration stage")
+                Stage(role, pair[0], pair[1], 256)
             context = None
             if memory_ids:
                 # Read only exactly selected project/IDs; no search or inference.
