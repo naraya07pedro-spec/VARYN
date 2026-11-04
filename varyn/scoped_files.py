@@ -1,11 +1,12 @@
-"""Checkpoint 16A: explicitly scoped, read-only local text-file prototype.
+"""Scoped read-only text-file prototype; 17B pins POSIX directory handles.
 
 The user/host chooses an ABSOLUTE root directory outside any model output.
 Only top-level ordinary .txt/.md files are accessible by basename. No shell,
 recursive walk, writes, network, model execution, or automatic context upload.
 
-NOT a hardened OS sandbox: especially on Windows, hostile concurrent filesystem
-replacement/reparse-point attacks need native handle-based validation.
+POSIX opens are tied to the original directory FD, protecting content reads
+from path replacement after scope selection. Windows still uses best-effort
+metadata checks, NOT a secure handle-based containment boundary.
 """
 import os
 import re
@@ -53,8 +54,47 @@ class ScopedLocalReader:
             raise ValueError('Unsafe root metadata')
         self._max_bytes = max_bytes
         self._max_list = max_list
+        self._closed = False
+        self._root_fd = None
+        if os.name != "nt":
+            flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+            flags |= getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+            fd = None
+            try:
+                fd = os.open(base, flags)
+                opened = os.fstat(fd)
+                if (not stat.S_ISDIR(opened.st_mode)
+                        or opened.st_dev != self._root_stat.st_dev
+                        or opened.st_ino != self._root_stat.st_ino):
+                    raise ValueError("Approved directory changed during scope creation")
+            except BaseException:
+                if fd is not None:
+                    os.close(fd)
+                raise
+            self._root_fd = fd
+
+    def close(self):
+        """Release original directory descriptor and refuse future operations."""
+        if not self._closed:
+            self._closed = True
+            fd, self._root_fd = self._root_fd, None
+            if fd is not None:
+                os.close(fd)
+
+    def __del__(self):
+        if getattr(self, "_closed", True) is False:
+            try:
+                self.close()
+            except OSError:
+                pass
+
+    def _active(self):
+        if self._closed:
+            raise AgentRejected("Approved directory reader is closed")
+
 
     def _check_root(self):
+        self._active()
         try:
             meta = self._root.lstat()
             if (not stat.S_ISDIR(meta.st_mode)
@@ -82,7 +122,8 @@ class ScopedLocalReader:
         self._check_root()
         found = []
         try:
-            with os.scandir(self._root) as entries:
+            # POSIX fd scan remains anchored if a directory path is swapped.
+            with os.scandir(self._root_fd if self._root_fd is not None else self._root) as entries:
                 for entry in entries:
                     try:
                         self._name(entry.name)
@@ -118,7 +159,17 @@ class ScopedLocalReader:
                 raise AgentRejected("Not a permitted regular text file")
             flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
             flags |= getattr(os, "O_NOFOLLOW", 0)
-            fd = os.open(path, flags)
+            # POSIX openat pins reads to the original approved directory.
+            # Windows does not support dir_fd here and remains synthetic-only.
+            fd = (os.open(name, flags, dir_fd=self._root_fd)
+                  if self._root_fd is not None else os.open(path, flags))
+            if self._root_fd is None:
+                # Windows recheck narrows exposure but does not close OS races.
+                try:
+                    self._check_root()
+                except BaseException:
+                    os.close(fd)
+                    raise
             try:
                 opened = os.fstat(fd)
                 if (not stat.S_ISREG(opened.st_mode)
