@@ -253,10 +253,10 @@ class PublicGithubToolGateway:
                     "result": result}
 
     def revoke_active(self):
-        """Invalidate every pending review and all in-flight results instantly.
+        """Invalidate reviews/results; best-effort terminate any child fetcher.
 
-        In-flight network transport can still finish; no retries or result
-        delivery are authorized after this call. This is not HTTP cancellation.
+        Same-thread or already-sent HTTP cannot be guaranteed cancelled.
+        A child-process fetcher may stop its process without a blocking join.
         """
         with self._lock:
             if self._closed:
@@ -264,9 +264,16 @@ class PublicGithubToolGateway:
             self._epoch += 1
             self._pending.clear()
             self._audit.append("revoked")
+        stopper = getattr(self._fetch, "cancel", None)
+        if callable(stopper):
+            try:
+                stopper()
+            except Exception:
+                # Result authority was already revoked; never regrant it.
+                pass
 
     def close(self):
-        """Mark session closed without waiting for a potentially blocked GET."""
+        """Mark session closed, invalidate outputs, terminate child if possible."""
         with self._lock:
             if self._closed:
                 return
@@ -274,6 +281,12 @@ class PublicGithubToolGateway:
             self._epoch += 1
             self._pending.clear()
             self._audit.append("closed")
+        closer = getattr(self._fetch, "close", None)
+        if callable(closer):
+            try:
+                closer()
+            except Exception:
+                pass
 
     def reject_all_pending(self):
         with self._lock:
