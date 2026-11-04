@@ -25,6 +25,7 @@ from varyn.tool_gateway import SyntheticReadToolGateway, ToolGatewayRejected
 from varyn.public_github_tool import PublicGithubToolGateway, PublicToolRejected
 from varyn.public_tool_worker import PublicGithubToolWorker
 from varyn.public_tool_process import ProcessRepoFetcher
+from varyn.public_repo_plan import PublicRepoComparison
 from varyn.desktop_collaboration import review_collaboration
 from varyn.desktop_memory import DesktopMemory
 from varyn.memory_handoff import parse_note_ids, selected_memory_context
@@ -60,6 +61,8 @@ class VarynDesktop(tk.Tk):
         self._synthetic_tools = SyntheticReadToolGateway(self._file_grants)
         self._public_github_tools = PublicGithubToolGateway(fetcher=ProcessRepoFetcher())
         self._public_tool_worker = PublicGithubToolWorker(self._public_github_tools)
+        self._public_comparison = None
+        self._public_comparison_request = None
         self._file_grant_id = None
         self._file_fixture = None
         self._busy = False
@@ -211,6 +214,10 @@ class VarynDesktop(tk.Tk):
         ttk.Button(
             outer, text="Hide/cancel public GitHub tool result (cannot cancel sent GET)",
             command=self._cancel_public_github_tool,
+        ).pack(anchor="w", pady=(0, 8))
+        ttk.Button(
+            outer, text="Review 2-repo public GitHub comparison plan (JSON)",
+            command=self._review_public_comparison,
         ).pack(anchor="w", pady=(0, 8))
         self._build_memory_controls(outer)
         ttk.Label(
@@ -466,6 +473,7 @@ class VarynDesktop(tk.Tk):
     def _public_tool_permission_changed(self):
         """Tk-thread-only explicit revocation; no assumptions about API consent."""
         if self.consent_public_tools.get() is not True:
+            VarynDesktop._abort_public_comparison(self, "GitHub permission revoked")
             worker = getattr(self, "_public_tool_worker", None)
             if worker is not None:
                 worker.revoke()
@@ -484,6 +492,7 @@ class VarynDesktop(tk.Tk):
             self._append("GITHUB TOOL", "No public GitHub request to hide")
             return
         worker.revoke()
+        VarynDesktop._abort_public_comparison(self, "Comparison cancelled by owner")
         self._append(
             "GITHUB TOOL",
             "Result hidden and permission for this request revoked. An already "
@@ -493,6 +502,9 @@ class VarynDesktop(tk.Tk):
     def _review_public_github_intent(self):
         """Review JSON on Tk main thread; dispatch approved GET in a worker."""
         if self._busy or self._closing:
+            return
+        if getattr(self, "_public_comparison", None) is not None:
+            self._append("GITHUB TOOL", "Comparison owns the public tool worker; no parallel manual request")
             return
         worker = getattr(self, "_public_tool_worker", None)
         if worker is None:
@@ -546,6 +558,120 @@ class VarynDesktop(tk.Tk):
         self._append("GITHUB TOOL", "Approved public read started; UI remains responsive")
         self.after(75, self._poll_public_github_tool)
 
+    def _abort_public_comparison(self, reason):
+        """Tk thread only; prevent stale callbacks from resuming a cancelled task."""
+        plan = getattr(self, "_public_comparison", None)
+        if plan is not None:
+            plan.cancel()
+            self._public_comparison = None
+            self._public_comparison_request = None
+            self._public_github_tools.reject_all_pending()
+            self._append("GITHUB PLAN", reason + "; no automatic resume")
+
+    def _review_public_comparison(self):
+        """Stage an untrusted two-repository task; whole-task review is not GET consent."""
+        if self._busy or self._closing:
+            return
+        worker = self._public_tool_worker
+        if not worker.uses_gateway(self._public_github_tools) or worker.busy:
+            self._append("GITHUB PLAN", "Public tool is busy or has mismatched authorization")
+            return
+        if self._public_comparison is not None:
+            self._append("GITHUB PLAN", "A comparison is already active")
+            return
+        if self.consent_public_tools.get() is not True:
+            self._append("GITHUB PLAN", "Enable the separate public GitHub network permission first")
+            return
+        try:
+            plan = PublicRepoComparison(self.prompt.get("1.0", "end-1c"))
+            review = plan.review()
+        except (PublicToolRejected, ValueError):
+            self._append("GITHUB PLAN", "Invalid two-repository comparison JSON; nothing executed")
+            return
+        approved = messagebox.askyesno(
+            "Review GitHub comparison task (NO automatic tool authorization)",
+            "Public read-only repositories, in exact order:"
+            + "\n1. " + review.repositories[0]
+            + "\n2. " + review.repositories[1]
+            + "\nTask digest: " + review.digest
+            + "\n\nThis task requires TWO separate explicit GET approvals."
+            + "\nOnly public metadata is compared locally, never code quality."
+            + "\nThe desktop will NOT send results to any AI provider."
+            + "\n\nStart owner-reviewed comparison?",
+            parent=self,
+        )
+        try:
+            started = plan.start(
+                review.plan_id, review.digest, approved=approved,
+                network_consent=self.consent_public_tools.get() is True,
+            )
+        except (PublicToolRejected, PermissionError):
+            self._append("GITHUB PLAN", "Plan expired or permission revoked; no network request")
+            return
+        if not started:
+            self._append("GITHUB PLAN", "Comparison declined; no network request")
+            return
+        self._public_comparison = plan
+        self._public_comparison_request = None
+        self._append("GITHUB PLAN", "Two-step plan staged; each GitHub read still needs its own approval")
+        VarynDesktop._run_public_comparison_step(self, plan)
+
+    def _run_public_comparison_step(self, plan):
+        """Acquire one new one-use permission on the Tk thread, never auto approve."""
+        if self._closing or getattr(self, "_public_comparison", None) is not plan:
+            return
+        if self.consent_public_tools.get() is not True:
+            VarynDesktop._abort_public_comparison(self, "Public GitHub permission disabled")
+            return
+        worker = self._public_tool_worker
+        if worker.busy or not worker.uses_gateway(self._public_github_tools):
+            VarynDesktop._abort_public_comparison(self, "Worker unavailable or authorization changed")
+            return
+        try:
+            intent = plan.next_intent()
+            preview = self._public_github_tools.propose(
+                intent, network_consent=self.consent_public_tools.get() is True,
+            )
+        except (PublicToolRejected, PermissionError):
+            VarynDesktop._abort_public_comparison(self, "Cannot stage next reviewed tool step")
+            return
+        step = plan.status()["steps_done"] + 1
+        approved = messagebox.askyesno(
+            "Approve EXACT GitHub comparison step " + str(step) + " of 2",
+            "Step: " + str(step) + "/2"
+            + "\nRead-only tool: " + preview.tool
+            + "\nRepository: " + preview.repository
+            + "\nEndpoint: https://api.github.com/repos/" + preview.repository
+            + "\nOne-use review digest: " + preview.digest
+            + "\n\nAnonymous GET in supervised same-user Low-MIC Windows child."
+            + "\nNo private data, writes, retry or AI context upload."
+            + "\nThis approval is only for this ONE request. Proceed?",
+            parent=self,
+        )
+        # Nested Tk dialogs may process checkbox/close callbacks. Re-check.
+        if self._closing or getattr(self, "_public_comparison", None) is not plan:
+            self._public_github_tools.reject_all_pending()
+            return
+        permission = self.consent_public_tools.get() is True
+        if not approved or not permission:
+            try:
+                self._public_github_tools.decide(
+                    preview.proposal_id, preview.digest, approved=False,
+                    network_consent=permission,
+                )
+            except (PublicToolRejected, PermissionError):
+                pass
+            VarynDesktop._abort_public_comparison(self, "Tool step declined or permission removed")
+            return
+        try:
+            request_id = worker.submit(preview, network_consent=permission)
+        except (PublicToolRejected, PermissionError, OSError, RuntimeError):
+            VarynDesktop._abort_public_comparison(self, "Tool dispatch failed")
+            return
+        self._public_comparison_request = request_id
+        self._append("GITHUB PLAN", "Approved step " + str(step) + "/2: " + preview.repository)
+        self.after(75, self._poll_public_github_tool)
+
     def _poll_public_github_tool(self):
         """Only the Tk thread renders approved results from the worker queue."""
         if self._closing:
@@ -555,7 +681,41 @@ class VarynDesktop(tk.Tk):
             return
         outcome = worker.poll()
         if outcome is not None:
-            if outcome.status != "completed":
+            plan = getattr(self, "_public_comparison", None)
+            if plan is not None:
+                if (outcome.request_id != self._public_comparison_request or
+                        outcome.status != "completed"):
+                    VarynDesktop._abort_public_comparison(self, "Comparison step failed or stale; no retry")
+                else:
+                    try:
+                        status = plan.commit(outcome.result)
+                        self._append("GITHUB PLAN", "Verified metadata step "
+                                     + str(plan.status()["steps_done"]) + "/2: "
+                                     + outcome.result["repository"])
+                        self._public_comparison_request = None
+                        if status == "completed":
+                            summary = plan.summary()
+                            a, b = summary["rows"]
+                            self._append(
+                                "GITHUB COMPARISON",
+                                a["repository"] + " | stars " + str(a["stars"])
+                                + " | open items " + str(a["open_items_including_prs"])
+                                + " | archived " + str(a["archived"])
+                                + "\n" + b["repository"] + " | stars " + str(b["stars"])
+                                + " | open items " + str(b["open_items_including_prs"])
+                                + " | archived " + str(b["archived"])
+                                + "\nMore stars: " + str(summary["more_stars"])
+                                + " | difference " + str(summary["stars_difference"])
+                                + "\nPublic metadata only, NOT code quality or security. "
+                                + "Never sent to model.",
+                            )
+                            self._public_comparison = None
+                        else:
+                            self.after(0, lambda p=plan:
+                                       VarynDesktop._run_public_comparison_step(self, p))
+                    except (PublicToolRejected, KeyError, TypeError, ValueError):
+                        VarynDesktop._abort_public_comparison(self, "Untrusted comparison result refused")
+            elif outcome.status != "completed":
                 self._append("GITHUB TOOL", "Public read failed, expired or was revoked; no retry")
             else:
                 repo = outcome.result
@@ -1108,6 +1268,7 @@ class VarynDesktop(tk.Tk):
             parent=self,
         ):
             return
+        VarynDesktop._abort_public_comparison(self, "Desktop closing")
         self._approval.reject_all_pending()
         gateway = getattr(self, "_synthetic_tools", None)
         if gateway is not None:
