@@ -2,12 +2,15 @@
 import json
 import time
 import unittest
+import tempfile
+from pathlib import Path
 from threading import Event
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from varyn.public_github_tool import PublicGithubToolGateway, PublicToolRejected
 from varyn.public_repo_plan import PublicRepoComparison, parse_comparison_plan
+from varyn.public_comparison_journal import PublicComparisonJournal
 from varyn.public_tool_worker import PublicGithubToolWorker
 
 
@@ -181,6 +184,66 @@ class FakeDesktop:
 
 
 class DesktopPlanTests(unittest.TestCase):
+    def test_opt_in_durable_journal_tracks_both_approved_real_ui_steps(self):
+        from varyn.desktop import VarynDesktop
+        with tempfile.TemporaryDirectory() as temp:
+            journal = PublicComparisonJournal(Path(temp) / "comparison.sqlite3")
+            calls = []
+            ui = FakeDesktop(fetcher=lambda r: calls.append(r) or metadata(r))
+            ui._comparison_journal = journal
+            ui._public_comparison_journal_ref = None
+            try:
+                with patch("varyn.desktop.messagebox.askyesno",
+                           side_effect=[True, True, True]) as ask:
+                    VarynDesktop._review_public_comparison(ui)
+                    self.assertTrue(pump(ui, lambda:
+                                        "GITHUB COMPARISON" in repr(ui.messages)))
+                self.assertEqual(ask.call_count, 3)
+                self.assertEqual(calls, list(REPOS))
+                rows = journal.db.execute(
+                    "SELECT task_id,cursor,status FROM public_comparison_checkpoints"
+                ).fetchall()
+                self.assertEqual(len(rows), 1)
+                self.assertEqual(rows[0][1:], (2, "completed"))
+                self.assertFalse(journal.inspect(rows[0][0])["executable"])
+                self.assertIsNone(ui._public_comparison_journal_ref)
+            finally:
+                ui._public_tool_worker.close()
+                journal.close()
+
+    def test_opt_in_journal_marks_uncertain_on_revocation_before_result(self):
+        from varyn.desktop import VarynDesktop
+        entered, release = Event(), Event()
+        def fetcher(repo):
+            entered.set()
+            release.wait(2)
+            return metadata(repo)
+        with tempfile.TemporaryDirectory() as temp:
+            journal = PublicComparisonJournal(Path(temp) / "comparison.sqlite3")
+            ui = FakeDesktop(fetcher=fetcher)
+            ui._comparison_journal = journal
+            ui._public_comparison_journal_ref = None
+            try:
+                with patch("varyn.desktop.messagebox.askyesno",
+                           side_effect=[True, True]):
+                    VarynDesktop._review_public_comparison(ui)
+                self.assertTrue(entered.wait(2))
+                VarynDesktop._abort_public_comparison(ui, "Revoked by owner")
+                rows = journal.db.execute(
+                    "SELECT cursor,status FROM public_comparison_checkpoints"
+                ).fetchall()
+                self.assertEqual(rows, [(0, "needs_reconciliation")])
+                self.assertIsNone(ui._public_comparison)
+                self.assertIsNone(ui._public_comparison_journal_ref)
+                release.set()
+                self.assertTrue(pump(ui, lambda:
+                                    not ui._public_tool_worker.busy))
+                self.assertNotIn("GITHUB COMPARISON", repr(ui.messages))
+            finally:
+                release.set()
+                ui._public_tool_worker.close()
+                journal.close()
+
     def test_three_separate_human_approvals_for_two_actual_gets(self):
         from varyn.desktop import VarynDesktop
         calls = []
