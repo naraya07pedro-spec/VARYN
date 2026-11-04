@@ -48,11 +48,11 @@ def review_collaboration(task, selections, *, network_enabled=False,
             "will be sent to this provider. For critic/synthesizer, earlier "
             "model outputs will ALSO be sent across provider boundaries as "
             "UNTRUSTED input (up to 950 characters per previous stage). "
-            ("The EXACT user-selected local memory records will be sent "
+            + ("The EXACT user-selected local memory records will be sent "
              "to the analyst stage; later stages may receive quoted or "
              "summarized contents via model outputs.\n\n"
              if memory_attached else "No stored memory is attached.\n\n")
-            "Approve this EXACT API stage, its possible cost, and data sharing?"
+            + "Approve this EXACT API stage, its possible cost, and data sharing?"
         )
         if ask_approval(warning) is not True:
             raise PermissionError("Collaboration plan declined; nothing was dispatched")
