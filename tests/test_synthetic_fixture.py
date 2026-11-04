@@ -56,6 +56,19 @@ class SyntheticFixtureTests(unittest.TestCase):
         self.assertFalse(root.exists())
         fixture.close()
 
+    def test_failed_cleanup_is_retriable_without_replacing_fixture(self):
+        fixture = SyntheticFixture()
+        root = fixture.root
+        with patch.object(fixture._tempdir, "cleanup",
+                          side_effect=OSError("synthetic transient lock")):
+            with self.assertRaises(OSError):
+                fixture.close()
+        self.assertTrue(root.exists())
+        self.assertIsNotNone(fixture._tempdir)
+        fixture.close()
+        self.assertFalse(root.exists())
+        self.assertIsNone(fixture._tempdir)
+
     def test_fixture_creation_failure_does_not_leave_temp_directory(self):
         roots = []
         original = tempfile.TemporaryDirectory
