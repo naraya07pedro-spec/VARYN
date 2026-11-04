@@ -108,9 +108,13 @@ class NativeWindowsJobTests(unittest.TestCase):
             guard = WindowsChildJob(proc)
             self.assertTrue(guard.attached)
             self.assertIsNone(proc.poll())
+            started = time.monotonic()
             guard.close()  # native KILL_ON_JOB_CLOSE
+            # Windows does not promise a nonzero status for Job teardown.
+            # The robust check is that a previously alive, stdin-blocked
+            # process terminates promptly while its stdin remains open.
             self.assertIsNotNone(proc.wait(timeout=5))
-            self.assertNotEqual(proc.returncode, 0)
+            self.assertLess(time.monotonic() - started, 5)
         finally:
             if guard is not None:
                 guard.close()
