@@ -670,7 +670,7 @@ class VarynDesktop(tk.Tk):
             parent=self,
         ):
             return
-        if self._memory is not None:
+        if getattr(self, "_memory", None) is not None:
             self._memory.close()
         self.controller.discard_pending_history()
         self._lifecycle.discard_visible()
