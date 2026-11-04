@@ -8,6 +8,7 @@ This does not provide an OS sandbox or protect against code running as the
 same operating-system user.
 """
 from pathlib import Path
+from threading import Lock
 from tempfile import TemporaryDirectory
 
 
@@ -22,6 +23,7 @@ class SyntheticFixture:
 
     def __init__(self):
         self._tempdir = None
+        self._close_lock = Lock()
         tempdir = TemporaryDirectory(prefix="varyn-synthetic-")
         try:
             root = Path(tempdir.name)
@@ -34,7 +36,13 @@ class SyntheticFixture:
         self.root = root
 
     def close(self):
-        """Delete only this instance's disposable fixture; idempotent."""
-        tempdir, self._tempdir = self._tempdir, None
-        if tempdir is not None:
-            tempdir.cleanup()
+        """Thread-safe once-only cleanup; retryable after filesystem error.
+
+        Background lease expiry and a user closing the UI can race. Never
+        clear the TemporaryDirectory reference before successful cleanup.
+        """
+        with self._close_lock:
+            tempdir = self._tempdir
+            if tempdir is not None:
+                tempdir.cleanup()
+                self._tempdir = None
