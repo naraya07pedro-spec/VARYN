@@ -675,3 +675,14 @@ See [17Q reasoning/creativity evaluation contract](docs/creative-reasoning-evalu
 ### Checkpoint 17S-1: reviewed synthetic file tool (first slice, NOT all tools)
 
 After using **Create & grant VARYN demo folder**, click **Review one VARYN synthetic file read (local only)**. The desktop shows an exact proposal/digest before opening its generated `sample.txt`. Approvals are single-use and consume the existing local grant; denial, expiry, revocation, replay, tampering and edited fixture contents fail closed. Only the fixed built-in synthetic sample can be displayed in the local RAM transcript. It is never uploaded to an AI provider. **This is not real personal file access, authenticated OS permission, external application control, autonomous planning, or official-app history sync.** See [17S-1 documentation](docs/tool-gateway-17s-1.md).
+
+
+### Checkpoint 17S-2: first real external, reviewed read-only GitHub tool
+
+VARYN Desktop offers **Allow public GitHub metadata reads (separate from AI provider APIs)**, OFF by default. Paste this exact untrusted request in the Message field and press **Review public GitHub tool intent (JSON, network)**:
+
+    {"format":"varyn.public_tool_intent.v1","tool":"github_public_repo_metadata","arguments":{"repository":"naraya07pedro-spec/VARYN"}}
+
+The owner must review the fixed GitHub HTTPS endpoint and one-use digest, then approve the exact read. The tool makes one anonymous public GitHub GET with no token, no redirects, no user-selected URLs, no private repository access, no shell or writes. Results display locally only and are not automatically supplied to an AI. A separate AI-provider network checkbox does NOT authorize this tool. Reviews expire after two minutes; up to five dispatch attempts are permitted per in-process session. UI networking is currently synchronous (up to five seconds per approved request); CI uses mocked HTTP, not live calls.
+
+This is not authenticated user identity, personal file access, autonomous tool dispatch, or official ChatGPT/Claude/Gemini app-history synchronization. See [17S-2 tool contract](docs/public-github-tool-17s-2.md).
