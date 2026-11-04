@@ -451,7 +451,7 @@ print(reader.list_files())
 print(reader.read_text('example.txt'))
 ```
 
-Supply an **existing absolute folder chosen by the host**, not from model text. Only nonrecursive `.txt`/`.md` file basenames are accepted with strict UTF-8 decoding and byte limits. This reader is **not connected to model tool calls or the desktop UI**; it has no filesystem write or network API. It is not an OS sandbox, particularly under Windows reparse-point/concurrent path changes, and must not be used with secrets or confidential files. Tests use synthetic folders only.
+Supply an **existing absolute folder chosen by the host**, not from model text. Only nonrecursive `.txt`/`.md` file basenames are accepted with strict UTF-8 decoding and byte limits. Originally this reader was standalone. As of 16C, the desktop UI uses it only for a synthetic filename count; it is **not connected to model tool calls**, has no filesystem write or network API, and is not an OS sandbox. Checkpoint 17C adds native Windows anchored reads without authorizing secrets or confidential files. Tests use synthetic folders only.
 
 ### Checkpoint 16B: Temporary read-only file grants
 
@@ -463,7 +463,7 @@ This is **not proof of user authentication**, permission from a graphical dialog
 
 The experimental Tkinter desktop now exposes **Grant synthetic test folder**, **Inspect test-folder count**, and **Revoke test-folder grant** actions. A trusted OS folder chooser and a separate explicit Yes/No dialog precede issuance of an ephemeral host-side read-only scope grant (default 5 minutes and 10 operations). The UI only shows a count of matching top-level test files; it does **not** display filenames or contents, attach files to a prompt, call models with folder data, or introduce file tools into the agent registry. Closing the desktop revokes active grants.
 
-Only select folders containing **synthetic test data**. This is **not authenticated access control or an OS sandbox**, and Windows concurrent reparse/path-swap attacks remain out of scope. Headless automated tests do not prove that a user physically clicked the dialogs. See [development log](docs/progress-log.md) and [official-app sync feasibility](docs/product-contract-and-feasibility.md).
+Only select folders containing **synthetic test data**. This is **not authenticated access control or an OS sandbox**. Checkpoint 17C mitigates Windows path-redirection risks with native pinned directory handles; it does not establish general process isolation or validate all adversarial Windows filesystems. Headless automated tests do not prove that a user physically clicked the dialogs. See [development log](docs/progress-log.md) and [official-app sync feasibility](docs/product-contract-and-feasibility.md).
 
 
 ### Checkpoint 17A: Official-app sync status and synthetic two-way reconciliation (offline)
@@ -490,7 +490,7 @@ All three currently report `blocked_pending_provider_evidence` for automatic off
 
 The standalone **synthetic-only** file reader now pins its approved directory to a POSIX file descriptor, then lists via the descriptor and opens files relative to the same directory with `O_NOFOLLOW`. This reduces the risk that a path swap between permission checks and opening a file will silently redirect reads to another directory. The descriptor is released when the reader closes, or when a temporary grant is revoked, expires upon attempted use, or exhausts its operation limit. Existing read-only size/extension restrictions remain.
 
-**Windows remains limited:** The reader now rechecks detectable reparse points in every parent directory on each operation and rechecks the approved directory after opening a content handle. These are **best-effort mitigations**, not atomic Win32 handle-based containment; concurrent malicious path swaps and local-process privilege attacks remain unmitigated. Windows native OS confinement and actual laptop acceptance still need separate proof. None of this authorizes personal/financial/client documents.
+**Historical 17B Windows limitation:** At this checkpoint Windows only rechecked parent reparse metadata and the root identity; it still had unanchored opens. **17C supersedes this specific gap** with native handle-relative Windows file opens and enumeration. The remaining limitations are authentication, full process isolation, native adversarial coverage, and actual laptop acceptance. None of this authorizes personal/financial/client documents.
 
 To run the offline synthetic regression tests:
 
@@ -499,3 +499,12 @@ python -m unittest discover -s tests -p "test_file_scope_lifecycle.py" -v
 ```
 
 This reader is not exposed as a model or agent tool and still cannot write files or upload them to providers.
+
+
+### Checkpoint 17C: Native Windows handle-pinned folder reads and inventory
+
+VARYN now uses a separate **Windows native directory-handle backend** for the approved synthetic folder. The native scope pins the selected directory, opens child files relative to that handle via NtCreateFile + RootDirectory, enumerates via NtQueryDirectoryFile using the pinned handle, and rejects file reparse points, hardlinks, Windows device aliases, and unsafe filenames. It fails closed if native access is unavailable rather than reverting to pathname-based Python opens. POSIX retains the 17B directory-FD path.
+
+A Windows-only CI regression suite exercises real native kernel calls, while the cross-platform suite verifies that non-Windows cannot open the Windows backend. No model tool is wired to file contents; the desktop displays only a bounded filename count, with host-approved temporary permissions. **This is not Windows account authentication or a secure process sandbox**. It remains limited to non-sensitive synthetic test folders until permission/authentication isolation, broader threat-model testing, and owner-laptop GUI acceptance pass.
+
+See [native Windows threat model, evidence and laptop test steps](docs/windows-native-file-scope-17c.md) and the [progress log](docs/progress-log.md). The official-app synchronization target Option C is unchanged and remains unverified.
