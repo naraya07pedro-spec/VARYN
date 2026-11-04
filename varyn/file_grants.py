@@ -59,7 +59,8 @@ class ScopedFileGrants:
         with self._lock:
             if not isinstance(grant_id, str) or grant_id not in self._grants:
                 raise AgentRejected("Unknown or revoked grant")
-            del self._grants[grant_id]
+            entry = self._grants.pop(grant_id)
+            entry["reader"].close()
             self._audit.append(("revoked", grant_id[:8]))
 
     def _take(self, grant_id, operation):
@@ -68,9 +69,11 @@ class ScopedFileGrants:
             raise AgentRejected("Unknown or revoked grant")
         if self._clock() >= entry["expiry"]:
             del self._grants[grant_id]
+            entry["reader"].close()
             self._audit.append(("expired", grant_id[:8]))
             raise PermissionError("Grant expired")
         if entry["remaining"] <= 0:
+            entry["reader"].close()
             self._audit.append(("exhausted", grant_id[:8]))
             raise PermissionError("Grant operation limit reached")
         # Debit before the call. Failed attempts are counted to bound abuse.
@@ -78,13 +81,23 @@ class ScopedFileGrants:
         self._audit.append((operation, grant_id[:8]))
         return entry["reader"]
 
-    def list_files(self, grant_id):
+    def _perform(self, grant_id, operation, method, *args):
         with self._lock:
-            return self._take(grant_id, "list_attempt").list_files()
+            reader = self._take(grant_id, operation)
+            try:
+                return getattr(reader, method)(*args)
+            finally:
+                # The final permitted operation may finish, but cannot leave
+                # the pinned OS directory handle open after quota exhaustion.
+                entry = self._grants.get(grant_id)
+                if entry is not None and entry["remaining"] == 0:
+                    entry["reader"].close()
+
+    def list_files(self, grant_id):
+        return self._perform(grant_id, "list_attempt", "list_files")
 
     def read_text(self, grant_id, filename):
-        with self._lock:
-            return self._take(grant_id, "read_attempt").read_text(filename)
+        return self._perform(grant_id, "read_attempt", "read_text", filename)
 
     def status(self):
         with self._lock:
@@ -102,5 +115,7 @@ class ScopedFileGrants:
 
     def revoke_all(self):
         with self._lock:
+            for entry in self._grants.values():
+                entry["reader"].close()
             self._grants.clear()
             self._audit.append(("revoked_all", ""))
