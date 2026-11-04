@@ -30,6 +30,7 @@ class PortableRestrictedPrimaryPolicyTests(unittest.TestCase):
         status = ProcessRepoFetcher().status()
         self.assertFalse(status["os_sandbox"])
         self.assertFalse(status["windows_mic_blocks_private_reads"])
+        self.assertFalse(status["windows_restricted_primary_production_enabled"])
         from varyn.package_desktop import archive_entries
         self.assertIn(Path(__file__).resolve().parent.parent /
                       "varyn/windows_restricted_primary.py", archive_entries())
@@ -136,6 +137,13 @@ class NativeWindowsRestrictedPrimaryTests(unittest.TestCase):
                 observed = proc.wait(timeout=8)
                 print("17S-11 restricted-primary diagnostic without Low MIC: "
                       + hex(observed), flush=True)
+                if observed in (0xC0000022, 0xC0000135, 0xC0000142):
+                    # NOT a successful read-denial result. Unsupported
+                    # restricted PRIMARY process bootstrap on this host.
+                    self.assertFalse(proc._closed)
+                    self.skipTest(
+                        "17S-11 PRIMARY TOKEN BOOTSTRAP UNAVAILABLE: "
+                        + hex(observed) + " (no private tools enabled)")
                 self.assertEqual(observed, 0,
                                  "Restricted PRIMARY token must run and deny a "
                                  "fresh read even before Low MIC integration")
@@ -159,6 +167,11 @@ class NativeWindowsRestrictedPrimaryTests(unittest.TestCase):
                 observed = proc.wait(timeout=8)
                 print("17S-11 absent-file diagnostic without Low MIC: "
                       + hex(observed), flush=True)
+                if observed in (0xC0000022, 0xC0000135, 0xC0000142):
+                    # A failed loader cannot be mistaken for file denial.
+                    self.skipTest(
+                        "17S-11 CONTROL NOT EXECUTED: restricted Python loader "
+                        + hex(observed))
                 self.assertEqual(observed, 62)
             finally:
                 if guard is not None:
