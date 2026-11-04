@@ -686,3 +686,10 @@ VARYN Desktop offers **Allow public GitHub metadata reads (separate from AI prov
 The owner must review the fixed GitHub HTTPS endpoint and one-use digest, then approve the exact read. The tool makes one anonymous public GitHub GET with no token, no redirects, no user-selected URLs, no private repository access, no shell or writes. Results display locally only and are not automatically supplied to an AI. A separate AI-provider network checkbox does NOT authorize this tool. Reviews expire after two minutes; up to five dispatch attempts are permitted per in-process session. UI networking is currently synchronous (up to five seconds per approved request); CI uses mocked HTTP, not live calls.
 
 This is not authenticated user identity, personal file access, autonomous tool dispatch, or official ChatGPT/Claude/Gemini app-history synchronization. See [17S-2 tool contract](docs/public-github-tool-17s-2.md).
+
+
+### Checkpoint 17S-3: nonblocking GitHub tool and revocable local results
+
+Public GitHub metadata requests now run on a bounded **background worker** instead of blocking the desktop's Tk event loop. Review the same strict JSON and explicit GitHub-specific network consent as 17S-2. The UI can stay responsive during a requested GET. Turning off the GitHub checkbox or selecting **Hide/cancel public GitHub tool result (cannot cancel sent GET)** invalidates pending reviews and suppresses in-flight results; closing the desktop also discards any response. At most one underlying tool request can be active. A dispatched request is *not guaranteed to be cancellable at the HTTP level*, and its network traffic may complete after revocation. No automatic retry, personal file access, private GitHub data, write tools, model-context upload or autonomous action is enabled.
+
+CI exercises synthetic/mocked timing, revocation races, shutdown and Windows Tk callbacks. This is in-process authorization, NOT authenticated OS owner identity or an isolation sandbox. See [17S-3 threat model and acceptance](docs/public-tool-worker-17s-3.md).
