@@ -649,3 +649,10 @@ See [17N selected memory integration and limitations](docs/selected-memory-colla
 ### Checkpoint 17O: Review and run a bounded synthetic task plan
 
 The desktop **Run reviewed synthetic task plan (JSON)** button executes a user-provided, fully validated 1–6 step plan. It supports only `inspect_status` (read synthetic counters) and `stage_note` (write a synthetic note in RAM); each write requires a separate digest-bound on-screen approval. All steps are prevalidated, refusals stop remaining steps, no retries occur, and no shell/network/file-system tools are available. This is genuine deterministic sequential execution, **not autonomous LLM planning or a durable resumable agent**. A sample JSON plan and remaining limitations are documented in [checkpoint 17O](docs/task-plan-17o.md). The 17N syntax regression was repaired, but a green final Windows/Ubuntu CI run has not yet been observed for these latest changes.
+
+
+### Checkpoint 17P: durable task status, no automatic replay
+
+The existing synthetic task runner supports **explicit opt-in** metadata-only SQLite checkpoints when VARYN Desktop is launched with `--task-journal ".\\varyn-task-checkpoints.sqlite3"` in an existing local folder. It records a random task ID, plan digest, step cursor and lifecycle state, never the task's JSON, arguments, note content or approval tokens. Every step gets an uncertain checkpoint before execution and a completed marker afterward. On restart, unfinished tasks become `needs_review` or `needs_reconciliation`, **never automatically restarted**. The demo agent's in-memory notes are NOT restored. This is crash-awareness groundwork, not autonomous durable execution. [17P contract and limitations](docs/task-journal-17p.md).
+
+CI additionally runs `tests/test_task_journal.py` on Windows and Ubuntu. A green final-commit CI result for 17N, 17O and 17P has not yet been confirmed through the available connector.
