@@ -61,6 +61,11 @@ jobs:
         run: python -m unittest discover -s tests -p "test_acceptance_packaging.py" -v
       - name: Owner GUI checklist reporting is bounded and NOT independent evidence
         run: python -m unittest discover -s tests -p "test_owner_acceptance.py" -v
+      - name: Real Tk widget command wiring contract (both OSes, no display required)
+        run: python -m unittest discover -s tests -p "test_tk_widget_smoke.py" -v
+      - name: Real Windows Tk widgets and synthetic button invocations (NOT human clicks)
+        if: runner.os == 'Windows'
+        run: python -m varyn.tk_widget_smoke --synthetic-only --require-display --json
       - name: Option C consumer-history proof gates stay blocked
         run: |
           python -m unittest discover -s tests -p "test_option_c_gate.py" -v
