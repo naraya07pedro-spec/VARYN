@@ -218,3 +218,14 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# VARYN private local data / credentials
+*.sqlite
+*.sqlite3
+*.sqlite3-*
+*.db
+*.db-*
+.env.*
+!.env.example
+*.pem
+*.key
