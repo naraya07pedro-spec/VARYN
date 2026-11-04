@@ -9,7 +9,7 @@ import argparse
 import queue
 import threading
 import tkinter as tk
-from tkinter import messagebox, ttk
+from tkinter import messagebox, simpledialog, ttk
 
 from varyn.desktop_controller import DesktopController, DEFAULT_MODELS, PROVIDERS
 from varyn.providers import ProviderError
@@ -26,6 +26,7 @@ from varyn.desktop_memory import DesktopMemory
 from varyn.memory_handoff import parse_note_ids, selected_memory_context
 from varyn.task_planner import compile_plan, TaskPlanRunner
 from varyn.task_journal import TaskJournal
+from varyn.reasoning_eval import parse_rubric, compare_collaboration_report, EvaluationError
 
 
 class VarynDesktop(tk.Tk):
@@ -55,6 +56,7 @@ class VarynDesktop(tk.Tk):
         self._file_fixture = None
         self._busy = False
         self._closing = False
+        self._last_collaboration = None
         self._build()
         self.protocol("WM_DELETE_WINDOW", self._close)
         if self._task_recovery is not None and (
@@ -145,6 +147,11 @@ class VarynDesktop(tk.Tk):
             controls, text="Collaborate (3 roles)", command=self._open_collaboration,
         )
         self.collaborate_button.pack(side="left", padx=(8, 0))
+        self.reasoning_eval_button = ttk.Button(
+            controls, text="Evaluate last collaboration",
+            command=self._evaluate_collaboration, state="disabled",
+        )
+        self.reasoning_eval_button.pack(side="left", padx=(8, 0))
         ttk.Button(controls, text="Clear RAM chat", command=self._clear).pack(
             side="left", padx=8
         )
@@ -466,6 +473,48 @@ class VarynDesktop(tk.Tk):
         worker.start()
         self.after(75, self._poll_result)
 
+    def _evaluate_collaboration(self):
+        """Local literal rubric diagnostic. No external grading or hidden API."""
+        if self._busy or self._closing:
+            return
+        report = getattr(self, "_last_collaboration", None)
+        if report is None:
+            self._append("EVAL", "No completed collaboration in current RAM session")
+            return
+        raw = simpledialog.askstring(
+            "Offline literal reasoning audit (NOT truth or creativity)",
+            "Enter JSON rubric with case_id, required[], forbidden[], "
+            "alternatives[]. This checks literal mentions only. "
+            "Example: {\\"case_id\\":\\"test\\","
+            "\\"required\\":[\\"consent\\"],"
+            "\\"forbidden\\":[],\\"alternatives\\":[]}",
+            parent=self,
+        )
+        if raw is None:
+            return
+        try:
+            rubric = parse_rubric(raw)
+            result = compare_collaboration_report(rubric, report)
+        except (EvaluationError, ValueError, TypeError):
+            self._append("EVAL", "Invalid bounded rubric; no evaluation performed")
+            return
+        self._append(
+            "EVAL",
+            rubric.case_id + ": analyst literal coverage "
+            + str(result["baseline"]["required_matched"]) + "/"
+            + str(result["baseline"]["required_total"])
+            + "; synthesis " + str(result["collaboration"]["required_matched"])
+            + "/" + str(result["collaboration"]["required_total"])
+            + "; forbidden mentions " +
+            str(result["baseline"]["forbidden_mentions"]) + " -> " +
+            str(result["collaboration"]["forbidden_mentions"]) +
+            "; alternatives mentioned " +
+            str(result["baseline"]["alternatives_mentioned"]) + " -> " +
+            str(result["collaboration"]["alternatives_mentioned"]) +
+            ". Not a controlled A/B. Truth, creativity and model superiority "
+            "are NOT established.",
+        )
+
     def _open_collaboration(self):
         """Configure three roles in a separate normal-user Tk window."""
         if self._busy or self._closing:
@@ -695,6 +744,9 @@ class VarynDesktop(tk.Tk):
             except (AgentRejected, AgentLimitReached, ValueError, RuntimeError):
                 self._append("AGENT", "Native proposal could not be staged or reviewed")
         elif kind == "collaboration":
+            self._last_collaboration = message
+            if hasattr(self, "reasoning_eval_button"):
+                self.reasoning_eval_button.configure(state="normal")
             self._append("YOU", message["task"])
             if message.get("context_source_refs"):
                 self._append(
