@@ -185,6 +185,7 @@ class ProcessRepoFetcher:
                 "windows_child_low_mic_required": os.name == "nt",
                 "windows_mic_prevents_medium_integrity_writes": os.name == "nt",
                 "windows_mic_blocks_private_reads": False,
+                "windows_restricted_primary_production_enabled": False,
                 "windows_child_commit_cap_bytes": (192 * 1024 * 1024
                                                    if os.name == "nt" else None),
                 "os_sandbox": False,
