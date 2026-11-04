@@ -35,6 +35,21 @@ class PortableRestrictedPrimaryPolicyTests(unittest.TestCase):
 
 @unittest.skipUnless(os.name == "nt", "Native Windows primary token required")
 class NativeWindowsRestrictedPrimaryTests(unittest.TestCase):
+    def test_control_normal_python_starts_with_same_minimal_environment(self):
+        # Causal control: distinguish bad argv/env from the restricted token.
+        import subprocess
+        result = subprocess.run(
+            [str(Path(sys.executable).resolve()), "-I", "-S",
+             "-c", "import sys; sys.exit(0)"],
+            cwd=str(Path(sys.executable).resolve().parent),
+            env={"SystemRoot": os.environ["SystemRoot"]},
+            stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            timeout=8, check=False,
+        )
+        self.assertEqual(result.returncode, 0)
+
     def _launch_probe(self, target):
         # Restricted-primary token MUST exist before child starts (suspended),
         # then attach job + Low MIC before any untrusted argv executes.
