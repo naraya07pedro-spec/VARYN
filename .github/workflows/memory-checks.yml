@@ -68,6 +68,8 @@ jobs:
         run: python -m varyn.tk_widget_smoke --synthetic-only --require-display --json
       - name: Real bounded multi-model role handoff and per-stage consent regressions
         run: python -m unittest discover -s tests -p "test_collaboration.py" -v
+      - name: Desktop three-role model selection and individual consent boundary
+        run: python -m unittest discover -s tests -p "test_desktop_collaboration.py" -v
       - name: Option C consumer-history proof gates stay blocked
         run: |
           python -m unittest discover -s tests -p "test_option_c_gate.py" -v
