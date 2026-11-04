@@ -33,3 +33,9 @@ The 17S-2 public GitHub metadata GET ran synchronously on the Tkinter UI thread;
 The code and docs must be committed to the existing draft feature branch. Windows and Ubuntu GitHub Actions must report SUCCESS on the exact **final HEAD SHA**. Count tests and skips from actual CI logs. Report earlier red commits if they uncovered failures; do not claim product acceptance or authenticated security boundaries from synthetic tests.
 
 Next: formal OS/user identity and process isolation design; ensure launch-time permissions and revocation survive harder failure modes, then move toward explicitly scoped, useful integrations and tested owner-device workflows.
+
+## Additional adversarial CI finding: gateway identity mismatch
+
+An intermediate hosted Windows Tk test replaced the desktop's gateway with a mocked fetcher but left its pre-existing background worker pointing to the original default gateway. That test was therefore **not** guaranteed network-free; a real public GitHub GET may have been attempted, although no completed outbound request has been independently verified. Treat the intermediate failing run as unsafe test isolation evidence, not as a live end-to-end product test.
+
+Correction: `PublicGithubToolWorker.uses_gateway()` now permits the trusted desktop to require exact object identity between the worker's gateway and the reviewed gateway, before staging any request. A mismatch fails closed and is covered by a dedicated regression. The hosted Tk test now replaces **both** gateway and worker with matched injected mocked fetchers and checks their identity. No credentials or private data are supplied; no new real network acceptance is asserted.
