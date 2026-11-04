@@ -137,7 +137,7 @@ jobs:
         run: python -m unittest discover -s tests -p "test_public_repo_plan_tk.py" -v
       - name: 17S-10 Windows restricted-token native synthetic read denial
         run: python -m unittest discover -s tests -p "test_windows_restricted_read_probe.py" -v
-      - name: 17S-11 suspended Windows restricted-primary-token startup and negative controls
+      - name: 17S-11 restricted-primary capability probe (SKIP means unavailable, NOT protected)
         run: python -m unittest discover -s tests -p "test_windows_restricted_primary.py" -v
       - name: Option C consumer-history proof gates stay blocked
         run: |
