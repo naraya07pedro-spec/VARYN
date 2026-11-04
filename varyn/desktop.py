@@ -498,6 +498,9 @@ class VarynDesktop(tk.Tk):
             # Headless desktop tests use a minimal UI double.
             worker = PublicGithubToolWorker(self._public_github_tools)
             self._public_tool_worker = worker
+        if not worker.uses_gateway(self._public_github_tools):
+            self._append("GITHUB TOOL", "Tool gateway/worker identity mismatch; no request")
+            return
         if worker.busy:
             self._append("GITHUB TOOL", "Previous GitHub request still finishing")
             return
