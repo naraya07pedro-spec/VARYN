@@ -45,9 +45,7 @@ class ReasoningEvalTkTests(unittest.TestCase):
                 "final_answer": "offline consent",
                 "multi_model_review": False,
             }
-            ui._results.put((0, "collaboration", "", synthetic))
-            # Real Tk result handling must reject stale/unowned tokens.
-            # Drive only the evaluator callback after an accepted synthetic report.
+            # Simulate an already-accepted completed synthetic report.
             ui._last_collaboration = synthetic
             button.configure(state="normal")
             rubric = json.dumps({
