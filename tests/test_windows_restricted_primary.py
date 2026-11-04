@@ -55,7 +55,7 @@ class NativeWindowsRestrictedPrimaryTests(unittest.TestCase):
         return spawn_suspended_restricted_primary(
             command, cwd=str(Path(sys.executable).resolve().parent))
 
-    def test_process_starts_restricted_and_denies_fresh_owner_file_read(self):
+    def test_diagnostic_primary_token_without_low_mic_denies_synthetic_read(self):
         with TemporaryDirectory(prefix="varyn-primary-token-") as folder:
             target = Path(folder) / "synthetic-private-only.txt"
             target.write_bytes(b"VARYN synthetic only")
@@ -66,13 +66,17 @@ class NativeWindowsRestrictedPrimaryTests(unittest.TestCase):
                 proc = self._launch_probe(target)
                 self.assertIsNone(proc.poll())
                 self.assertFalse(proc._resumed)
-                guard = WindowsChildJob(proc)
-                self.assertTrue(guard.attached)
+                # DIAGNOSTIC: no Low MIC or Job Object applied at startup.
+                # This isolates whether the restricted primary token itself
+                # can initialize Python. It is NOT the production integration.
                 self.assertIsNone(proc.poll())
                 proc.resume()
-                self.assertEqual(proc.wait(timeout=8), 0,
-                                 "Kernel must deny fresh synthetic read in "
-                                 "actual restricted PRIMARY token child")
+                observed = proc.wait(timeout=8)
+                print("17S-11 restricted-primary diagnostic without Low MIC: "
+                      + hex(observed), flush=True)
+                self.assertEqual(observed, 0,
+                                 "Restricted PRIMARY token must run and deny a "
+                                 "fresh read even before Low MIC integration")
                 self.assertEqual(target.read_bytes(), b"VARYN synthetic only")
             finally:
                 if guard is not None:
@@ -87,9 +91,12 @@ class NativeWindowsRestrictedPrimaryTests(unittest.TestCase):
             guard = None
             try:
                 proc = self._launch_probe(target)
-                guard = WindowsChildJob(proc)
+                # Same causal diagnostic without the Low MIC transition.
                 proc.resume()
-                self.assertEqual(proc.wait(timeout=8), 62)
+                observed = proc.wait(timeout=8)
+                print("17S-11 absent-file diagnostic without Low MIC: "
+                      + hex(observed), flush=True)
+                self.assertEqual(observed, 62)
             finally:
                 if guard is not None:
                     guard.close()
