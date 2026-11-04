@@ -485,9 +485,8 @@ class VarynDesktop(tk.Tk):
             "Offline literal reasoning audit (NOT truth or creativity)",
             "Enter JSON rubric with case_id, required[], forbidden[], "
             "alternatives[]. This checks literal mentions only. "
-            "Example: {\\"case_id\\":\\"test\\","
-            "\\"required\\":[\\"consent\\"],"
-            "\\"forbidden\\":[],\\"alternatives\\":[]}",
+            'Example: {"case_id":"test","required":["consent"],'
+            '"forbidden":[],"alternatives":[]}',
             parent=self,
         )
         if raw is None:
