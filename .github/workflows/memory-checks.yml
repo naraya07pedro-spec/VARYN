@@ -109,6 +109,11 @@ jobs:
       - name: 17S-2 hosted Windows Tk network-consent/approval smoke
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_public_github_tool_tk.py" -v
+      - name: 17S-3 nonblocking worker, revocation race, and untrusted result regressions
+        run: python -m unittest discover -s tests -p "test_public_tool_worker.py" -v
+      - name: 17S-3 hosted Windows Tk stale network result suppression
+        if: runner.os == 'Windows'
+        run: python -m unittest discover -s tests -p "test_public_github_tool_tk.py" -v
       - name: Option C consumer-history proof gates stay blocked
         run: |
           python -m unittest discover -s tests -p "test_option_c_gate.py" -v
