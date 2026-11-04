@@ -20,10 +20,14 @@ Grant expiry was checked on read/list/status and host operations, but if the des
 
 - varyn/file_grants.py: guarded single-timer schedule, generation-based stale-callback rejection, deadline-check after I/O.
 - varyn/desktop.py: enables idle expiry for desktop synthetic grants.
-- tests/test_file_grant_idle_timer.py: **14 synthetic tests** including fake timer races, stale-callback rejection, single pending timer across several grants, concurrent revoke waiting for an in-flight operation, cancellation/revoke, expiry while idle, quota exhaustion, deadline crossed while reading, independent threads holding a lock, invalid configuration and default-off behavior. One test uses a **real one-second Python timer** with no intervening status/read call and verifies reader close.
+- tests/test_file_grant_idle_timer.py: **17 synthetic tests** including fake timer races, stale-callback rejection, single pending timer across several grants, concurrent revoke waiting for an in-flight operation, cancellation/revoke, expiry while idle, quota exhaustion, deadline crossed while reading, independent threads holding a lock, invalid configuration and default-off behavior. One test uses a **real one-second Python timer** with no intervening status/read call and verifies reader close.
 - .github/workflows/memory-checks.yml: explicit cross-platform timer regression step in addition to the existing full suite and native-Windows-only checks.
 
 The observed CI results and verified commit are recorded in docs/progress-log.md. A green hosted runner does not establish physical owner-laptop acceptance.
+
+## Scheduler failure is a denial, never a quiet fallback
+
+A resource-exhausted Python process may fail to instantiate or start a threading.Timer. When that happens, ScopedFileGrants now cancels its partial timer, revokes **all** grants owned by the manager, closes all pinned directory handles, and raises PermissionError rather than leaving any supposedly temporary permission without an expiry callback. The metadata-only audit adds timer_unavailable without paths, filenames, or content. Three additional regressions exercise factory failure, thread-start failure, and a failed reschedule with an existing earlier grant.
 
 ## Limitations and remaining gates
 
