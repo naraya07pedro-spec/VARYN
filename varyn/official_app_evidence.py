@@ -1,4 +1,4 @@
-"""Checkpoint 18A: reviewed OFFLINE consumer-app capability evidence.
+"""Checkpoint 17H: reviewed OFFLINE consumer-app capability evidence.
 
 This is a static, source-linked decision matrix, not a connector. It makes
 no HTTP requests, stores no secrets and never grants provider-app access.
