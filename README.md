@@ -464,3 +464,23 @@ This is **not proof of user authentication**, permission from a graphical dialog
 The experimental Tkinter desktop now exposes **Grant synthetic test folder**, **Inspect test-folder count**, and **Revoke test-folder grant** actions. A trusted OS folder chooser and a separate explicit Yes/No dialog precede issuance of an ephemeral host-side read-only scope grant (default 5 minutes and 10 operations). The UI only shows a count of matching top-level test files; it does **not** display filenames or contents, attach files to a prompt, call models with folder data, or introduce file tools into the agent registry. Closing the desktop revokes active grants.
 
 Only select folders containing **synthetic test data**. This is **not authenticated access control or an OS sandbox**, and Windows concurrent reparse/path-swap attacks remain out of scope. Headless automated tests do not prove that a user physically clicked the dialogs. See [development log](docs/progress-log.md) and [official-app sync feasibility](docs/product-contract-and-feasibility.md).
+
+
+### Checkpoint 17A: Official-app sync status and synthetic two-way reconciliation (offline)
+
+The **Option C** goal remains to use official ChatGPT, Claude and Gemini apps with automatic two-way conversation/context synchronization. A model API, an export file or a provider's web UI is **not** evidence that official-app history can be read and written through an authorized synchronization interface.
+
+Run this offline, no-auth diagnostic:
+
+```powershell
+python -m varyn.official_sync
+python -m varyn.official_sync --provider chatgpt
+python -m varyn.official_sync --provider claude
+python -m varyn.official_sync --provider gemini
+```
+
+All three currently report `blocked_pending_provider_evidence` for automatic official-app history sync. This is **not** an assertion of permanent impossibility; it means that supported official-app read/write capabilities have **not been demonstrated** for VARYN. The referenced vendor guides explain export, not real-time authorized write-back.
+
+`varyn.official_sync.SyncMarker` and `plan_synthetic_reconciliation(..., synthetic_fixture=True)` are an independent, **strictly offline fixture planner**. They only examine bounded synthetic IDs, revision numbers, digests and explicit tombstones. They never access a vendor, read a chat, write a file, execute a mutation, or authorize a model to modify app history. The planner refuses ambiguous deletions, conflicts, regressed revisions, and changed content without a revision increment. All candidate actions are review-only and have `can_dispatch=false`. No local or vendor text is included in its output.
+
+**Safety:** the planner is not a sync engine or source-of-truth for real accounts. Treat actual provider support, ownership, deletion semantics, user consent, history API limits and vendor terms as separate evidence gates before attempting a live connector. See [product contract](docs/product-contract-and-feasibility.md) and [progress log](docs/progress-log.md).
