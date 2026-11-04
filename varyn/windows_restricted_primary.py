@@ -24,6 +24,7 @@ _TOKEN_ASSIGN_PRIMARY = 0x0001
 _TOKEN_DUPLICATE = 0x0002
 _TOKEN_IMPERSONATE = 0x0004
 _TOKEN_QUERY = 0x0008
+_TOKEN_ADJUST_DEFAULT = 0x0080
 _DISABLE_MAX_PRIVILEGE = 0x00000001
 _CREATE_SUSPENDED = 0x00000004
 _CREATE_NO_WINDOW = 0x08000000
@@ -314,7 +315,8 @@ def spawn_suspended_restricted_primary(argv, *, cwd):
     created = False
     try:
         rights = (_TOKEN_ASSIGN_PRIMARY | _TOKEN_DUPLICATE |
-                  _TOKEN_QUERY | _TOKEN_IMPERSONATE)
+                  _TOKEN_QUERY | _TOKEN_IMPERSONATE |
+                  _TOKEN_ADJUST_DEFAULT)
         if not a.OpenProcessToken(k.GetCurrentProcess(),
                                   rights, ctypes.byref(owner)):
             raise PublicToolRejected("Cannot open caller primary token")
