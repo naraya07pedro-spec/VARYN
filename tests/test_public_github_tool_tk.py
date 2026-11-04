@@ -45,8 +45,13 @@ class PublicGithubToolTkTests(unittest.TestCase):
                     "archived": False,
                 }
             )
-            with patch("varyn.desktop.messagebox.askyesno") as ask:
-                buttons[0].invoke()
+            from varyn.public_tool_worker import PublicGithubToolWorker
+            ui._public_tool_worker = PublicGithubToolWorker(ui._public_github_tools)
+            self.assertTrue(ui._public_tool_worker.uses_gateway(ui._public_github_tools))
+            with patch("varyn.public_github_tool.build_opener",
+                       side_effect=AssertionError("No real HTTP permitted in this test")):
+                with patch("varyn.desktop.messagebox.askyesno") as ask:
+                    buttons[0].invoke()
             ask.assert_not_called()
             self.assertEqual(calls, [])
 
@@ -61,6 +66,7 @@ class PublicGithubToolTkTests(unittest.TestCase):
             with patch("varyn.desktop.messagebox.askyesno", return_value=True) as ask:
                 buttons[0].invoke()
             self.assertEqual(ask.call_count, 1)
+            self.assertTrue(ui._public_tool_worker.uses_gateway(ui._public_github_tools))
             deadline = time.monotonic() + 3
             while time.monotonic() < deadline:
                 ui.update()  # process Tk main-thread after callbacks
