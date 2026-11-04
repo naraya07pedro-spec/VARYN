@@ -1,8 +1,9 @@
 """VARYN Tkinter MVP: offline chat and explicitly confirmed optional live calls.
 
 Run: python -m varyn.desktop
-The UI never touches Tk widgets from worker threads, never reads local memory,
-and never persists a transcript. Real providers require account API credentials.
+The UI never touches Tk widgets from worker threads and never persists chat.
+Local synthetic-note memory is only enabled by explicit --memory-db path,
+and is NEVER automatically sent to any model. Real provider APIs require keys.
 """
 import argparse
 import queue
@@ -21,10 +22,11 @@ from varyn.native_tool_requests import NativeToolRequestClient
 from varyn.file_grants import ScopedFileGrants
 from varyn.synthetic_fixture import SyntheticFixture
 from varyn.desktop_collaboration import review_collaboration
+from varyn.desktop_memory import DesktopMemory
 
 
 class VarynDesktop(tk.Tk):
-    def __init__(self, controller=None, *, agent_journal=None):
+    def __init__(self, controller=None, *, agent_journal=None, memory_db=None):
         super().__init__()
         self.controller = controller or DesktopController(allow_live_providers=True)
         self.title("VARYN  |  Local AI Workspace (Opt-in Live MVP)")
@@ -39,6 +41,8 @@ class VarynDesktop(tk.Tk):
         self._results = queue.Queue()
         self._lifecycle = DesktopRequestState()
         self._agent_journal = agent_journal
+        self._memory = DesktopMemory(memory_db) if memory_db is not None else None
+        self.memory_project = tk.StringVar(value="VARYN")
         self._approval = DesktopApprovalController(journal=agent_journal)
         self._native_client = NativeToolRequestClient(allow_network=True)
         self._file_grants = ScopedFileGrants(auto_expire=True)
@@ -155,8 +159,10 @@ class VarynDesktop(tk.Tk):
             file_controls, text="Revoke test-folder grant",
             command=self._revoke_synthetic_folder,
         ).pack(side="left", padx=(8, 0))
+        self._build_memory_controls(outer)
         ttk.Label(
-            outer, text="History and usage counters reset on restart. Live APIs may bill.",
+            outer, text="Chat RAM resets on restart. Local memory only with --memory-db; "
+                        "plaintext synthetic notes; never auto-uploaded. Live APIs may bill.",
             style="V.TLabel",
         ).pack(anchor="w")
         self._append(
@@ -164,6 +170,112 @@ class VarynDesktop(tk.Tk):
             "API key set outside this app, network consent, and confirmation "
             "of each individual request. Do not input private data."
         )
+
+    def _build_memory_controls(self, outer):
+        """Memory must be explicitly activated by --memory-db at app launch."""
+        row = ttk.Frame(outer, style="V.TFrame")
+        row.pack(fill="x", pady=(2, 6))
+        ttk.Label(row, text="Local project", style="V.TLabel").pack(
+            side="left", padx=(0, 6),
+        )
+        ttk.Entry(row, textvariable=self.memory_project, width=12).pack(
+            side="left", padx=(0, 8),
+        )
+        state = "normal" if self._memory is not None else "disabled"
+        self.memory_save_button = ttk.Button(
+            row, text="Save synthetic note", command=self._save_memory,
+            state=state,
+        )
+        self.memory_save_button.pack(side="left", padx=(0, 5))
+        self.memory_search_button = ttk.Button(
+            row, text="Search project notes", command=self._search_memory,
+            state=state,
+        )
+        self.memory_search_button.pack(side="left", padx=(0, 5))
+        self.memory_delete_button = ttk.Button(
+            row, text="Delete note ID", command=self._delete_memory,
+            state=state,
+        )
+        self.memory_delete_button.pack(side="left")
+
+    def _save_memory(self):
+        if self._busy or self._closing or self._memory is None:
+            return
+        project = self.memory_project.get()
+        note = self.prompt.get("1.0", "end-1c")
+        try:
+            self._memory._project(project)
+            self._memory._note(note)
+        except (ValueError, PermissionError):
+            self._append("MEMORY", "Use project A-Z/0-9/_/- and a note starting SYNTHETIC: (max 1000).")
+            return
+        approved = messagebox.askyesno(
+            "Save SYNTHETIC note in local plaintext SQLite?",
+            f"Save EXACTLY this typed synthetic note to project {project}?\n\n"
+            "The database is unencrypted and stays on this device. "
+            "Nothing is sent to any AI provider. Not suitable for private data. "
+            "You can delete it later by ID.",
+            parent=self,
+        )
+        if not approved:
+            self._append("MEMORY", "Save declined; nothing stored")
+            return
+        try:
+            memory_id = self._memory.save(project, note, confirmed=True)
+        except (ValueError, PermissionError, OSError):
+            self._append("MEMORY", "Local synthetic note was not saved")
+            return
+        self._append("MEMORY", f"Synthetic note saved in project {project}, ID {memory_id}; no model upload")
+
+    def _search_memory(self):
+        if self._busy or self._closing or self._memory is None:
+            return
+        try:
+            project = self.memory_project.get()
+            query = self.prompt.get("1.0", "end-1c")
+            rows = self._memory.search(project, query)
+        except (ValueError, OSError):
+            self._append("MEMORY", "Enter a valid project and 1..100-character search query")
+            return
+        self._append("MEMORY", f"Local-only search in project {project}: {len(rows)} notes found")
+        for row in rows:
+            self._append(
+                "MEMORY " + str(row["id"]),
+                row["content"][:1000],
+            )
+
+    def _delete_memory(self):
+        if self._busy or self._closing or self._memory is None:
+            return
+        project = self.memory_project.get()
+        raw_id = self.prompt.get("1.0", "end-1c").strip()
+        if not raw_id.isascii() or not raw_id.isdecimal() or len(raw_id) > 12:
+            self._append("MEMORY", "Enter a positive numeric note ID in the message box")
+            return
+        try:
+            note_id = int(raw_id)
+            self._memory._project(project)
+            if note_id < 1:
+                raise ValueError("Bad ID")
+        except ValueError:
+            self._append("MEMORY", "Invalid project or note ID")
+            return
+        if not messagebox.askyesno(
+            "Permanently delete local synthetic note?",
+            f"Delete ONLY note ID {note_id} from exact project {project}?\n\n"
+            "No other projects will be modified. Deletion does not erase "
+            "previous backups or secure-delete raw disk blocks.",
+            parent=self,
+        ):
+            self._append("MEMORY", "Delete declined; nothing changed")
+            return
+        try:
+            deleted = self._memory.delete(project, note_id, confirmed=True)
+        except (ValueError, PermissionError, OSError):
+            self._append("MEMORY", "Local delete failed")
+            return
+        self._append("MEMORY", "One local note deleted" if deleted else
+                     "No matching note ID in this project")
 
     def _discard_synthetic_fixture(self):
         """Reclaim only a VARYN-owned disposable sample folder."""
@@ -558,6 +670,8 @@ class VarynDesktop(tk.Tk):
             parent=self,
         ):
             return
+        if self._memory is not None:
+            self._memory.close()
         self.controller.discard_pending_history()
         self._lifecycle.discard_visible()
         self._busy = False
@@ -649,11 +763,13 @@ def main():
     parser = argparse.ArgumentParser(description="VARYN desktop")
     parser.add_argument("--agent-journal", metavar="PATH",
                         help="Opt-in metadata-only SQLite recovery file")
+    parser.add_argument("--memory-db", metavar="PATH",
+                        help="Explicit opt-in UNENCRYPTED local SQLite for SYNTHETIC notes only")
     args = parser.parse_args()
     journal = (AgentRecoveryJournal(args.agent_journal)
                if args.agent_journal else None)
     try:
-        window = VarynDesktop(agent_journal=journal)
+        window = VarynDesktop(agent_journal=journal, memory_db=args.memory_db)
     except tk.TclError:
         if journal is not None:
             journal.close()
