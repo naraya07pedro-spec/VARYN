@@ -19,7 +19,9 @@ The hosted Windows 17S-8 suite had a nonfatal `invalid command name "..._poll_pu
 
 `tests/test_public_comparison_journal.py` also checks that opening an existing file with invalid SQLite contents fails with a database error and does not silently recreate/reset that file.
 
-These are deterministic negative regressions against a local SQLite test fixture, not a simulation of power loss, filesystem exhaustion on the owner's machine, or guarantees about every form of disk corruption. Existing 17S-8 recovery still classifies interrupted `ready` or `uncertain` records without any automatic replay.
+These are deterministic negative regressions against a local SQLite test fixture, not a simulation of power loss, filesystem exhaustion on the owner's machine, or guarantees about every form of disk corruption.
+
+**Windows discovery and fix:** The first hosted Windows run including the corrupt-file test failed during test teardown with WinError 32, because an exception in `PublicComparisonJournal.__init__` left its SQLite connection open. This was a genuine Windows file-handle leak despite corruption detection. `__init__` now closes the connection and marks it closed on setup failure before re-raising. Earlier red CI remains part of the audit trail and must not be relabeled green. Existing 17S-8 recovery still classifies interrupted `ready` or `uncertain` records without any automatic replay.
 
 ## 3. Strict boundaries / acceptance
 
