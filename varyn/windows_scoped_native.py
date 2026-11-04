@@ -12,6 +12,7 @@ an unanchored pathname.
 """
 import ctypes
 import os
+import re
 from ctypes import wintypes
 
 from varyn.agent_runtime import AgentRejected
@@ -35,6 +36,7 @@ _FILE_NAMES_INFORMATION = 12
 _STATUS_NO_MORE_FILES = 0x80000006
 _MAX_ENUMERATED = 2048
 _INVALID_HANDLE = ctypes.c_void_p(-1).value
+_SAFE_NAME = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9_. -]{0,119}\.(?:txt|md)\Z", re.I)
 
 
 class _UnicodeString(ctypes.Structure):
@@ -155,9 +157,15 @@ class WindowsScopedDirectory:
 
     def _open_child(self, basename):
         root = self._active()
-        if (type(basename) is not str or not basename or
-                "\\" in basename or "/" in basename or ":" in basename):
-            raise AgentRejected("Invalid relative filename")
+        if type(basename) is not str or not _SAFE_NAME.fullmatch(basename):
+            raise AgentRejected("Invalid native relative filename")
+        stem = basename.rsplit(".", 1)[0]
+        if stem.rstrip(" .") != stem:
+            raise AgentRejected("Ambiguous native filename denied")
+        device = stem.split(".", 1)[0].rstrip(" ").upper()
+        if (device in {"CON", "PRN", "AUX", "NUL"} or
+                re.fullmatch(r"(?:COM|LPT)[1-9]", device)):
+            raise AgentRejected("Reserved Windows device name")
         name = ctypes.create_unicode_buffer(basename)
         unicode_name = _UnicodeString(
             len(basename.encode("utf-16-le")),
