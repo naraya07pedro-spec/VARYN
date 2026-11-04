@@ -42,6 +42,7 @@ class VarynDesktop(tk.Tk):
         self.provider = tk.StringVar(value="fake")
         self.model = tk.StringVar(value="fake-test")
         self.consent_network = tk.BooleanVar(value=False)
+        self.consent_public_tools = tk.BooleanVar(value=False)
         self.consent_context = tk.BooleanVar(value=False)
         self.status_line = tk.StringVar(value="")
         self._results = queue.Queue()
@@ -122,6 +123,10 @@ class VarynDesktop(tk.Tk):
             outer, text="Allow a confirmed API request to selected provider",
             variable=self.consent_network, command=self._permissions_changed,
         ).pack(anchor="w", pady=(6, 0))
+        ttk.Checkbutton(
+            outer, text="Allow public GitHub metadata reads (separate from AI provider APIs)",
+            variable=self.consent_public_tools,
+        ).pack(anchor="w", pady=(2, 0))
         ttk.Checkbutton(
             outer, text="Allow context sharing (not loaded automatically)",
             variable=self.consent_context, command=self._permissions_changed,
@@ -458,13 +463,13 @@ class VarynDesktop(tk.Tk):
         """
         if self._busy or self._closing:
             return
-        if not self.consent_network.get():
+        if not self.consent_public_tools.get():
             self._append("GITHUB TOOL", "Network consent disabled; no request sent")
             return
         try:
             preview = self._public_github_tools.propose(
                 self.prompt.get("1.0", "end-1c"),
-                network_consent=self.consent_network.get() is True,
+                network_consent=self.consent_public_tools.get() is True,
             )
         except (PublicToolRejected, PermissionError, ValueError):
             self._append("GITHUB TOOL", "Invalid public GitHub tool intent; no request")
@@ -483,7 +488,7 @@ class VarynDesktop(tk.Tk):
             )
             result = self._public_github_tools.decide(
                 preview.proposal_id, preview.digest, approved=approved,
-                network_consent=self.consent_network.get() is True,
+                network_consent=self.consent_public_tools.get() is True,
             )
         except (PublicToolRejected, PermissionError, OSError):
             self._public_github_tools.reject_all_pending()
