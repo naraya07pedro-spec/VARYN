@@ -670,8 +670,6 @@ class VarynDesktop(tk.Tk):
             parent=self,
         ):
             return
-        if getattr(self, "_memory", None) is not None:
-            self._memory.close()
         self.controller.discard_pending_history()
         self._lifecycle.discard_visible()
         self._busy = False
@@ -753,6 +751,8 @@ class VarynDesktop(tk.Tk):
         VarynDesktop._discard_synthetic_fixture(self)
         if self._agent_journal is not None:
             self._agent_journal.close()
+        if getattr(self, "_memory", None) is not None:
+            self._memory.close()
         self.controller.discard_pending_history()
         self._lifecycle.close()
         self._closing = True
