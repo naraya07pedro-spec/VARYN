@@ -291,7 +291,7 @@ class DesktopIntentTests(unittest.TestCase):
             _busy = False
             _closing = False
             def __init__(self):
-                self.consent_network = SimpleNamespace(get=lambda: True)
+                self.consent_public_tools = SimpleNamespace(get=lambda: True)
                 self.prompt = SimpleNamespace(get=lambda *_: intent())
                 self._public_github_tools = PublicGithubToolGateway(
                     fetcher=lambda repo: calls.append(repo) or metadata(repo))
@@ -315,7 +315,7 @@ class DesktopIntentTests(unittest.TestCase):
             _busy = False
             _closing = False
             def __init__(self):
-                self.consent_network = SimpleNamespace(get=lambda: False)
+                self.consent_public_tools = SimpleNamespace(get=lambda: False)
                 self.prompt = SimpleNamespace(get=lambda *_: intent())
                 self._public_github_tools = PublicGithubToolGateway(
                     fetcher=lambda _: (_ for _ in ()).throw(AssertionError("network")))
