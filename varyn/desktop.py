@@ -24,6 +24,7 @@ from varyn.synthetic_fixture import SyntheticFixture
 from varyn.desktop_collaboration import review_collaboration
 from varyn.desktop_memory import DesktopMemory
 from varyn.memory_handoff import parse_note_ids, selected_memory_context
+from varyn.task_planner import compile_plan, TaskPlanRunner
 
 
 class VarynDesktop(tk.Tk):
@@ -141,6 +142,10 @@ class VarynDesktop(tk.Tk):
         ttk.Button(
             outer, text="Request native model tool proposal (live, may bill)",
             command=self._request_native_tool,
+        ).pack(anchor="w", pady=(0, 8))
+        ttk.Button(
+            outer, text="Run reviewed synthetic task plan (JSON)",
+            command=self._run_synthetic_plan,
         ).pack(anchor="w", pady=(0, 8))
         ttk.Button(
             outer, text="Review structured tool intent (untrusted JSON)",
@@ -732,6 +737,51 @@ class VarynDesktop(tk.Tk):
         if hasattr(self, "collaborate_button"):
             self.collaborate_button.configure(state="normal")
         self._append("NOTICE", "Reply hidden; remote API request was not canceled")
+        self._refresh_status()
+
+    def _run_synthetic_plan(self):
+        """Run a fixed, fully prevalidated task with per-mutation UI consent."""
+        if self._busy or self._closing:
+            return
+        try:
+            plan = compile_plan(self.prompt.get("1.0", "end-1c"))
+            available = self._approval.status()
+            if (available["steps_used"] + available["pending_approvals"] +
+                    len(plan) > available["steps_limit"]):
+                raise AgentLimitReached("Task step budget exhausted")
+        except (ValueError, AgentRejected, AgentLimitReached):
+            self._append("TASK", "Invalid or oversized synthetic task plan; no action")
+            return
+        runner = TaskPlanRunner(self._approval)
+
+        def approve_step(index, preview):
+            return messagebox.askyesno(
+                "Review EXACT synthetic task action",
+                f"Step {index + 1}/{len(plan)}\\n"
+                f"Tool: {preview.tool}\\n"
+                f"Digest: {preview.digest}\\n"
+                f"Effect: {preview.summary}\\n"
+                f"Risk: {preview.risk}\\n\\n"
+                "This action only changes synthetic in-memory agent state. "
+                "Approve this individual action?",
+                parent=self,
+            )
+        try:
+            result = runner.run(plan, approve_mutation=approve_step)
+        except (ValueError, PermissionError, RuntimeError):
+            self._append("TASK", "Task halted; prior steps may have executed. No automatic retry")
+            self._refresh_status()
+            return
+        self._append(
+            "TASK",
+            result["status"] + "; steps processed " + str(len(result["steps"]))
+            + "; external actions: none",
+        )
+        for step in result["steps"]:
+            self._append(
+                "TASK STEP", str(step["index"] + 1) + " "
+                + step["tool"] + ": " + step["status"],
+            )
         self._refresh_status()
 
     def _review_tool_intent(self):
