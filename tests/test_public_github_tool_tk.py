@@ -46,7 +46,9 @@ class PublicGithubToolTkTests(unittest.TestCase):
             ask.assert_not_called()
             self.assertEqual(calls, [])
 
-            ui.consent_network.set(True)
+            # Provider-API consent remains independent and disabled.
+            self.assertFalse(ui.consent_network.get())
+            ui.consent_public_tools.set(True)
             with patch("varyn.desktop.messagebox.askyesno", return_value=False) as ask:
                 buttons[0].invoke()
             self.assertEqual(ask.call_count, 1)
