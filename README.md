@@ -562,3 +562,22 @@ The temporary demo files are now coupled directly to the lifetime of the **speci
 SyntheticFixture.close() is protected by its own lock and retains its owner reference after a transient delete error so normal desktop shutdown can retry. The desktop no longer needs an Inspect or Revoke click to delete a sample after a successful idle-expiry callback. This is *best effort* during Windows sleep, process suspension or deletion failures, and **does not** clean up after sudden power loss or OS process death.
 
 Additional Windows and Ubuntu regression suites test real one-second idle cleanup, concurrent revoke/timer access, fail-closed scheduler, and idempotent temporary directory cleanup. No private file access or provider app-history synchronization was enabled. See [17G evidence and limitations](docs/grant-fixture-cleanup-17g.md) and [development log](docs/progress-log.md).
+
+
+### Checkpoint 17H: Real synthetic-only Windows self-check and official app feasibility
+
+**No provider consumer-app account has been connected.** A reviewed, dated, offline-only evidence matrix now distinguishes the *actual official-app UI* capabilities of ChatGPT, Claude and Gemini: manual data export, memory import, chat history import, and unverified programmatic consumer-history read/write. ChatGPT exported chat upload is reference-only, Claude supports experimental manual memory import but not cross-provider full history import, and eligible Gemini Apps accounts support manual history and memory import. **None of these manual workflows proves automatic bidirectional sync.** The user-selected Option C requirement is unchanged and remains blocked pending provider-published evidence for supported official consumer-app READ and WRITE interfaces.
+
+The desktop acceptance probe creates ONLY two disposable VARYN sample files. It exercises the platform's real scoped reader (including the native Windows backend), checks read-only listing, waits for a real one-second idle expiry, verifies automatic fixture cleanup and denies subsequent use. Its JSON report contains **no paths, names or file contents**, and explicitly states that it did **not** perform physical-user GUI clicks. It requires no AI provider, account credentials, network request, Administrator shell, or private files.
+
+With an inspected source checkout in **normal PowerShell**:
+
+    py -3 -m varyn.desktop_acceptance --synthetic-only --json
+
+A source-only Windows ZIP now also includes **Verify-VARYN-Synthetic.cmd** for a double-click local self-test; it does not bundle Python or a compiled executable. Independently, the owner can run the GUI smoke command below and manually test the Tk UI with fake provider mode and generated synthetic files:
+
+    py -3 -m varyn.doctor --gui-smoke --json
+
+Passing hosted CI or the CLI probe is **not evidence of completed physical-PC GUI acceptance**.
+
+See [official consumer-app feasibility evidence](docs/official-app-sync-feasibility-17h.md), [safe Windows acceptance steps](docs/windows-local-acceptance-17h.md) and [progress log](docs/progress-log.md). Do not import personal files, browser profiles, passwords or provider-account exports into this experimental desktop.
