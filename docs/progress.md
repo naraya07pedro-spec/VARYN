@@ -207,3 +207,7 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 ## Checkpoint 15C: Desktop native proposal review
 - Desktop has a separate native-tool proposal action. A worker parses the selected provider response; only the UI thread may stage the current proposal after request identity verification.
 - No memory export, automatic tool execution or model-issued approval. Ten new headless tests. [GitHub Actions #41688204257](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41688204257) passed **318 tests per OS** on Windows and Ubuntu; vendor accounts and GUI interaction untested.
+
+## Checkpoint 16A: Scoped read-only local file foundation
+- Added standalone `ScopedLocalReader`, restricted to a user/host-supplied absolute directory and top-level UTF-8 .txt/.md files, with size/list caps, no recursive traversal and no write/network APIs.
+- **Not connected to AI agent tools or desktop**. Fifteen synthetic fixture tests; CI pending. Windows reparse-point/hardlink and concurrent path-swap threats are not fully blocked. Do not use with secrets or private data.
