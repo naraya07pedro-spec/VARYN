@@ -102,6 +102,19 @@ class DesktopController:
                 self._history.append(("assistant", reply.text))
         return result
 
+    def collaboration_engine(self):
+        """Share this session's provider registry and in-memory request budget.
+
+        Live capability is a snapshot of current network permission, not
+        authorization to bypass each stage's separate human confirmation.
+        """
+        from varyn.collaboration import CollaborationEngine
+        with self._lock:
+            enabled = self.allow_live_providers and self.network_consent
+        return CollaborationEngine(
+            self._router.router, budget=self._budget, allow_live=enabled,
+        )
+
     @property
     def history(self):
         with self._lock:
