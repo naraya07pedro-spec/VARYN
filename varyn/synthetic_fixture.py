@@ -28,7 +28,7 @@ class SyntheticFixture:
         try:
             root = Path(tempdir.name)
             for name, text in _FIXTURE_FILES.items():
-                (root / name).write_text(text, encoding="utf-8")
+                (root / name).write_text(text, encoding="utf-8", newline="\n")
         except BaseException:
             tempdir.cleanup()
             raise
