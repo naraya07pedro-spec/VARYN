@@ -87,6 +87,14 @@ jobs:
         run: python -m unittest discover -s tests -p "test_task_planner_tk.py" -v
       - name: Durable task checkpoint crash and no-replay regression
         run: python -m unittest discover -s tests -p "test_task_journal.py" -v
+      - name: Offline deterministic collaborative reasoning evaluator and adversarial controls
+        run: |
+          python -m unittest discover -s tests -p "test_reasoning_eval.py" -v
+          python -m unittest discover -s tests -p "test_reasoning_eval_desktop.py" -v
+          python -m varyn.reasoning_eval
+      - name: Native Windows Tk offline reasoning diagnostic button
+        if: runner.os == 'Windows'
+        run: python -m unittest discover -s tests -p "test_reasoning_eval_tk.py" -v
       - name: Option C consumer-history proof gates stay blocked
         run: |
           python -m unittest discover -s tests -p "test_option_c_gate.py" -v
