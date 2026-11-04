@@ -20,6 +20,7 @@ from varyn.tool_protocol import stage_tool_intent
 from varyn.native_tool_requests import NativeToolRequestClient
 from varyn.file_grants import ScopedFileGrants
 from varyn.synthetic_fixture import SyntheticFixture
+from varyn.desktop_collaboration import review_collaboration
 
 
 class VarynDesktop(tk.Tk):
@@ -119,6 +120,10 @@ class VarynDesktop(tk.Tk):
         controls.pack(fill="x", pady=10)
         self.send_button = ttk.Button(controls, text="Send", command=self._send)
         self.send_button.pack(side="left")
+        self.collaborate_button = ttk.Button(
+            controls, text="Collaborate (3 roles)", command=self._open_collaboration,
+        )
+        self.collaborate_button.pack(side="left", padx=(8, 0))
         ttk.Button(controls, text="Clear RAM chat", command=self._clear).pack(
             side="left", padx=8
         )
@@ -318,6 +323,7 @@ class VarynDesktop(tk.Tk):
         request_id = self._lifecycle.begin()
         self._busy = True
         self.send_button.configure(state="disabled")
+        self.collaborate_button.configure(state="disabled")
         self._refresh_status()
         worker = threading.Thread(
             target=self._send_worker,
@@ -326,6 +332,106 @@ class VarynDesktop(tk.Tk):
         )
         worker.start()
         self.after(75, self._poll_result)
+
+    def _open_collaboration(self):
+        """Configure three roles in a separate normal-user Tk window."""
+        if self._busy or self._closing:
+            return
+        dialog = tk.Toplevel(self)
+        dialog.title("VARYN | Three-role collaboration")
+        dialog.geometry("650x330")
+        dialog.resizable(True, False)
+        dialog.transient(self)
+        frame = ttk.Frame(dialog, padding=16)
+        frame.pack(fill="both", expand=True)
+        ttk.Label(
+            frame,
+            text="Analyst -> Critic -> Synthesizer | Offline fake by default",
+        ).grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 12))
+        values = []
+        for index, role in enumerate(("analyst", "critic", "synthesizer"), start=1):
+            provider = tk.StringVar(master=dialog, value="fake")
+            model = tk.StringVar(master=dialog, value="fake-test")
+            ttk.Label(frame, text=role.capitalize()).grid(
+                row=index, column=0, sticky="w", padx=(0, 10), pady=5,
+            )
+            menu = ttk.Combobox(
+                frame, values=PROVIDERS, state="readonly",
+                textvariable=provider, width=12,
+            )
+            menu.grid(row=index, column=1, sticky="w", padx=(0, 10))
+            ttk.Entry(frame, textvariable=model, width=27).grid(
+                row=index, column=2, sticky="we",
+            )
+            menu.bind(
+                "<<ComboboxSelected>>",
+                lambda _event, p=provider, m=model:
+                    m.set(DEFAULT_MODELS[p.get()]),
+            )
+            values.append((provider, model))
+        frame.columnconfigure(2, weight=1)
+        ttk.Label(
+            frame, text="Live model API requests may bill and share previous "
+                        "stage results with later providers.",
+        ).grid(row=4, column=0, columnspan=3, sticky="w", pady=(15, 6))
+
+        def submit():
+            task = self.prompt.get("1.0", "end-1c")
+            selections = tuple((p.get(), m.get()) for p, m in values)
+            if self._start_collaboration(task, selections):
+                dialog.destroy()
+
+        ttk.Button(
+            frame, text="Review and run 3 stages", command=submit,
+        ).grid(row=5, column=0, columnspan=3, sticky="w", pady=10)
+
+    def _start_collaboration(self, task, selections):
+        """Review on Tk thread, then transfer immutable snapshot to worker."""
+        if self._busy or self._closing:
+            return False
+        try:
+            stages, approvals = review_collaboration(
+                task, selections,
+                network_enabled=self.consent_network.get()
+                and self.controller.status()["network_enabled"],
+                ask_approval=lambda prompt: messagebox.askyesno(
+                    "Confirm each external AI stage", prompt, parent=self,
+                ),
+            )
+            engine = self.controller.collaboration_engine()
+            if self._closing or self._busy:
+                return False
+            request_id = self._lifecycle.begin()
+        except (ValueError, PermissionError, RuntimeError):
+            self._append(
+                "COLLAB", "Plan invalid or approval declined. No stage started.",
+            )
+            return False
+        self._busy = True
+        self.send_button.configure(state="disabled")
+        self.collaborate_button.configure(state="disabled")
+        self._refresh_status()
+        threading.Thread(
+            target=self._collaboration_worker,
+            args=(request_id, task, stages, approvals, engine),
+            daemon=True,
+        ).start()
+        self.after(75, self._poll_result)
+        return True
+
+    def _collaboration_worker(self, request_id, task, stages, approvals, engine):
+        """Background model work. Never access Tk from this thread."""
+        try:
+            result = engine.run(
+                task, stages, live_confirmations=approvals,
+            )
+            self._results.put((request_id, "collaboration", "", result))
+        except Exception:
+            self._results.put((
+                request_id, "collaboration_error", "",
+                "Collaboration stopped. Earlier API stages may have billed; "
+                "no automatic retry.",
+            ))
 
     def _request_native_tool(self):
         if self._busy:
@@ -353,6 +459,7 @@ class VarynDesktop(tk.Tk):
         request_id = self._lifecycle.begin()
         self._busy = True
         self.send_button.configure(state="disabled")
+        self.collaborate_button.configure(state="disabled")
         self._refresh_status()
         threading.Thread(
             target=self._native_tool_worker,
@@ -407,6 +514,18 @@ class VarynDesktop(tk.Tk):
                 self._confirm_agent_proposal(preview)
             except (AgentRejected, AgentLimitReached, ValueError, RuntimeError):
                 self._append("AGENT", "Native proposal could not be staged or reviewed")
+        elif kind == "collaboration":
+            self._append("YOU", message["task"])
+            for stage in message["stages"]:
+                self._append(
+                    "COLLAB " + stage["role"].upper(),
+                    stage["provider"] + " / " + stage["model"]
+                    + ": " + stage["text"],
+                )
+            self._append("VARYN SYNTHESIS", message["final_answer"])
+            self.prompt.delete("1.0", "end")
+        elif kind == "collaboration_error":
+            self._append("COLLAB", message)
         elif kind == "ok":
             self._append("YOU", question.strip())
             self._append("VARYN", message)
@@ -415,6 +534,7 @@ class VarynDesktop(tk.Tk):
             self._append("NOTICE", message)
         self._busy = False
         self.send_button.configure(state="normal")
+        self.collaborate_button.configure(state="normal")
         self._refresh_status()
 
     def _clear(self):
