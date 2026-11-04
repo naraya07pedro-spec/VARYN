@@ -87,6 +87,30 @@ class ScopedHandleLifecycleTests(unittest.TestCase):
             grants.read_text(grant.grant_id, "../escape.txt")
         self.assertTrue(reader._closed)
 
+    @unittest.skipUnless(os.name == "nt", "Windows-specific reparse metadata check")
+    def test_windows_detects_ancestor_reparse_change_at_access(self):
+        from types import SimpleNamespace
+
+        reader = self.reader()
+        watched = self.root.parent
+        original_lstat = Path.lstat
+
+        def modified_lstat(path, *args, **kwargs):
+            info = original_lstat(path, *args, **kwargs)
+            if path == watched:
+                return SimpleNamespace(
+                    st_mode=info.st_mode, st_dev=info.st_dev,
+                    st_ino=info.st_ino, st_nlink=1,
+                    st_file_attributes=0x400,
+                )
+            return info
+
+        with patch("varyn.scoped_files.Path.lstat", new=modified_lstat):
+            with self.assertRaises(AgentRejected):
+                reader.list_files()
+            with self.assertRaises(AgentRejected):
+                reader.read_text("hello.txt")
+
     @unittest.skipIf(os.name == "nt", "POSIX descriptor relative opens only")
     def test_posix_dir_descriptor_is_pinned(self):
         reader = self.reader()
