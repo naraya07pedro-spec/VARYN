@@ -69,6 +69,10 @@ class ScopedLocalReader:
     def _name(name):
         if not isinstance(name, str) or not _NAME.fullmatch(name):
             raise AgentRejected("Only top-level .txt/.md basenames are permitted")
+        stem = name.rsplit(".", 1)[0].rstrip(" .").upper()
+        if (stem in {"CON", "PRN", "AUX", "NUL"} or
+                re.fullmatch(r"(?:COM|LPT)[1-9]", stem)):
+            raise AgentRejected("Reserved device name denied")
         if name in (".", "..") or name.startswith("."):
             raise AgentRejected("Hidden and special names are refused")
         return name
