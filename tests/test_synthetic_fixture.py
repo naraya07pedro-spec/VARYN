@@ -16,6 +16,7 @@ class SyntheticFixtureTests(unittest.TestCase):
                          set(_FIXTURE_FILES))
         for name, text in _FIXTURE_FILES.items():
             self.assertEqual((fixture.root / name).read_text(encoding="utf-8"), text)
+            self.assertEqual((fixture.root / name).read_bytes(), text.encode("utf-8"))
             self.assertTrue(name.endswith((".txt", ".md")))
 
     def test_close_deletes_owned_directory_and_is_idempotent(self):
