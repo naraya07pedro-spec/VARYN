@@ -221,3 +221,61 @@ def score_blinded(packet, key, ratings):
         "statistical_significance_claimed": False,
         "network_calls": 0,
     }
+
+def synthetic_demo():
+    """Fabricated paired outputs, NOT actual model performance."""
+    def meta(requests, models):
+        return {
+            "requested_models": models, "requests": requests,
+            "reserved_output_tokens": 768,
+            "reported_input_tokens": None, "reported_output_tokens": None,
+            "elapsed_ms": None, "api_cost_usd": None,
+            "provider_attested": False,
+        }
+    cases = [
+        {
+            "case_id": "synthetic_improvement",
+            "task": "Invented local workflow design",
+            "single": "Offline execution.",
+            "collaboration": "Offline execution with consent and recovery.",
+            "single_meta": meta(1, ["fake-test"]),
+            "collaboration_meta": meta(3, ["fake-test"] * 3),
+        },
+        {
+            "case_id": "synthetic_regression",
+            "task": "Invented backup choice",
+            "single": "Backup and test restoration.",
+            "collaboration": "Delete backups and skip review.",
+            "single_meta": meta(1, ["fake-test"]),
+            "collaboration_meta": meta(3, ["fake-test"] * 3),
+        },
+    ]
+    packet, key = prepare_blinded(
+        cases, organizer_secret="synthetic-demo-secret-not-for-real",
+    )
+    ratings = []
+    for card in packet["cases"]:
+        cid = card["case_id"]
+        for rater in ("synthetic_rater_one", "synthetic_rater_two"):
+            scores = {}
+            for label in ("A", "B"):
+                arm = key["mapping"][cid][label]
+                preferred = (
+                    (cid == "synthetic_improvement" and arm == "collaboration")
+                    or (cid == "synthetic_regression" and arm == "single")
+                )
+                scores[label] = {
+                    dim: 5 if preferred else 2 for dim in _DIMENSIONS
+                }
+            ratings.append({
+                "case_id": cid, "rater_id": rater,
+                "A": scores["A"], "B": scores["B"],
+            })
+    report = score_blinded(packet, key, ratings)
+    report["synthetic_demo_only"] = True
+    report["real_model_outputs_used"] = False
+    return report
+
+
+if __name__ == "__main__":
+    print(json.dumps(synthetic_demo(), sort_keys=True, indent=2))
