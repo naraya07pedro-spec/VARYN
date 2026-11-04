@@ -4,6 +4,7 @@ No GUI root/window, user folders, provider APIs, real sensitive files or
 untrusted model tools. Scope count is never routed to any model.
 """
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -181,6 +182,48 @@ class DesktopSyntheticOnlyTests(unittest.TestCase):
         self.assertFalse(root.exists())
         with self.assertRaises(AgentRejected):
             self.ui._file_grants.list_files(old_id)
+
+    def test_desktop_idle_timer_deletes_fixture_without_user_action(self):
+        """Proves the real 1s timer releases the exact UI-owned sample."""
+        original_ui = self.ui
+        original_ui._file_grants.revoke_all()
+        manager = ScopedFileGrants(auto_expire=True)
+        self.ui = FakeDesktop(grants=manager)
+        deleted = threading.Event()
+        created = []
+        real_fixture = SyntheticFixture
+        original_grant = manager.grant
+
+        def make_fixture():
+            fixture = real_fixture()
+            original_close = fixture.close
+
+            def cleanup_and_signal():
+                original_close()
+                deleted.set()
+
+            fixture.close = cleanup_and_signal
+            created.append(fixture)
+            return fixture
+
+        def short_grant(path, **kwargs):
+            return original_grant(path, duration_seconds=1, **kwargs)
+
+        with patch("varyn.desktop.SyntheticFixture", side_effect=make_fixture), \
+             patch.object(manager, "grant", side_effect=short_grant):
+            self._grant()
+        self.assertEqual(len(created), 1)
+        root = created[0].root
+        self.assertTrue(root.is_dir())
+        grant_id = self.ui._file_grant_id
+        # No UI inspection, revoke, or status poll before the timer fires.
+        self.assertTrue(deleted.wait(5), "synthetic fixture still on disk after expiry")
+        self.assertFalse(root.exists())
+        with self.assertRaises(AgentRejected):
+            manager.list_files(grant_id)
+        VarynDesktop._inspect_synthetic_folder(self.ui)
+        self.assertIsNone(self.ui._file_grant_id)
+        self.assertIsNone(self.ui._file_fixture)
 
     def test_audit_has_no_fixture_names_or_private_bytes(self):
         self._grant()
