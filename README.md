@@ -508,3 +508,19 @@ VARYN now uses a separate **Windows native directory-handle backend** for the ap
 A Windows-only CI regression suite exercises real native kernel calls, while the cross-platform suite verifies that non-Windows cannot open the Windows backend. No model tool is wired to file contents; the desktop displays only a bounded filename count, with host-approved temporary permissions. **This is not Windows account authentication or a secure process sandbox**. It remains limited to non-sensitive synthetic test folders until permission/authentication isolation, broader threat-model testing, and owner-laptop GUI acceptance pass.
 
 See [native Windows threat model, evidence and laptop test steps](docs/windows-native-file-scope-17c.md) and the [progress log](docs/progress-log.md). The official-app synchronization target Option C is unchanged and remains unverified.
+
+
+### Checkpoint 17D: Expired grants, Windows read stability, and local-only volume policy
+
+The experimental, **synthetic-folder-only** scoped reader now closes stale Windows/POSIX directory handles when a trusted host calls the grant status endpoint, issues another grant, or revokes a grant. Expiration remains **opportunistic**, not timer-driven: if the app is idle without a status check, a handle may remain open until the next host action or process exit.
+
+On Windows, the native reader now verifies file identity, metadata, size and last-write timestamp **before and after** reading. It rejects detectable concurrent changes, unexpected short/long reads, remote/mapped or removable volumes, and files with cloud-placeholder/remote-recall indicators. A path on a fixed drive can still involve a cloud service; these controls are **not** a guarantee against network access and do not establish OS-level process isolation, authenticated grants, or tamper-proof snapshots.
+
+Run the new synthetic tests offline:
+
+\`\`\`powershell
+python -m unittest discover -s tests -p "test_grant_expiry_sweep.py" -v
+python -m unittest discover -s tests -p "test_windows_file_consistency.py" -v
+\`\`\`
+
+No filesystem write API, model file access, or provider-account history synchronization was introduced. Never select sensitive folders. See [17D security and test notes](docs/file-access-17d.md) and [progress log](docs/progress-log.md).
