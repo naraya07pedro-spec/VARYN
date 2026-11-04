@@ -34,6 +34,9 @@ jobs:
       - name: Native Windows handle containment regression (must execute)
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_windows_scoped_native.py" -v
+      - name: Native Windows read consistency regression (must execute)
+        if: runner.os == 'Windows'
+        run: python -m unittest discover -s tests -p "test_windows_file_consistency.py" -v
       - name: Offline official-app sync capability gate (no provider request)
         run: |
           python -m varyn.official_sync
