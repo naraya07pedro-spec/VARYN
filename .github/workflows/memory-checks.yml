@@ -99,6 +99,8 @@ jobs:
         run: |
           python -m unittest discover -s tests -p "test_blind_benchmark.py" -v
           python -m varyn.blind_benchmark
+      - name: 17S-1 reviewed synthetic file tool permission and desktop regressions
+        run: python -m unittest discover -s tests -p "test_tool_gateway.py" -v
       - name: Option C consumer-history proof gates stay blocked
         run: |
           python -m unittest discover -s tests -p "test_option_c_gate.py" -v
