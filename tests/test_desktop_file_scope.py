@@ -34,7 +34,7 @@ class DesktopFileScopeTests(unittest.TestCase):
 
     def _grant(self, folder=None, approve=True):
         with patch("varyn.desktop.filedialog.askdirectory",
-                   return_value=str(folder if folder is not None else self.root)), \\
+                   return_value=str(folder if folder is not None else self.root)), \
              patch("varyn.desktop.messagebox.askyesno", return_value=approve) as consent:
             VarynDesktop._grant_synthetic_folder(self.ui)
             return consent.call_count
@@ -53,7 +53,7 @@ class DesktopFileScopeTests(unittest.TestCase):
         self.assertEqual(self.ui._file_grants.status()["active"], 0)
 
     def test_cancel_folder_dialog_does_not_ask_for_consent(self):
-        with patch("varyn.desktop.filedialog.askdirectory", return_value=""), \\
+        with patch("varyn.desktop.filedialog.askdirectory", return_value=""), \
              patch("varyn.desktop.messagebox.askyesno") as consent:
             VarynDesktop._grant_synthetic_folder(self.ui)
         consent.assert_not_called()
@@ -67,7 +67,7 @@ class DesktopFileScopeTests(unittest.TestCase):
     def test_filename_count_does_not_leak_name_or_file_text(self):
         self._grant()
         VarynDesktop._inspect_synthetic_folder(self.ui)
-        transcript = "\\n".join(x[1] for x in self.ui.messages)
+        transcript = "\n".join(x[1] for x in self.ui.messages)
         self.assertIn("count: 1", transcript)
         self.assertNotIn("example.txt", transcript)
         self.assertNotIn("synthetic only", transcript)
