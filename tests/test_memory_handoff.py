@@ -227,6 +227,19 @@ class DesktopMemoryContextTests(unittest.TestCase):
         self.assertEqual(report["context_project"], "VARYN")
         self.assertEqual(self.ui.controller.status()["requests_used"], 3)
 
+    def test_invalid_model_rejected_before_memory_preview(self):
+        selections = (
+            ("fake", "fake-test"),
+            ("anthropic", "valid-critic"),
+            ("gemini", ""),
+        )
+        with patch("varyn.desktop.messagebox.askyesno") as ask:
+            self.assertFalse(VarynDesktop._start_collaboration(
+                self.ui, "Task", selections, memory_ids=str(self.idx)
+            ))
+        ask.assert_not_called()
+        self.assertEqual(self.ui.controller.status()["requests_used"], 0)
+
     def test_no_database_requires_refusal_before_disclosure(self):
         self.ui._memory = None
         with patch("varyn.desktop.messagebox.askyesno") as ask:
