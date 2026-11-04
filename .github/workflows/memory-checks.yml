@@ -31,6 +31,8 @@ jobs:
         run: python -c "import tkinter; print('Tkinter module available')"
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
+      - name: Idle grant expiration and cancellation regression (both OSes)
+        run: python -m unittest discover -s tests -p "test_file_grant_idle_timer.py" -v
       - name: Native Windows handle containment regression (must execute)
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_windows_scoped_native.py" -v
