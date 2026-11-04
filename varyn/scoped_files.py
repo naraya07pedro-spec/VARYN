@@ -4,9 +4,9 @@ The user/host chooses an ABSOLUTE root directory outside any model output.
 Only top-level ordinary .txt/.md files are accessible by basename. No shell,
 recursive walk, writes, network, model execution, or automatic context upload.
 
-POSIX opens are tied to the original directory FD, protecting content reads
-from path replacement after scope selection. Windows still uses best-effort
-metadata checks, NOT a secure handle-based containment boundary.
+POSIX opens use the approved directory FD. Windows uses NtCreateFile with an
+approved non-inheritable directory HANDLE and explicitly rejects reparse
+points. Both remain non-sandbox, trusted-host synthetic prototypes.
 """
 import os
 import re
@@ -56,7 +56,15 @@ class ScopedLocalReader:
         self._max_list = max_list
         self._closed = False
         self._root_fd = None
-        if os.name != "nt":
+        self._win_scope = None
+        if os.name == "nt":
+            from varyn.windows_scoped_native import WindowsScopedDirectory
+            try:
+                self._win_scope = WindowsScopedDirectory(base, self._root_stat.st_ino)
+            except AgentRejected:
+                self._closed = True
+                raise ValueError("Native Windows scope validation failed") from None
+        else:
             flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
             flags |= getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
             fd = None
@@ -80,6 +88,9 @@ class ScopedLocalReader:
             fd, self._root_fd = self._root_fd, None
             if fd is not None:
                 os.close(fd)
+            if self._win_scope is not None:
+                self._win_scope.close()
+                self._win_scope = None
 
     def __del__(self):
         if getattr(self, "_closed", True) is False:
@@ -132,6 +143,22 @@ class ScopedLocalReader:
         """List basename metadata only, capped; contents are not read."""
         self._check_root()
         found = []
+        if self._win_scope is not None:
+            # Directory enumeration and child metadata both use the native
+            # approved HANDLE; there is no unanchored Windows path fallback.
+            for basename in self._win_scope.list_names():
+                try:
+                    self._name(basename)
+                    size = self._win_scope.size_of(basename)
+                    if size <= self._max_bytes:
+                        found.append({"name": basename, "bytes": size})
+                except AgentRejected:
+                    continue
+            found.sort(key=lambda item: item["name"].casefold())
+            return {"format": "varyn.scoped_file_listing.v1",
+                    "files": found[:self._max_list],
+                    "truncated": len(found) > self._max_list,
+                    "recursive": False, "read_only": True}
         try:
             # POSIX fd scan remains anchored if a directory path is swapped.
             with os.scandir(self._root_fd if self._root_fd is not None else self._root) as entries:
@@ -161,6 +188,17 @@ class ScopedLocalReader:
         """Read bounded UTF-8 text; never follow a basename path through subdirs."""
         name = self._name(filename)
         self._check_root()
+        if self._win_scope is not None:
+            data = self._win_scope.read_bounded(name, self._max_bytes)
+            try:
+                content = data.decode("utf-8", errors="strict")
+            except UnicodeDecodeError:
+                raise AgentRejected("Only UTF-8 text is supported") from None
+            if "\x00" in content:
+                raise AgentRejected("Binary-like content not allowed")
+            return {"format": "varyn.scoped_file_read.v1",
+                    "name": name, "bytes": len(data), "text": content,
+                    "read_only": True, "external_upload": False}
         path = self._root / name
         try:
             before = path.lstat()
@@ -171,16 +209,7 @@ class ScopedLocalReader:
             flags = os.O_RDONLY | getattr(os, "O_BINARY", 0)
             flags |= getattr(os, "O_NOFOLLOW", 0)
             # POSIX openat pins reads to the original approved directory.
-            # Windows does not support dir_fd here and remains synthetic-only.
-            fd = (os.open(name, flags, dir_fd=self._root_fd)
-                  if self._root_fd is not None else os.open(path, flags))
-            if self._root_fd is None:
-                # Windows recheck narrows exposure but does not close OS races.
-                try:
-                    self._check_root()
-                except BaseException:
-                    os.close(fd)
-                    raise
+            fd = os.open(name, flags, dir_fd=self._root_fd)
             try:
                 opened = os.fstat(fd)
                 if (not stat.S_ISREG(opened.st_mode)
