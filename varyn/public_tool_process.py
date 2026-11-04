@@ -11,6 +11,7 @@ import sys
 from threading import RLock
 
 from varyn.public_github_tool import PublicToolRejected, _unique_pairs, _REPO
+from varyn.windows_child_job import attach_windows_child_guard
 
 
 _CHILD_MAX_OUTPUT = 4096
@@ -23,15 +24,22 @@ class ProcessRepoFetcher:
     URL, argv, environment or cwd is accepted. Only known JSON metadata exits.
     """
 
-    def __init__(self, *, spawn=None, timeout_seconds=8):
+    def __init__(self, *, spawn=None, timeout_seconds=8, guard_factory=None):
         if spawn is not None and not callable(spawn):
             raise TypeError("spawn factory must be callable")
         if type(timeout_seconds) is not int or not 1 <= timeout_seconds <= 20:
             raise ValueError("bounded child timeout required")
+        if guard_factory is not None and not callable(guard_factory):
+            raise TypeError("guard factory must be callable")
         self._spawn = spawn or subprocess.Popen
+        # Production Windows always requires a native Job Object and same-user SID.
+        # Custom guards exist solely for offline injected-process tests.
+        self._guard_factory = (guard_factory if guard_factory is not None else
+                               attach_windows_child_guard if os.name == "nt" else None)
         self._timeout = timeout_seconds
         self._lock = RLock()
         self._active = None
+        self._active_guard = None
         self._epoch = 0
         self._closed = False
         self._attempts = 0
@@ -84,8 +92,31 @@ class ProcessRepoFetcher:
                 )
             except (OSError, ValueError, TypeError):
                 raise PublicToolRejected("Could not start isolated child") from None
-            self._active = proc
             self._attempts += 1
+            guard = None
+            try:
+                # The child blocks reading stdin until AFTER job assignment.
+                # If token SID, job limits or assignment fail, refuse input.
+                if self._guard_factory is not None:
+                    guard = self._guard_factory(proc)
+                    if not getattr(guard, "attached", False):
+                        raise PublicToolRejected("Child OS containment unverified")
+            except Exception:
+                self._terminate(proc)
+                try:
+                    proc.wait(timeout=1)
+                except (AttributeError, OSError, subprocess.TimeoutExpired):
+                    pass
+                if guard is not None:
+                    try:
+                        guard.close()
+                    except Exception:
+                        pass
+                raise PublicToolRejected(
+                    "Child OS process gate refused; no network intent sent"
+                ) from None
+            self._active = proc
+            self._active_guard = guard
 
         try:
             stdout, _ = proc.communicate(input=raw, timeout=self._timeout)
@@ -111,8 +142,12 @@ class ProcessRepoFetcher:
             except (AttributeError, OSError, subprocess.TimeoutExpired):
                 pass
             with self._lock:
+                guard = self._active_guard if self._active is proc else None
                 if self._active is proc:
                     self._active = None
+                    self._active_guard = None
+            if guard is not None:
+                guard.close()
 
     def cancel(self):
         """Stop an active child if possible and invalidate previous results."""
@@ -122,6 +157,9 @@ class ProcessRepoFetcher:
             if proc is not None:
                 self._terminations += 1
                 self._terminate(proc)
+                guard = self._active_guard
+                if guard is not None:
+                    guard.close()
 
     def close(self):
         with self._lock:
@@ -140,6 +178,10 @@ class ProcessRepoFetcher:
                 "termination_attempts": self._terminations,
                 "isolated_python_flags": True,
                 "credential_env_allowlist": True,
+                "windows_native_job_required": os.name == "nt",
+                "windows_same_user_sid_required": os.name == "nt",
+                "windows_child_commit_cap_bytes": (192 * 1024 * 1024
+                                                   if os.name == "nt" else None),
                 "os_sandbox": False,
                 "os_authenticated_human": False,
             }
