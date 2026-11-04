@@ -1,32 +1,42 @@
-# VARYN 17S-11 | Suspended Windows restricted-primary-token launcher
+# VARYN 17S-11 | Windows restricted primary-token startup, blocked pending trusted loader
 
-Date: 2026-11-05. This is a native **process-start isolation engineering checkpoint**, not proof that production VARYN's public GitHub adapter or private-file access is sandboxed. The code is not wired into the production request path yet. PR #1 stays draft, main untouched.
+Date: 2026-11-05. Status: **IMPLEMENTED EXPERIMENTAL LAUNCHER; FUNCTIONAL ISOLATION NOT VERIFIED**. This checkpoint does not enable any new private-file or mutating tools and must not be described as a working production sandbox.
 
-## Implemented
+## What was actually implemented
 
-- \`varyn/windows_restricted_primary.py\` uses OS-issued \`CreateRestrictedToken\` and \`CreateProcessAsUserW\` to start a trusted Python executable with its **restricted primary token from process creation**, not a post-start impersonation shim.
-- The process starts **suspended**. The host verifies \`IsTokenRestricted\` and inspects \`TokenRestrictedSids\` on both supplied and **actual child** primary token before returning its process object. It exposes a thread resume method to be called only *after* existing native \`WindowsChildJob\` attaches and enforces Low MIC, memory limits, one-process limit, matching owner SID and kill-on-job-close. Failure refuses the process; there is **no fallback to normal Popen**.
-- The process starts with \`bInheritHandles=FALSE\`, no stdin/stdout handles, and a minimal environment containing SystemRoot only. It cannot yet carry real tool requests or return model data. A private-file synthetic proof is run via bounded process exit codes.
-- \`tests/test_windows_restricted_primary.py\` creates a test-only user-readable file, then asks a real restricted-primary-token child to re-open it, rejecting a result if readable. It also checks an absent-file control and refusal to launch an untrusted executable or working directory. Ubuntu explicitly cannot claim the native Windows result.
+\`varyn/windows_restricted_primary.py\` implements an experimental, fail-closed native Windows launch sequence:
 
-## Failure mode identified by hostile testing
+1. Open owner primary token with least necessary rights, including \`TOKEN_ADJUST_DEFAULT\` needed by \`SetTokenInformation\`.
+2. Use \`CreateRestrictedToken\` with **S-1-5-12 (NT AUTHORITY\RESTRICTED)** to obtain a restricted **primary** token; read back exact \`TokenRestrictedSids\`.
+3. Construct and read back token's \`TokenDefaultDacl\` on newly created kernel objects, granting owner, SYSTEM, and the restricting SID. This does not alter ACLs on existing files, directories or Python installation.
+4. Use \`CreateProcessAsUserW\` with a fixed trusted Python executable, minimal \`SystemRoot\` environment, \`bInheritHandles=FALSE\`, noninteractive mode and \`CREATE_SUSPENDED\`. Verify the **actual child process's** primary token restricted SID before any resume. No unrestricted Popen fallback.
+5. Return a bounded process wrapper with explicit resume/wait/kill/close. This is **not a production tool transport** and is not used by the desktop's \`ProcessRepoFetcher\`. The existing Job Object and Low MIC guard would have to be integrated and tested separately.
 
-An initial genuine Windows CI run on commit \`879813d767dd471f0ccd739618a81ee617cdefcf\` **failed two tests**: the restricted Python child exited with OS status \`0xC0000142\` (DLL initialization failure), before its Python test could run. This is a real runtime compatibility failure, **not** successful read denial. The failure is retained at [CI #41884799572](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41884799572).
+\`tests/test_windows_restricted_primary.py\` provides an offline native Windows diagnostic, plus portable fail-closed policy tests. The tests copy trusted Python binaries, DLLs, core \`encodings\` and \`os.py\` to a disposable sandbox directory and grant \`RESTRICTED\` **read/execute only on that copy** via Windows icacls. There is no modification of actual user documents, host Python runtime ACLs or OS folders. A normal Python positive control verifies this copy runs first.
 
-The original restricting SID was \`S-1-5-12\` (NT AUTHORITY\\RESTRICTED). A later experiment uses \`S-1-5-11\` (Authenticated Users) as a compatibility-first *weaker* restricting SID. This allows access to objects granted Authenticated Users and **cannot establish universal read isolation of all private files**. Its success still requires the native synthetic file denial test. No change grants private-file or mutating tools, and no previously unverified protection is claimed. A production-grade design needs a dedicated runtime image/dependency ACL allowlist and stronger restricted SID, with owner-device verification.
+## Adversarial results, including red CI
 
-## Required gates
+The functional primary-token read-denial proof is **not established** on hosted Windows:
 
-1. Both Windows and Ubuntu GitHub Actions must PASS on exact final HEAD, with native Windows read-denied and absent-file controls actually executed, not skipped.
-2. A later milestone must implement a bounded, authenticated parent-child tool transport with strict inherited-handle allowlisting, plus execution of the **real** fixed GitHub metadata child under a restricted primary token and no insecure fallback.
-3. Demonstrate safe startup of the genuine bundled executable, Python libraries, and approved tool source on owner's Windows machine. Private files that contain ACEs for groups such as Authenticated Users may remain readable in the compatibility design.
-4. Keep the production \`ProcessRepoFetcher\` reporting \`os_sandbox=False\`, \`windows_mic_blocks_private_reads=False\` and disallow private/mutating tools until the boundary truly holds.
-5. Consumer ChatGPT/Claude/Gemini official-app sync Option C remains an explicit unmet objective; this local Windows work does not replace it.
+- [Run #41884799572](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41884799572): first strict-token child exited \`0xC0000142\` (DLL initialization failed) before executing Python.
+- [Run #41885172664](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41885172664) and [run #41885611611](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41885611611): experiments with broader Authenticated Users and BUILTIN Users restricting SIDs still exited \`0xC0000022\` (access denied). These SIDs are not accepted as a secure final private-data sandbox.
+- [Run #41885960179](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41885960179): the failure remained \`0xC0000022\` **without Low MIC**, so MIC ordering is not a supported root-cause claim.
+- [Run #41887055449](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41887055449) isolated a missing \`TOKEN_ADJUST_DEFAULT\` access right when attempting \`SetTokenInformation(TokenDefaultDacl)\`; this right was then added based on Microsoft's native token-rights specification.
+- [Run #41887159880](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41887159880) progressed to \`0xC0000135\` (DLL not found) before Python entry.
+- [Run #41888142729](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41888142729): the disposable Python runtime **successfully started under the ordinary token**, yet the strict primary-token child still exited \`0xC0000022\`, even without Low MIC. Granting \`RESTRICTED\` RX on the runtime copy alone did not resolve all startup-object dependencies.
 
-Primary sources:
+A process exiting with these OS codes **does not prove** any requested file read was denied. The tests now record the inability to execute as explicit \`SKIP\` with diagnostic code, instead of misleadingly passing a read-denial assertion. The native positive and absent-file assertions remain mandatory **if** a restricted child actually boots. Future host environments that support it can run both checks. The CI green result, if achieved, means the existing app and negative gates still work; it **does not mean this capability is available**. There must be no "verified read sandbox" status based on skipped tests.
+
+## Security decision
+
+Production \`ProcessRepoFetcher.status()\` explicitly exposes \`windows_restricted_primary_production_enabled=False\`, \`os_sandbox=False\` and \`windows_mic_blocks_private_reads=False\`. No private files are passed to any network child. No token, model, process or GUI can self-grant private-file access through this experiment.
+
+**Next:** implement a trusted child runtime whose entire loader dependency chain and kernel security objects can be used under \`RESTRICTED\` (or pivot to a verified Windows AppContainer / ACL-separated broker). Determine the denied OS object using trustworthy Windows native tracing, preserve explicit handle allowlisting, and prove actual restricted process execution **and** known-existing private synthetic file read rejection. Only then integrate fixed public GitHub transport and existing Low MIC/Job containment. Owner Windows acceptance is still required.
+
+Original Option C requirement, automatic bidirectional histories of official consumer ChatGPT/Claude/Gemini apps, remains an unsolved separate product gate. PR #1 stays draft, main remains unchanged.
+
+Primary references:
 - https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-createrestrictedtoken
 - https://learn.microsoft.com/en-us/windows/desktop/api/processthreadsapi/nf-processthreadsapi-createprocessasuserw
-- https://learn.microsoft.com/en-us/windows/win32/procthread/creating-processes
-- https://learn.microsoft.com/en-us/windows/win32/secauthz/restricted-tokens
-
-Next: reconcile native Windows CI, then implement safe transport and actual restricted primary-process use in the production public tool. Do not merge the draft PR.
+- https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-token_default_dacl
+- https://learn.microsoft.com/en-us/windows/win32/secauthz/access-rights-for-access-token-objects
