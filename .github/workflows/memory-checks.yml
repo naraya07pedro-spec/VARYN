@@ -80,6 +80,8 @@ jobs:
       - name: Windows Tk exact-selected-memory review and provenance
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_memory_handoff_tk.py" -v
+      - name: Bounded 17O multi-step synthetic task planning and approval regressions
+        run: python -m unittest discover -s tests -p "test_task_planner.py" -v
       - name: Option C consumer-history proof gates stay blocked
         run: |
           python -m unittest discover -s tests -p "test_option_c_gate.py" -v
