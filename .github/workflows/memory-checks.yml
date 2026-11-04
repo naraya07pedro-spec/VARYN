@@ -75,6 +75,8 @@ jobs:
       - name: Hosted Windows Tk synthetic memory UI save/search/delete (no human clicks)
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_desktop_memory_tk.py" -v
+      - name: Check 17N selected memory context handoff
+        run: python -m unittest discover -s tests -p "test_memory_handoff.py" -v
       - name: Option C consumer-history proof gates stay blocked
         run: |
           python -m unittest discover -s tests -p "test_option_c_gate.py" -v
