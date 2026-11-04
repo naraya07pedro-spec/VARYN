@@ -11,7 +11,7 @@ from secrets import token_urlsafe
 from time import monotonic
 
 from varyn.public_github_tool import (
-    PublicToolRejected, _unique_pairs, parse_public_tool_intent,
+    PublicToolRejected, _BRANCH, _unique_pairs, parse_public_tool_intent,
 )
 
 _PLAN_FORMAT = "varyn.public_repo_comparison.v1"
@@ -32,7 +32,13 @@ class ComparisonReview:
 
 def parse_comparison_plan(raw):
     """Two exact, distinct public repo slugs; no URLs or injected tool names."""
-    if type(raw) is not str or not raw or len(raw.encode("utf-8")) > _MAX_PLAN_BYTES:
+    if type(raw) is not str or not raw:
+        raise PublicToolRejected("Invalid or oversized comparison task")
+    try:
+        encoded_length = len(raw.encode("utf-8", "strict"))
+    except UnicodeError:
+        raise PublicToolRejected("Invalid comparison text encoding") from None
+    if encoded_length > _MAX_PLAN_BYTES:
         raise PublicToolRejected("Invalid or oversized comparison task")
     try:
         data = json.loads(raw, object_pairs_hook=_unique_pairs)
@@ -129,7 +135,7 @@ class PublicRepoComparison:
                 metadata.get("untrusted_external_data") is not True or
                 metadata.get("provider_handoff") is not False or
                 type(metadata.get("default_branch")) is not str or
-                not 1 <= len(metadata["default_branch"]) <= 150 or
+                not _BRANCH.fullmatch(metadata["default_branch"]) or
                 type(metadata.get("stars")) is not int or
                 metadata["stars"] < 0 or
                 type(metadata.get("open_items_including_prs")) is not int or
