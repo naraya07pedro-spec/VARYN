@@ -10,7 +10,7 @@ ROLES = ("analyst", "critic", "synthesizer")
 
 
 def review_collaboration(task, selections, *, network_enabled=False,
-                         ask_approval=None):
+                         ask_approval=None, memory_attached=False):
     """Return frozen stages/confirmations only after reviewing EACH live step.
 
     All model IDs and role order are validated before showing any approval
@@ -18,6 +18,8 @@ def review_collaboration(task, selections, *, network_enabled=False,
     discloses that original task AND earlier AI outputs reach later providers.
     Approval callback is controlled by the GUI, never by an LLM or a file.
     """
+    if type(memory_attached) is not bool:
+        raise ValueError("Memory attachment flag must be boolean")
     if type(task) is not str or not 1 <= len(task.strip()) <= 1200:
         raise ValueError("Task must be 1..1200 characters")
     if (type(selections) not in (tuple, list) or len(selections) != 3 or
@@ -46,7 +48,10 @@ def review_collaboration(task, selections, *, network_enabled=False,
             "will be sent to this provider. For critic/synthesizer, earlier "
             "model outputs will ALSO be sent across provider boundaries as "
             "UNTRUSTED input (up to 950 characters per previous stage). "
-            "No stored memory is attached.\n\n"
+            ("The EXACT user-selected local memory records will be sent "
+             "to the analyst stage; later stages may receive quoted or "
+             "summarized contents via model outputs.\n\n"
+             if memory_attached else "No stored memory is attached.\n\n")
             "Approve this EXACT API stage, its possible cost, and data sharing?"
         )
         if ask_approval(warning) is not True:
