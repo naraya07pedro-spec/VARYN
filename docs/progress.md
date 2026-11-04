@@ -211,3 +211,8 @@ Verify the restore tests in CI, then test real Windows filesystem behavior and a
 ## Checkpoint 16A: Scoped read-only local file foundation
 - Added standalone `ScopedLocalReader`, restricted to a user/host-supplied absolute directory and top-level UTF-8 .txt/.md files, with size/list caps, no recursive traversal and no write/network APIs.
 - **Not connected to AI agent tools or desktop**. Fifteen synthetic fixture tests; [GitHub Actions #41760389734](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41760389734) passed **333 tests per OS** on Windows and Ubuntu. Windows reparse-point/hardlink and concurrent path-swap threats are not fully blocked. Do not use with secrets or private data.
+
+## Checkpoint 16B: Ephemeral local file access grants
+- Host-only `ScopedFileGrants` requires explicit caller-asserted user consent, binds an absolute folder to a random grant ID, limits operations and lifetime, and supports immediate revocation. A bounded metadata-only audit excludes file content and paths.
+- Windows checks now deny detectable reparse points, multiple-link file metadata and reserved device basenames. This is best-effort, not a hardened Windows OS sandbox.
+- Sixteen synthetic tests added; CI pending. Grants are not connected to AI/desktop and no real user file was accessed.
