@@ -182,6 +182,61 @@ class SyntheticIdleExpiryTests(unittest.TestCase):
         self.assertEqual(outcome, ["expired"])
         self.assertTrue(reader._closed)
 
+    def test_revocation_waits_for_inflight_operation_without_losing_lock(self):
+        grant = self.grant()
+        reader = self.grants._grants[grant.grant_id]["reader"]
+        started = threading.Event()
+        release = threading.Event()
+        revoke_finished = threading.Event()
+        results = []
+        original = reader.list_files
+
+        def blocking_list():
+            started.set()
+            self.assertTrue(release.wait(3))
+            return original()
+
+        reader.list_files = blocking_list
+
+        def do_read():
+            try:
+                results.append(self.grants.list_files(grant.grant_id)["format"])
+            except Exception as exc:
+                results.append(type(exc).__name__)
+
+        def do_revoke():
+            self.grants.revoke(grant.grant_id)
+            revoke_finished.set()
+
+        operation = threading.Thread(target=do_read)
+        operation.start()
+        self.assertTrue(started.wait(3))
+        revoker = threading.Thread(target=do_revoke)
+        revoker.start()
+        # The already-running in-process operation is serialized and can
+        # finish before revocation; revocation blocks future accesses.
+        release.set()
+        operation.join(3)
+        revoker.join(3)
+        self.assertFalse(operation.is_alive())
+        self.assertFalse(revoker.is_alive())
+        self.assertTrue(revoke_finished.is_set())
+        self.assertEqual(results, ["varyn.scoped_file_listing.v1"])
+        self.assertTrue(reader._closed)
+        with self.assertRaises(AgentRejected):
+            self.grants.list_files(grant.grant_id)
+
+    def test_only_one_pending_expiry_timer_across_many_grants(self):
+        grants = [self.grant(duration=4 + offset) for offset in range(5)]
+        live = [timer for timer in self.timers.timers
+                if timer.started and not timer.cancelled]
+        self.assertEqual(len(live), 1)
+        self.assertTrue(all(g.grant_id in self.grants._grants for g in grants))
+        self.grants.revoke_all()
+        self.assertEqual(
+            [t for t in self.timers.timers if t.started and not t.cancelled], []
+        )
+
     def test_invalid_timer_configuration_is_rejected(self):
         for options in (
             {"auto_expire": 1},
