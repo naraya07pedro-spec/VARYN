@@ -534,7 +534,8 @@ class VarynDesktop(tk.Tk):
             self._append("NOTICE", message)
         self._busy = False
         self.send_button.configure(state="normal")
-        self.collaborate_button.configure(state="normal")
+        if hasattr(self, "collaborate_button"):
+            self.collaborate_button.configure(state="normal")
         self._refresh_status()
 
     def _clear(self):
