@@ -171,6 +171,29 @@ class CollaborationTests(unittest.TestCase):
         self.assertFalse(out["multi_model_review"])
         self.assertEqual(out["distinct_provider_model_pairs"], 1)
 
+    def test_fake_different_model_ids_are_not_independent_review(self):
+        one = ProviderRouter(providers={"fake": self.a})
+        engine = CollaborationEngine(one)
+        stages = tuple(Stage(role, "fake", model, 32) for role, model in (
+            ("analyst", "fake-a"), ("critic", "fake-b"),
+            ("synthesizer", "fake-c"),
+        ))
+        result = engine.run("Task", stages)
+        self.assertEqual(result["distinct_provider_model_pairs"], 3)
+        self.assertFalse(result["multi_model_review"])
+        self.assertFalse(result["live_execution_independently_attested"])
+
+    def test_one_real_provider_and_one_fake_is_not_independent_review(self):
+        stages = (
+            Stage("analyst", "fake", "fake-test", 32),
+            Stage("critic", "anthropic", "test-critic", 32),
+            Stage("synthesizer", "anthropic", "test-synthesis", 32),
+        )
+        result = self.engine.run("Task", stages,
+                                 live_confirmations=(False, True, True))
+        self.assertFalse(result["multi_model_review"])
+        self.assertEqual(len(self.b.calls), 2)
+
     def test_rejects_unbounded_task_and_bad_stage_configuration(self):
         for text in ("", "x" * 1201, 5, None):
             with self.subTest(text=str(text)[:10]), self.assertRaises(ValueError):
