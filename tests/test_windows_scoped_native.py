@@ -114,6 +114,17 @@ class NativeWindowsHandleTests(unittest.TestCase):
             with self.subTest(name=name), self.assertRaises(AgentRejected):
                 native.read_bounded(name, 128)
 
+    def test_native_backend_rejects_device_aliases_and_direct_bypass(self):
+        reader = self.reader()
+        native = reader._win_scope
+        for name in ("private.env", "CON.foo.txt", "NUL.backup.md",
+                     "COM1.other.txt", "AUX.v1.md", "notes..md",
+                     "bad .txt", "../allowed.txt", ".hidden.txt"):
+            with self.subTest(name=name), self.assertRaises(AgentRejected):
+                native.read_bounded(name, 128)
+            with self.subTest(name=name), self.assertRaises(AgentRejected):
+                reader.read_text(name)
+
     def test_native_handle_pins_origin_across_directory_path_swap(self):
         reader = self.reader()
         native = reader._win_scope
