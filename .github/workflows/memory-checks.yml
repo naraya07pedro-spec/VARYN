@@ -2,7 +2,7 @@ name: Memory prototype checks
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/local-memory-prototype-20261103]
   pull_request:
 
 permissions:
