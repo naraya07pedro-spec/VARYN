@@ -451,3 +451,9 @@ print(reader.read_text('example.txt'))
 ```
 
 Supply an **existing absolute folder chosen by the host**, not from model text. Only nonrecursive `.txt`/`.md` file basenames are accepted with strict UTF-8 decoding and byte limits. This reader is **not connected to model tool calls or the desktop UI**; it has no filesystem write or network API. It is not an OS sandbox, particularly under Windows reparse-point/concurrent path changes, and must not be used with secrets or confidential files. Tests use synthetic folders only.
+
+### Checkpoint 16B: Temporary read-only file grants
+
+`ScopedFileGrants` manages host-created read-only directory grants. A trusted caller provides an existing absolute folder and asserts `user_confirmed=True`. The default scope expires after five minutes or ten operations, whichever comes first. A caller may revoke a grant. Failed accesses also consume operations, and the audit records only event type and a shortened ID, not paths or contents. The model cannot request these grants through existing VARYN tools.
+
+This is **not proof of user authentication**, permission from a graphical dialog, or a secure Windows sandbox. Detected reparse points, hardlinks and Windows reserved names are denied, but OS-level handle/race protection remains incomplete. Only use synthetic test files.
