@@ -222,6 +222,33 @@ class WorkerSecurityTests(unittest.TestCase):
         finally:
             worker.close()
 
+    def test_desktop_mismatched_gateway_fails_before_network(self):
+        from types import SimpleNamespace
+        from varyn.desktop import VarynDesktop
+        calls = []
+        host = PublicGithubToolGateway(fetcher=lambda r:
+                                       calls.append(("host", r)) or metadata(r))
+        other = PublicGithubToolGateway(fetcher=lambda r:
+                                        calls.append(("other", r)) or metadata(r))
+        class Fake:
+            _busy = False
+            _closing = False
+            consent_public_tools = SimpleNamespace(get=lambda: True)
+            def __init__(self):
+                self._public_github_tools = host
+                self._public_tool_worker = PublicGithubToolWorker(other)
+                self.messages = []
+            def _append(self, role, message):
+                self.messages.append((role, message))
+        ui = Fake()
+        VarynDesktop._review_public_github_intent(ui)
+        self.assertEqual(calls, [])
+        self.assertIn("identity mismatch", repr(ui.messages))
+        self.assertEqual(host.status()["pending"], 0)
+        self.assertEqual(other.status()["pending"], 0)
+        ui._public_tool_worker.close()
+        host.close()
+
     def test_result_revalidated_and_free_text_removed(self):
         def fetch(repo):
             data = metadata(repo)
