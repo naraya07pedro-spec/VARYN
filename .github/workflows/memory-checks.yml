@@ -128,6 +128,13 @@ jobs:
         run: python -m unittest discover -s tests -p "test_public_repo_plan_tk.py" -v
       - name: 17S-8 crash-safe public comparison journal and no replay regressions
         run: python -m unittest discover -s tests -p "test_public_comparison_journal.py" -v
+      - name: 17S-9 SQLite fault injections and dispatch-no-replay on both OSes
+        run: |
+          python -m unittest discover -s tests -p "test_public_repo_plan.py" -v
+          python -m unittest discover -s tests -p "test_public_comparison_journal.py" -v
+      - name: 17S-9 native Windows Tk callback teardown acceptance
+        if: runner.os == 'Windows'
+        run: python -m unittest discover -s tests -p "test_public_repo_plan_tk.py" -v
       - name: Option C consumer-history proof gates stay blocked
         run: |
           python -m unittest discover -s tests -p "test_option_c_gate.py" -v
