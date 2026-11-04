@@ -88,11 +88,12 @@ class CollaborationEngine:
             if not context_upload_confirmed:
                 raise PermissionError("Local context handoff requires opt-in")
             _validate(stages[0].model, task, 16, 10, context)
-        if (len({(s.provider, s.model) for s in stages}) < 2):
-            # Still a valid role workflow but not independent multi-model review.
-            independent_models = False
-        else:
-            independent_models = True
+        # Fake or multiple IDs on the same provider MUST NOT be counted
+        # as independently executed models. The engine cannot independently
+        # attest what actually ran behind a registered provider adapter.
+        independent_models = len({
+            s.provider for s in stages if s.provider != "fake"
+        }) >= 2
         if any(s.provider not in self._router.router.providers for s in stages):
             raise PermissionError("Requested provider not registered")
         for index, stage in enumerate(stages):
@@ -156,6 +157,7 @@ class CollaborationEngine:
                 (s.provider, s.model) for s in stages
             }),
             "multi_model_review": independent_models,
+            "live_execution_independently_attested": False,
             "fact_checked_externally": False,
             "independent_quality_verified": False,
             "automatic_provider_failover": False,
