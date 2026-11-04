@@ -41,6 +41,27 @@ class EvaluationCase:
             raise EvaluationError("Rubric terms must be globally distinct")
 
 
+def parse_rubric(raw):
+    """Parse owner-authored bounded criteria. Never ask the model to grade itself."""
+    if type(raw) is not str or not 1 <= len(raw) <= 2400:
+        raise EvaluationError("Rubric JSON must be 1..2400 characters")
+    try:
+        doc = json.loads(raw)
+    except (ValueError, TypeError):
+        raise EvaluationError("Invalid rubric JSON") from None
+    if type(doc) is not dict or set(doc) != {
+        "case_id", "required", "forbidden", "alternatives"
+    }:
+        raise EvaluationError("Rubric needs exactly four named fields")
+    for name in ("required", "forbidden", "alternatives"):
+        if type(doc[name]) is not list:
+            raise EvaluationError("Rubric criteria must be lists")
+    return EvaluationCase(
+        doc["case_id"], tuple(doc["required"]),
+        tuple(doc["forbidden"]), tuple(doc["alternatives"]),
+    )
+
+
 def _found(text, phrase):
     """Case-insensitive, literal boundary-aware matching; not semantic entailment."""
     return re.search(
