@@ -484,3 +484,18 @@ All three currently report `blocked_pending_provider_evidence` for automatic off
 `varyn.official_sync.SyncMarker` and `plan_synthetic_reconciliation(..., synthetic_fixture=True)` are an independent, **strictly offline fixture planner**. They only examine bounded synthetic IDs, revision numbers, digests and explicit tombstones. They never access a vendor, read a chat, write a file, execute a mutation, or authorize a model to modify app history. The planner refuses ambiguous deletions, conflicts, regressed revisions, and changed content without a revision increment. All candidate actions are review-only and have `can_dispatch=false`. No local or vendor text is included in its output.
 
 **Safety:** the planner is not a sync engine or source-of-truth for real accounts. Treat actual provider support, ownership, deletion semantics, user consent, history API limits and vendor terms as separate evidence gates before attempting a live connector. See [product contract](docs/product-contract-and-feasibility.md) and [progress log](docs/progress-log.md).
+
+
+### Checkpoint 17B: Scoped local reader handle lifecycle (experimental)
+
+The standalone **synthetic-only** file reader now pins its approved directory to a POSIX file descriptor, then lists via the descriptor and opens files relative to the same directory with `O_NOFOLLOW`. This reduces the risk that a path swap between permission checks and opening a file will silently redirect reads to another directory. The descriptor is released when the reader closes, or when a temporary grant is revoked, expires upon attempted use, or exhausts its operation limit. Existing read-only size/extension restrictions remain.
+
+**Windows remains limited:** The reader now rechecks detectable reparse points in every parent directory on each operation and rechecks the approved directory after opening a content handle. These are **best-effort mitigations**, not atomic Win32 handle-based containment; concurrent malicious path swaps and local-process privilege attacks remain unmitigated. Windows native OS confinement and actual laptop acceptance still need separate proof. None of this authorizes personal/financial/client documents.
+
+To run the offline synthetic regression tests:
+
+```powershell
+python -m unittest discover -s tests -p "test_file_scope_lifecycle.py" -v
+```
+
+This reader is not exposed as a model or agent tool and still cannot write files or upload them to providers.
