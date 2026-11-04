@@ -37,6 +37,8 @@ jobs:
           python -m unittest discover -s tests -p "test_synthetic_fixture.py" -v
       - name: Idle grant expiration and cancellation regression (both OSes)
         run: python -m unittest discover -s tests -p "test_file_grant_idle_timer.py" -v
+      - name: Grant-owned fixture release and idle cleanup regression (both OSes)
+        run: python -m unittest discover -s tests -p "test_grant_fixture_release.py" -v
       - name: Native Windows handle containment regression (must execute)
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_windows_scoped_native.py" -v
