@@ -52,9 +52,9 @@ def build_owner_report(synthetic, answers):
         "identity_authenticated": False,
         "official_apps_connected": False,
         "automatic_official_app_sync_verified": False,
-        "provider_requests": 0,
-        "user_files_collected": False,
-        "saved_to_disk": False,
+        "provider_requests_by_report_tool": 0,
+        "user_file_paths_requested_by_report_tool": False,
+        "report_saved_to_disk_by_tool": False,
     }
     return result
 
