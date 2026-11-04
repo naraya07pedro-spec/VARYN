@@ -3,6 +3,7 @@
 Local UI tool bridge only: no model execution, OS sandbox, identity authentication,
 or access to personal files. Grant IDs must stay inside trusted host code.
 """
+from collections import deque
 from dataclasses import dataclass
 from hashlib import sha256
 import json
@@ -46,7 +47,7 @@ class SyntheticReadToolGateway:
         self._max_decisions = max_decisions
         self._decisions = 0
         self._lock = RLock()
-        self._events = []
+        self._events = deque(maxlen=64)
 
     def propose(self, tool, arguments, *, grant_id):
         """Build a review, without reading files or making a provider request."""
@@ -120,7 +121,7 @@ class SyntheticReadToolGateway:
             return {"format": "varyn.synthetic_tool_gateway.v1",
                     "pending": len(self._pending), "decisions": self._decisions,
                     "decision_limit": self._max_decisions,
-                    "events": tuple(self._events[-20:]),
+                    "events": tuple(self._events),
                     "model_connected": False,
                     "provider_handoff_allowed": False,
                     "identity_authenticated": False,
