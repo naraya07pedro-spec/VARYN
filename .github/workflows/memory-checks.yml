@@ -118,6 +118,9 @@ jobs:
         run: python -m unittest discover -s tests -p "test_public_tool_process.py" -v
       - name: 17S-5 Windows native Job Object SID/resource enforcement and offline child probe
         run: python -m unittest discover -s tests -p "test_windows_child_job.py" -v
+      - name: 17S-6 Windows Low MIC native child token enforcement and write-denial proof
+        if: runner.os == 'Windows'
+        run: python -m unittest discover -s tests -p "test_windows_child_job.py" -v
       - name: Option C consumer-history proof gates stay blocked
         run: |
           python -m unittest discover -s tests -p "test_option_c_gate.py" -v
