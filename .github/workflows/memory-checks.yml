@@ -31,6 +31,10 @@ jobs:
         run: python -c "import tkinter; print('Tkinter module available')"
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
+      - name: Synthetic-only desktop boundary and disposable sample cleanup
+        run: |
+          python -m unittest discover -s tests -p "test_desktop_file_scope.py" -v
+          python -m unittest discover -s tests -p "test_synthetic_fixture.py" -v
       - name: Idle grant expiration and cancellation regression (both OSes)
         run: python -m unittest discover -s tests -p "test_file_grant_idle_timer.py" -v
       - name: Native Windows handle containment regression (must execute)
