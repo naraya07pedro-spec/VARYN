@@ -111,6 +111,21 @@ class DesktopFileScopeTests(unittest.TestCase):
         self.assertIsNone(ui._file_grant_id)
         self.assertIn("expired", ui.messages[-1][1])
 
+    def test_normal_desktop_close_revokes_all_grants(self):
+        from types import SimpleNamespace
+        self._grant()
+        old = self.ui._file_grant_id
+        self.ui._lifecycle = SimpleNamespace(busy=False, close=lambda: None)
+        self.ui._approval = SimpleNamespace(reject_all_pending=lambda: None)
+        self.ui._agent_journal = None
+        self.ui.controller = SimpleNamespace(discard_pending_history=lambda: None)
+        self.ui.destroy = lambda: None
+        VarynDesktop._close(self.ui)
+        self.assertTrue(self.ui._closing)
+        self.assertIsNone(self.ui._file_grant_id)
+        with self.assertRaises(AgentRejected):
+            self.ui._file_grants.list_files(old)
+
     def test_no_grant_contents_in_public_status(self):
         self._grant()
         VarynDesktop._inspect_synthetic_folder(self.ui)
