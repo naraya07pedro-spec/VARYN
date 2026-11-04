@@ -32,6 +32,42 @@ def metadata(name):
 
 @unittest.skipUnless(sys.platform == "win32", "Hosted Windows Tk display required")
 class PublicRepoPlanTkTests(unittest.TestCase):
+    def test_cancel_pending_tk_public_poll_and_second_step_callbacks(self):
+        ui = VarynDesktop(controller=DesktopController())
+        try:
+            ui.withdraw()
+            VarynDesktop._schedule_public_poll(ui)
+            poll_id = ui._public_poll_after_id
+            self.assertIsNotNone(poll_id)
+            self.assertIn(poll_id, ui.tk.call("after", "info"))
+            # Scheduled second step must remain revocable during the gap.
+            candidate = object()
+            VarynDesktop._schedule_public_comparison_next(ui, candidate)
+            step_id = ui._public_step_after_id
+            self.assertIsNotNone(step_id)
+            self.assertIn(step_id, ui.tk.call("after", "info"))
+            VarynDesktop._cancel_public_scheduled_callbacks(ui)
+            pending = ui.tk.call("after", "info")
+            self.assertNotIn(poll_id, pending)
+            self.assertNotIn(step_id, pending)
+            self.assertIsNone(ui._public_poll_after_id)
+            self.assertIsNone(ui._public_step_after_id)
+        finally:
+            with patch("varyn.desktop.messagebox.askyesno", return_value=True):
+                ui._close()
+
+    def test_close_cancels_public_poll_before_widget_destroy(self):
+        ui = VarynDesktop(controller=DesktopController())
+        ui.withdraw()
+        VarynDesktop._schedule_public_poll(ui)
+        outstanding = ui._public_poll_after_id
+        self.assertIn(outstanding, ui.tk.call("after", "info"))
+        with patch("varyn.desktop.messagebox.askyesno", return_value=True):
+            ui._close()
+        self.assertIsNone(ui._public_poll_after_id)
+        # A lingering Tcl after script would create the observed teardown warning.
+        self.assertNotIn(outstanding, ui.tk.call("after", "info"))
+
     def test_real_tk_button_requires_three_reviews_and_only_two_mocked_gets(self):
         ui = VarynDesktop(controller=DesktopController())
         try:
