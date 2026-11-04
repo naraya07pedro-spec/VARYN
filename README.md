@@ -615,3 +615,12 @@ To run locally on an ordinary (non-Administrator) Windows desktop with Python an
 If no graphical session exists, the command fails rather than reporting success. A PASS means only that native Tk controls and synthetic permission flows behaved correctly in that environment. **It does NOT mean the owner visually inspected the app, consented to real file access, authenticated the OS user, or enabled official ChatGPT/Claude/Gemini bidirectional chat-history synchronization.**
 
 See [17J Tk widget smoke and residual limitations](docs/tk-widget-smoke-17j.md) and [running progress log](docs/progress-log.md). The physical owner's normal Windows GUI acceptance checklist from 17I remains a separate step.
+
+
+### Checkpoint 17K: Bounded three-role multi-provider collaboration engine
+
+The module varyn/collaboration.py implements an actual staged **analyst -> critic -> synthesizer** handoff through VARYN's existing ProviderRouter and UsageBudget. Each stage explicitly selects a provider/model; later roles receive earlier role output marked UNTRUSTED, and their final synthesis is returned with per-stage metadata. Failure stops the chain: no implicit retries or fallback. The whole three-stage plan is preflighted for valid roles, available adapters, quota and explicit per-stage permission **before** any live request is dispatched.
+
+**Default: offline and blocked from all live requests.** An application must opt in to each live stage, explicitly disclose that prior results will be shared across the chosen providers, and use external API credentials held outside source. Local quota is NOT a money/billing cap. The module is an engine, not yet an integrated desktop feature, and neither multi-provider invocation nor its output proves factual correctness or official consumer-app history synchronization. All-fake workflows and workflows using only one real provider never count as verified independent multi-provider review.
+
+See [17K collaboration contract](docs/multi-provider-collaboration-17k.md), tests/test_collaboration.py and [progress log](docs/progress-log.md). Next: user-facing per-stage consent, shared memory handoffs, measured reasoning evaluation, resumable work.
