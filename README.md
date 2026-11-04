@@ -714,3 +714,16 @@ The trusted desktop's public GitHub read-only subprocess now requires a **native
 The default **public GitHub metadata child** now requires an OS-enforced **Low Mandatory Integrity Level (MIC)** in addition to the 17S-5 native Windows Job Object and matching user SID. After the child is attached to its constrained Job Object, the parent uses `SetTokenInformation(TokenIntegrityLevel)` to lower the **child** token to `S-1-16-4096`, and re-reads its token from Windows to verify the exact Low SID. **Only after all checks pass** can the public read-only tool intent be passed to child stdin. Failure kills the child and refuses tool execution, with no permissive fallback.
 
 On hosted Windows CI, a real Low child reads a parent-created synthetic file but is **blocked by Windows from modifying its Medium-integrity contents**. A separate test forces MIC setup failure and confirms the child is stopped before any reviewed request. These tests are completely offline. **Low MIC does not block reads of same-user private files**, and is not AppContainer, a full restricted token, or human identity authentication. Keep personal-file tools and write-capable tools disabled. OS behavior on the owner's laptop remains unverified. See [17S-6 Windows Low MIC proof and boundary](docs/windows-low-mic-17s-6.md).
+
+
+### Checkpoint 17S-7: first two-step owner-reviewed external tool workflow
+
+VARYN now accepts an exactly validated **two-repository public GitHub comparison task** as a bounded real-tool workflow. Paste this JSON into the desktop message field:
+
+```json
+{"format":"varyn.public_repo_comparison.v1","repositories":["naraya07pedro-spec/VARYN","python/cpython"]}
+```
+
+Enable the *separate GitHub public metadata consent* checkbox and select **Review 2-repo public GitHub comparison plan (JSON)**. A whole-task dialog describes both targets and the plan digest. **Two additional, independent dialogs** approve each exact public GitHub GET separately. The second request can never run without its own confirmation. Only after both GETs complete does VARYN render a local, structured comparison of stars, open items (including PRs) and archived state, with a clear warning that popularity data is **not** code quality or security. No model-provider handoff, unbounded tool plan, file access, persistence or automatic retry is authorized.
+
+Closing, revoking GitHub permission or pressing the existing cancel button drops the **entire comparison**, including a second-step callback that was scheduled but not yet executed. There is no resume or reapproval by a model. Windows production public metadata GETs still use the 17S-6 supervised child + native Job Object + Low MIC. **Low MIC does not stop reading accessible personal files; those inputs remain disabled.** Mocked CI does not prove live GitHub availability or owner-PC acceptance. [17S-7 contract and tests](docs/public-repo-plan-17s-7.md).
