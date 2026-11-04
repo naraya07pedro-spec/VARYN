@@ -318,6 +318,7 @@ class DesktopIntentTests(unittest.TestCase):
                     fetcher=lambda repo: calls.append(repo) or metadata(repo))
                 self.messages = []
                 self.scheduled = []
+                self._poll_public_github_tool = lambda: VarynDesktop._poll_public_github_tool(self)
             def _append(self, title, message):
                 self.messages.append((title, message))
             def after(self, ms, callback):
