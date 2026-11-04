@@ -16,7 +16,11 @@ import sys
 
 from varyn.public_github_tool import PublicToolRejected
 
-_RESTRICTING_SID = "S-1-5-12"  # NT AUTHORITY\RESTRICTED
+# Compatibility-first restricted primary-token proof. Authenticated Users is
+# deliberately weaker than S-1-5-12: it cannot certify all personal files.
+# Production private-file access MUST remain disabled until an isolated runtime
+# with a dedicated restricting SID and verified ACL grants is available.
+_RESTRICTING_SID = "S-1-5-11"  # NT AUTHORITY\Authenticated Users
 _TOKEN_ASSIGN_PRIMARY = 0x0001
 _TOKEN_DUPLICATE = 0x0002
 _TOKEN_IMPERSONATE = 0x0004
@@ -136,8 +140,8 @@ def _os_restricted_token_verified(token, advapi):
         if not 8 <= size <= 68:
             return False
         observed = ctypes.string_at(item.Sid, size)
-        # S-1-5-12 in canonical binary SID format.
-        expected = bytes((1, 1, 0, 0, 0, 0, 0, 5)) + (12).to_bytes(4, "little")
+        # Exact current restricting SID in canonical binary SID format.
+        expected = bytes((1, 1, 0, 0, 0, 0, 0, 5)) + (11).to_bytes(4, "little")
         if observed == expected:
             return True
     return False
