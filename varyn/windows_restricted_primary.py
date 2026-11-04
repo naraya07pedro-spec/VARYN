@@ -32,11 +32,24 @@ _WAIT_OBJECT_0 = 0
 _WAIT_TIMEOUT = 258
 _STILL_ACTIVE = 259
 _TOKEN_RESTRICTED_SIDS = 11
+_TOKEN_DEFAULT_DACL = 6
+_TOKEN_USER = 1
+_GENERIC_ALL = 0x10000000
 
 
 if os.name == "nt":
     class _SidAndAttributes(ctypes.Structure):
         _fields_ = [("Sid", wintypes.HANDLE), ("Attributes", wintypes.DWORD)]
+
+    class _TokenDefaultDacl(ctypes.Structure):
+        _fields_ = [("DefaultDacl", ctypes.c_void_p)]
+
+    class _AclHeader(ctypes.Structure):
+        _fields_ = [("AclRevision", ctypes.c_uint8),
+                    ("Sbz1", ctypes.c_uint8),
+                    ("AclSize", ctypes.c_uint16),
+                    ("AceCount", ctypes.c_uint16),
+                    ("Sbz2", ctypes.c_uint16)]
 
     class _StartupInfo(ctypes.Structure):
         _fields_ = [
@@ -99,6 +112,14 @@ def _apis():
     a.IsValidSid.restype = wintypes.BOOL
     a.GetLengthSid.argtypes = [wintypes.HANDLE]
     a.GetLengthSid.restype = wintypes.DWORD
+    a.SetTokenInformation.argtypes = [
+        wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+    a.SetTokenInformation.restype = wintypes.BOOL
+    a.InitializeAcl.argtypes = [ctypes.c_void_p, wintypes.DWORD, wintypes.DWORD]
+    a.InitializeAcl.restype = wintypes.BOOL
+    a.AddAccessAllowedAce.argtypes = [
+        ctypes.c_void_p, wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+    a.AddAccessAllowedAce.restype = wintypes.BOOL
     a.CreateProcessAsUserW.argtypes = [
         wintypes.HANDLE, wintypes.LPCWSTR, wintypes.LPWSTR,
         ctypes.c_void_p, ctypes.c_void_p, wintypes.BOOL, wintypes.DWORD,
@@ -144,6 +165,66 @@ def _os_restricted_token_verified(token, advapi):
         if observed == expected:
             return True
     return False
+
+
+
+def _set_restricted_token_default_dacl(source, restricted, sid, kernel, advapi):
+    """Grant only owner/SYSTEM and restricting SID for newly created objects.
+
+    A restricted token can otherwise create an object whose default DACL
+    fails its own second (restricting-SID) access check. Do NOT apply this
+    DACL to any existing user files or public directories.
+    """
+    needed = wintypes.DWORD()
+    advapi.GetTokenInformation(source, _TOKEN_USER, None, 0,
+                               ctypes.byref(needed))
+    if not 16 <= needed.value <= 65536:
+        raise PublicToolRejected("Caller token SID inaccessible")
+    user_buf = ctypes.create_string_buffer(needed.value)
+    if not advapi.GetTokenInformation(source, _TOKEN_USER, user_buf,
+                                      needed, ctypes.byref(needed)):
+        raise PublicToolRejected("Cannot read caller token user")
+    user_sid = ctypes.cast(user_buf, ctypes.POINTER(_SidAndAttributes)).contents.Sid
+    if not user_sid or not advapi.IsValidSid(user_sid):
+        raise PublicToolRejected("Caller SID not OS validated")
+
+    system_sid = wintypes.HANDLE()
+    try:
+        if not advapi.ConvertStringSidToSidW("S-1-5-18",
+                                             ctypes.byref(system_sid)):
+            raise PublicToolRejected("SYSTEM SID unavailable")
+        acl = ctypes.create_string_buffer(512)
+        if not advapi.InitializeAcl(acl, ctypes.sizeof(acl), 2):
+            raise PublicToolRejected("Cannot initialize restricted object ACL")
+        for item in (user_sid, sid, system_sid):
+            if not advapi.AddAccessAllowedAce(acl, 2, _GENERIC_ALL, item):
+                raise PublicToolRejected("Cannot add restricted default ACL")
+        label = _TokenDefaultDacl(ctypes.addressof(acl))
+        if not advapi.SetTokenInformation(
+                restricted, _TOKEN_DEFAULT_DACL,
+                ctypes.byref(label), ctypes.sizeof(label)):
+            raise PublicToolRejected("Cannot set restricted token default ACL")
+        required = wintypes.DWORD()
+        advapi.GetTokenInformation(restricted, _TOKEN_DEFAULT_DACL,
+                                   None, 0, ctypes.byref(required))
+        if not 16 <= required.value <= 65536:
+            raise PublicToolRejected("Restricted default ACL unreadable")
+        observed_buf = ctypes.create_string_buffer(required.value)
+        if not advapi.GetTokenInformation(
+                restricted, _TOKEN_DEFAULT_DACL, observed_buf,
+                required, ctypes.byref(required)):
+            raise PublicToolRejected("Cannot attest restricted default ACL")
+        observed = ctypes.cast(
+            observed_buf, ctypes.POINTER(_TokenDefaultDacl)).contents
+        if not observed.DefaultDacl:
+            raise PublicToolRejected("Restricted default ACL missing")
+        header = ctypes.cast(
+            observed.DefaultDacl, ctypes.POINTER(_AclHeader)).contents
+        if header.AclRevision != 2 or header.AceCount != 3:
+            raise PublicToolRejected("Restricted default ACL rejected by OS")
+    finally:
+        if system_sid:
+            kernel.LocalFree(system_sid)
 
 
 class SuspendedRestrictedProcess:
@@ -247,6 +328,8 @@ def spawn_suspended_restricted_primary(argv, *, cwd):
             raise PublicToolRejected("Cannot create restricted primary token")
         if not _os_restricted_token_verified(restricted, a):
             raise PublicToolRejected("Restricted primary token missing kernel SID")
+        # Restrict token-created kernel object DACL, not filesystem DACL.
+        _set_restricted_token_default_dacl(owner, restricted, sid, k, a)
         startup = _StartupInfo()
         startup.cb = ctypes.sizeof(startup)
         # Default noninteractive window station. No stdio handles inherited.
