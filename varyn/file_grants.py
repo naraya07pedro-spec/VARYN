@@ -57,10 +57,33 @@ class ScopedFileGrants:
             return
         generation = self._timer_generation
         delay = max(0.0, min(active) - self._clock())
-        timer = self._timer_factory(delay, self._expire_due, args=(generation,))
-        timer.daemon = True
-        self._timer = timer
-        timer.start()
+        timer = None
+        try:
+            timer = self._timer_factory(delay, self._expire_due, args=(generation,))
+            timer.daemon = True
+            self._timer = timer
+            timer.start()
+        except Exception:
+            # A failed scheduler cannot leave "live" unattended handles.
+            # Revoke ALL this manager's grants rather than falling back to
+            # idle handles that never expire.
+            self._timer_generation += 1
+            self._timer = None
+            if timer is not None:
+                try:
+                    timer.cancel()
+                except Exception:
+                    pass
+            for entry in self._grants.values():
+                try:
+                    entry["reader"].close()
+                except OSError:
+                    pass
+            self._grants.clear()
+            self._audit.append(("timer_unavailable", ""))
+            raise PermissionError(
+                "Automatic expiry unavailable; all file grants revoked"
+            ) from None
 
     def _expire_due(self, generation):
         """Runs inside the desktop process; never reads file contents."""
@@ -68,7 +91,11 @@ class ScopedFileGrants:
             if generation != self._timer_generation:
                 return
             self._sweep_expired(self._clock())
-            self._schedule_expiry_locked()
+            try:
+                self._schedule_expiry_locked()
+            except PermissionError:
+                # Already failed closed and audited. No unhandled timer exception.
+                return
 
     def _sweep_expired(self, now):
         """Release stale handles on trusted host activity; no background timer."""
