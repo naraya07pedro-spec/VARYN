@@ -104,8 +104,12 @@ class ProcessRepoFetcher:
         except (OSError, ValueError, TypeError, UnicodeError, subprocess.TimeoutExpired):
             raise PublicToolRejected("Public child failed or exceeded time limit") from None
         finally:
-            # May race with cancel(); a terminated child never returns a result.
+            # Reap a terminated child on the worker thread, never on Tk.
             self._terminate(proc)
+            try:
+                proc.wait(timeout=1)
+            except (AttributeError, OSError, subprocess.TimeoutExpired):
+                pass
             with self._lock:
                 if self._active is proc:
                     self._active = None
