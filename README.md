@@ -600,3 +600,18 @@ The separate offline Option C status utility enumerates seven required proof gat
 **All provider gates remain blocked** because no verified supported native consumer-app history read/write interface has been established. This is a diagnostic, not a connector. A successful diagnostic exit code never means synchronization works. Manual Claude/Gemini transfers and model developer APIs do not satisfy the chosen Option C product requirement.
 
 See [17I owner report and official-sync proof gates](docs/owner-acceptance-option-c-17i.md), [17H Windows steps](docs/windows-local-acceptance-17h.md) and [progress log](docs/progress-log.md). Do not enable private-file access or claim hardware GUI acceptance based on hosted CI.
+
+
+### Checkpoint 17J: Real Tkinter button-command acceptance on hosted Windows
+
+Beyond unit tests that call methods directly, VARYN can now **instantiate the real Tkinter desktop and exercise the actual Create / Inspect / Revoke ttk.Button callbacks** with no provider account, paid API or personal folders. The test initializes a fake-only controller with network consent disabled and an offline-only native tool client. It simulates decline/approval of the **generated synthetic demo folder** using test-controlled messagebox responses. It checks that the UI reports two example files without exposing their names/paths/content, that Revoke deletes the fixture and denies reuse, that a new one-second synthetic grant is cleaned automatically on idle expiry, and that reopening a fresh window does not restore old permissions.
+
+Windows hosted GitHub Actions now runs this **real Tk widget command test as a required CI step**, with additional cross-platform tests that fail closed when buttons are missing/duplicated, graphics are unavailable, or errors could disclose private strings. The visible report distinguishes programmatic button invocation from physical mouse clicks or actual human approval.
+
+To run locally on an ordinary (non-Administrator) Windows desktop with Python and Tkinter:
+
+    py -3 -m varyn.tk_widget_smoke --synthetic-only --require-display --json
+
+If no graphical session exists, the command fails rather than reporting success. A PASS means only that native Tk controls and synthetic permission flows behaved correctly in that environment. **It does NOT mean the owner visually inspected the app, consented to real file access, authenticated the OS user, or enabled official ChatGPT/Claude/Gemini bidirectional chat-history synchronization.**
+
+See [17J Tk widget smoke and residual limitations](docs/tk-widget-smoke-17j.md) and [running progress log](docs/progress-log.md). The physical owner's normal Windows GUI acceptance checklist from 17I remains a separate step.
