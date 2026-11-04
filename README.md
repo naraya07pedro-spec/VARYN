@@ -581,3 +581,22 @@ A source-only Windows ZIP now also includes **Verify-VARYN-Synthetic.cmd** for a
 Passing hosted CI or the CLI probe is **not evidence of completed physical-PC GUI acceptance**.
 
 See [official consumer-app feasibility evidence](docs/official-app-sync-feasibility-17h.md), [safe Windows acceptance steps](docs/windows-local-acceptance-17h.md) and [progress log](docs/progress-log.md). Do not import personal files, browser profiles, passwords or provider-account exports into this experimental desktop.
+
+
+### Checkpoint 17I: Owner self-reported Windows GUI checks and native Option C proof gates
+
+The source-only Windows ZIP now ships **Record-VARYN-GUI-Checks.cmd** alongside Verify-VARYN-Synthetic.cmd. The optional report launcher runs the existing synthetic-only CLI test, then guides the owner through six fixed yes/no/skip observations in a separate desktop window: opening VARYN in fake/network-off mode, declining demo consent, approving a two-file example, checking that no file contents/paths appear in chat, revoking, and restarting without restoring old permissions. The result is a bounded JSON status report, with NO raw answers, device identifiers, file paths or screenshots collected or persisted by this tool.
+
+**This is an owner SELF-REPORT, not proof that software observed GUI mouse clicks or authenticated a Windows user.** Any missing, skipped or failed observation blocks even self-reported PASS. The report explicitly says independent owner-PC verification is false, and the source-only tool never upgrades privileges or connects AI accounts. No real files should be used.
+
+From a normal (non-admin) PowerShell in the inspected VARYN source folder:
+
+    py -3 -m varyn.owner_acceptance --synthetic-only --interactive
+
+The separate offline Option C status utility enumerates seven required proof gates for EACH real official ChatGPT/Claude/Gemini consumer app, including supported consumer-app history read and write APIs, authorized identity, change detection, conflicts/deletions, account eligibility, and genuine end-to-end two-way owner acceptance:
+
+    py -3 -m varyn.option_c_gate
+
+**All provider gates remain blocked** because no verified supported native consumer-app history read/write interface has been established. This is a diagnostic, not a connector. A successful diagnostic exit code never means synchronization works. Manual Claude/Gemini transfers and model developer APIs do not satisfy the chosen Option C product requirement.
+
+See [17I owner report and official-sync proof gates](docs/owner-acceptance-option-c-17i.md), [17H Windows steps](docs/windows-local-acceptance-17h.md) and [progress log](docs/progress-log.md). Do not enable private-file access or claim hardware GUI acceptance based on hosted CI.
