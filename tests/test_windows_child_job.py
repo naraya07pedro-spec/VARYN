@@ -37,6 +37,10 @@ class PortableJobPolicyTests(unittest.TestCase):
         with self.assertRaises(PublicToolRejected):
             WindowsChildJob(object())
 
+    def test_untrusted_caller_cannot_override_native_guard_with_real_spawner(self):
+        with self.assertRaises(ValueError):
+            ProcessRepoFetcher(guard_factory=lambda proc: object())
+
     def test_attestation_missing_or_failed_disallows_stdin(self):
         class Proc:
             communicated = False
