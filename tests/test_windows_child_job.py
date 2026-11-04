@@ -9,6 +9,7 @@ import sys
 import time
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from varyn.public_tool_process import ProcessRepoFetcher
@@ -22,14 +23,20 @@ class PortableJobPolicyTests(unittest.TestCase):
     def test_memory_cap_is_explicit_and_bounded(self):
         self.assertEqual(MAX_CHILD_COMMIT_BYTES, 192 * 1024 * 1024)
         self.assertFalse(ProcessRepoFetcher().status()["os_sandbox"])
+        self.assertFalse(ProcessRepoFetcher().status()[
+            "windows_mic_blocks_private_reads"])
         if os.name == "nt":
             self.assertTrue(ProcessRepoFetcher().status()[
                 "windows_native_job_required"])
             self.assertTrue(ProcessRepoFetcher().status()[
                 "windows_same_user_sid_required"])
+            self.assertTrue(ProcessRepoFetcher().status()[
+                "windows_child_low_mic_required"])
         else:
             self.assertFalse(ProcessRepoFetcher().status()[
                 "windows_native_job_required"])
+            self.assertFalse(ProcessRepoFetcher().status()[
+                "windows_child_low_mic_required"])
 
     def test_job_is_not_available_on_non_windows(self):
         if os.name == "nt":
@@ -122,6 +129,76 @@ class NativeWindowsJobTests(unittest.TestCase):
         finally:
             if guard is not None:
                 guard.close()
+            if proc.poll() is None:
+                proc.kill()
+            proc.communicate(timeout=5)
+
+    def test_actual_low_integrity_denies_medium_file_write(self):
+        # Entirely OFFLINE: the child waits on stdin, opens one synthetic
+        # file made by this test, reads it, then tries a write that MIC must
+        # refuse. No GitHub API requests or client data are present.
+        probe = (
+            "import sys\\n"
+            "p=sys.stdin.buffer.readline().decode('utf-8').strip()\\n"
+            "try:\\n"
+            " f=open(p,'rb'); data=f.read(); f.close()\\n"
+            " r=(data==b'unchanged')\\n"
+            "except OSError: r=False\\n"
+            "try:\\n"
+            " f=open(p,'r+b'); f.write(b'MODIFIED!'); f.close()\\n"
+            " w=True\\n"
+            "except OSError: w=False\\n"
+            "sys.stdout.write(('READ_OK' if r else 'READ_FAIL') + '/' + "
+            "('WRITE_ALLOWED' if w else 'WRITE_DENIED'))\\n"
+        )
+        # Convert explicit line separators to real newlines for -c.
+        probe = probe.replace("\\n", "\n")
+        with TemporaryDirectory(prefix="varyn-mic-test-") as tmp:
+            target = Path(tmp) / "medium.txt"
+            target.write_bytes(b"unchanged")
+            proc = subprocess.Popen(
+                [sys.executable, "-I", "-S", "-c", probe],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE, close_fds=True,
+                shell=False, env=ProcessRepoFetcher._environment(),
+                cwd=str(Path(sys.executable).resolve().parent),
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            guard = None
+            try:
+                self.assertIsNone(proc.poll())
+                guard = WindowsChildJob(proc)
+                self.assertTrue(guard.attached)
+                stdout, stderr = proc.communicate(
+                    input=(str(target) + "\n").encode("utf-8"), timeout=5)
+                self.assertEqual(proc.returncode, 0, stderr.decode("utf-8", "replace"))
+                self.assertEqual(stdout, b"READ_OK/WRITE_DENIED")
+                self.assertEqual(target.read_bytes(), b"unchanged")
+            finally:
+                if guard is not None:
+                    guard.close()
+                if proc.poll() is None:
+                    proc.kill()
+                proc.communicate(timeout=5)
+
+    def test_native_low_integrity_failure_kills_without_payload(self):
+        proc = subprocess.Popen(
+            ProcessRepoFetcher._command(),
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL, close_fds=True,
+            shell=False, env=ProcessRepoFetcher._environment(),
+            cwd=str(Path(sys.executable).resolve().parent),
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        try:
+            self.assertIsNone(proc.poll())
+            with patch("varyn.windows_child_job._enforce_child_low_integrity",
+                       side_effect=PublicToolRejected("MIC not enforceable")):
+                with self.assertRaises(PublicToolRejected):
+                    WindowsChildJob(proc)
+            proc.wait(timeout=5)
+            self.assertIsNotNone(proc.returncode)
+        finally:
             if proc.poll() is None:
                 proc.kill()
             proc.communicate(timeout=5)
