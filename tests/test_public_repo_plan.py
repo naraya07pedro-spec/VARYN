@@ -1,5 +1,6 @@
 """17S-7 offline reviewed two-step public metadata orchestration tests."""
 import json
+import sqlite3
 import time
 import unittest
 import tempfile
@@ -184,6 +185,95 @@ class FakeDesktop:
 
 
 class DesktopPlanTests(unittest.TestCase):
+    def test_disk_failure_before_approved_get_prevents_any_dispatch(self):
+        from varyn.desktop import VarynDesktop
+        with tempfile.TemporaryDirectory() as temp:
+            journal = PublicComparisonJournal(Path(temp) / "comparison.sqlite3")
+            # Real SQLite error at a durable transition, not only a fake exception.
+            journal.db.execute(
+                "CREATE TRIGGER reject_begin BEFORE UPDATE OF status "
+                "ON public_comparison_checkpoints WHEN NEW.status='uncertain' "
+                "BEGIN SELECT RAISE(ABORT,'simulated disk write failure'); END"
+            )
+            calls = []
+            ui = FakeDesktop(fetcher=lambda repo: calls.append(repo) or metadata(repo))
+            ui._comparison_journal = journal
+            ui._public_comparison_journal_ref = None
+            try:
+                with patch("varyn.desktop.messagebox.askyesno",
+                           side_effect=[True, True]) as ask:
+                    VarynDesktop._review_public_comparison(ui)
+                self.assertEqual(ask.call_count, 2)
+                self.assertEqual(calls, [])
+                self.assertIsNone(ui._public_comparison)
+                self.assertIsNone(ui._public_comparison_journal_ref)
+                rows = journal.db.execute(
+                    "SELECT cursor,status FROM public_comparison_checkpoints"
+                ).fetchall()
+                self.assertEqual(rows, [(0, "cancelled")])
+            finally:
+                ui._public_tool_worker.close()
+                journal.close()
+
+    def test_disk_failure_after_first_verified_get_prevents_second(self):
+        from varyn.desktop import VarynDesktop
+        with tempfile.TemporaryDirectory() as temp:
+            journal = PublicComparisonJournal(Path(temp) / "comparison.sqlite3")
+            journal.db.execute(
+                "CREATE TRIGGER reject_complete BEFORE UPDATE OF status "
+                "ON public_comparison_checkpoints "
+                "WHEN OLD.status='uncertain' AND NEW.status='ready' "
+                "BEGIN SELECT RAISE(ABORT,'simulated checkpoint write failure'); END"
+            )
+            calls = []
+            ui = FakeDesktop(fetcher=lambda repo: calls.append(repo) or metadata(repo))
+            ui._comparison_journal = journal
+            ui._public_comparison_journal_ref = None
+            try:
+                with patch("varyn.desktop.messagebox.askyesno",
+                           side_effect=[True, True]) as ask:
+                    VarynDesktop._review_public_comparison(ui)
+                    self.assertTrue(pump(ui, lambda:
+                                        ui._public_comparison is None))
+                self.assertEqual(ask.call_count, 2)
+                self.assertEqual(calls, [REPOS[0]])
+                self.assertNotIn("GITHUB COMPARISON", repr(ui.messages))
+                self.assertEqual(journal.db.execute(
+                    "SELECT cursor,status FROM public_comparison_checkpoints"
+                ).fetchall(), [(0, "needs_reconciliation")])
+            finally:
+                ui._public_tool_worker.close()
+                journal.close()
+
+    def test_disk_failure_at_final_checkpoint_suppresses_summary(self):
+        from varyn.desktop import VarynDesktop
+        with tempfile.TemporaryDirectory() as temp:
+            journal = PublicComparisonJournal(Path(temp) / "comparison.sqlite3")
+            journal.db.execute(
+                "CREATE TRIGGER reject_finish BEFORE UPDATE OF status "
+                "ON public_comparison_checkpoints WHEN NEW.status='completed' "
+                "BEGIN SELECT RAISE(ABORT,'simulated finish failure'); END"
+            )
+            calls = []
+            ui = FakeDesktop(fetcher=lambda repo: calls.append(repo) or metadata(repo))
+            ui._comparison_journal = journal
+            ui._public_comparison_journal_ref = None
+            try:
+                with patch("varyn.desktop.messagebox.askyesno",
+                           side_effect=[True, True, True]) as ask:
+                    VarynDesktop._review_public_comparison(ui)
+                    self.assertTrue(pump(ui, lambda:
+                                        ui._public_comparison is None))
+                self.assertEqual(ask.call_count, 3)
+                self.assertEqual(calls, list(REPOS))
+                self.assertNotIn("GITHUB COMPARISON", repr(ui.messages))
+                self.assertEqual(journal.db.execute(
+                    "SELECT cursor,status FROM public_comparison_checkpoints"
+                ).fetchall(), [(2, "cancelled")])
+            finally:
+                ui._public_tool_worker.close()
+                journal.close()
+
     def test_opt_in_durable_journal_tracks_both_approved_real_ui_steps(self):
         from varyn.desktop import VarynDesktop
         with tempfile.TemporaryDirectory() as temp:
