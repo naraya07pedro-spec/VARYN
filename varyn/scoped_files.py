@@ -131,9 +131,14 @@ class ScopedLocalReader:
     def _name(name):
         if not isinstance(name, str) or not _NAME.fullmatch(name):
             raise AgentRejected("Only top-level .txt/.md basenames are permitted")
-        stem = name.rsplit(".", 1)[0].rstrip(" .").upper()
-        if (stem in {"CON", "PRN", "AUX", "NUL"} or
-                re.fullmatch(r"(?:COM|LPT)[1-9]", stem)):
+        stem = name.rsplit(".", 1)[0]
+        # Windows device aliases include NUL.anything.txt and CON.foo.md.
+        # Reject ambiguous extra trailing periods/spaces before extension.
+        if stem.rstrip(" .") != stem:
+            raise AgentRejected("Ambiguous trailing filename separator denied")
+        device = stem.split(".", 1)[0].rstrip(" ").upper()
+        if (device in {"CON", "PRN", "AUX", "NUL"} or
+                re.fullmatch(r"(?:COM|LPT)[1-9]", device)):
             raise AgentRejected("Reserved device name denied")
         if name in (".", "..") or name.startswith("."):
             raise AgentRejected("Hidden and special names are refused")
