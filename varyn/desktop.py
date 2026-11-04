@@ -24,6 +24,7 @@ from varyn.synthetic_fixture import SyntheticFixture
 from varyn.tool_gateway import SyntheticReadToolGateway, ToolGatewayRejected
 from varyn.public_github_tool import PublicGithubToolGateway, PublicToolRejected
 from varyn.public_tool_worker import PublicGithubToolWorker
+from varyn.public_tool_process import ProcessRepoFetcher
 from varyn.desktop_collaboration import review_collaboration
 from varyn.desktop_memory import DesktopMemory
 from varyn.memory_handoff import parse_note_ids, selected_memory_context
@@ -57,7 +58,7 @@ class VarynDesktop(tk.Tk):
         self._native_client = NativeToolRequestClient(allow_network=True)
         self._file_grants = ScopedFileGrants(auto_expire=True)
         self._synthetic_tools = SyntheticReadToolGateway(self._file_grants)
-        self._public_github_tools = PublicGithubToolGateway()
+        self._public_github_tools = PublicGithubToolGateway(fetcher=ProcessRepoFetcher())
         self._public_tool_worker = PublicGithubToolWorker(self._public_github_tools)
         self._file_grant_id = None
         self._file_fixture = None
@@ -522,7 +523,8 @@ class VarynDesktop(tk.Tk):
                 "\nPublic repository: " + preview.repository +
                 "\nEndpoint: https://api.github.com/repos/" + preview.repository +
                 "\nReview digest: " + preview.digest +
-                "\n\nOne anonymous GET (up to 5 seconds), no GitHub token, "
+                "\n\nOne anonymous GET via same-user child process (5s HTTP timeout; "
+                "8s subprocess timeout), no GitHub token, "
                 "no writes, no retry, no provider context upload. "
                 "The request runs in a background worker. "
                 "Revocation can hide the result but cannot retract a sent GET. Approve?",
