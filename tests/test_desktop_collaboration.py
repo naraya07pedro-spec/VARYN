@@ -148,6 +148,11 @@ class FakeUI:
     def _poll_result(self):
         pass
 
+    def _collaboration_worker(self, request_id, task, stages, approvals, engine):
+        return VarynDesktop._collaboration_worker(
+            self, request_id, task, stages, approvals, engine
+        )
+
 
 class DesktopCollaborationTests(unittest.TestCase):
     def setUp(self):
