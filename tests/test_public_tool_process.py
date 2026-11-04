@@ -43,6 +43,15 @@ def until(fn, timeout=3):
     return fn()
 
 
+class FakeGuard:
+    """Injected only in mock-process tests, never into production desktop."""
+    attached = True
+    def __init__(self):
+        self.closed = False
+    def close(self):
+        self.closed = True
+
+
 class FakeProcess:
     def __init__(self, *, block=False, body=None, returncode=0):
         self.started = Event()
@@ -97,7 +106,7 @@ class ProcessBoundaryTests(unittest.TestCase):
             record["kwargs"] = kwargs
             return proc
 
-        fetch = ProcessRepoFetcher(spawn=spawn)
+        fetch = ProcessRepoFetcher(guard_factory=lambda _: FakeGuard(), spawn=spawn)
         with patch.dict(os.environ, {
             "GITHUB_TOKEN": "SHOULD_NEVER_PASS",
             "OPENAI_API_KEY": "NOPE",
@@ -123,7 +132,7 @@ class ProcessBoundaryTests(unittest.TestCase):
 
     def test_process_revocation_kills_child_and_drops_response(self):
         proc = FakeProcess(block=True)
-        fetch = ProcessRepoFetcher(spawn=lambda *a, **k: proc)
+        fetch = ProcessRepoFetcher(guard_factory=lambda _: FakeGuard(), spawn=lambda *a, **k: proc)
         gate = PublicGithubToolGateway(fetcher=fetch)
         worker = PublicGithubToolWorker(gate)
         try:
@@ -144,7 +153,7 @@ class ProcessBoundaryTests(unittest.TestCase):
 
     def test_close_terminates_child_and_blocks_future_calls(self):
         proc = FakeProcess(block=True)
-        fetch = ProcessRepoFetcher(spawn=lambda *a, **k: proc)
+        fetch = ProcessRepoFetcher(guard_factory=lambda _: FakeGuard(), spawn=lambda *a, **k: proc)
         gate = PublicGithubToolGateway(fetcher=fetch)
         worker = PublicGithubToolWorker(gate)
         try:
@@ -166,7 +175,7 @@ class ProcessBoundaryTests(unittest.TestCase):
         def timeout_now(*, input, timeout):
             raise subprocess.TimeoutExpired("test-child", timeout)
         proc.communicate = timeout_now
-        fetch = ProcessRepoFetcher(spawn=lambda *a, **k: proc, timeout_seconds=1)
+        fetch = ProcessRepoFetcher(guard_factory=lambda _: FakeGuard(), spawn=lambda *a, **k: proc, timeout_seconds=1)
         with self.assertRaises(PublicToolRejected):
             fetch(REPO)
         self.assertTrue(proc.killed)
@@ -176,13 +185,13 @@ class ProcessBoundaryTests(unittest.TestCase):
         for body in (b"{}", b"not-json", b"a" * 4097,
                      json.dumps({**metadata(), "repository": "evil/repo"}).encode()):
             proc = FakeProcess(body=body)
-            fetch = ProcessRepoFetcher(spawn=lambda *a, **k: proc)
+            fetch = ProcessRepoFetcher(guard_factory=lambda _: FakeGuard(), spawn=lambda *a, **k: proc)
             with self.subTest(body=body[:30]), self.assertRaises(PublicToolRejected):
                 fetch(REPO)
 
     def test_cannot_spawn_concurrent_child_calls(self):
         proc = FakeProcess(block=True)
-        fetch = ProcessRepoFetcher(spawn=lambda *a, **k: proc)
+        fetch = ProcessRepoFetcher(guard_factory=lambda _: FakeGuard(), spawn=lambda *a, **k: proc)
         from threading import Thread
         failures = []
         t = Thread(target=lambda: failures.append(
@@ -206,7 +215,7 @@ class ProcessBoundaryTests(unittest.TestCase):
             return None
 
     def test_rejected_repository_never_spawns(self):
-        fetch = ProcessRepoFetcher(spawn=lambda *a, **k:
+        fetch = ProcessRepoFetcher(guard_factory=lambda _: FakeGuard(), spawn=lambda *a, **k:
                                   (_ for _ in ()).throw(AssertionError("spawn")))
         for bad in ("https://localhost/x", "a/../../etc", "file:///secret", ""):
             with self.subTest(bad=bad), self.assertRaises(PublicToolRejected):
