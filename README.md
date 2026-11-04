@@ -735,3 +735,10 @@ Start the desktop with `--comparison-journal "D:\\VARYN\\public-comparison-check
 ### Checkpoint 17S-9: reliable public-tool GUI teardown and SQLite failure handling
 
 VARYN now registers and cancels pending Tk `after` callbacks for public GitHub polling and the deferred second comparison step, preventing a callback from outliving the destroyed window or reawakening a cancelled plan. Real SQLite fault-injection regressions block the next network GET when a checkpoint write fails, keep possibly sent work marked for reconciliation, and suppress a result summary when the final durable write fails. A malformed existing SQLite file is rejected without silent reset. This does **not** enable automatic task restart, private-file tools, or official consumer-app synchronization. See [17S-9 verification scope](docs/desktop-journal-hardening-17s-9.md).
+
+
+### Checkpoint 17S-10: native Windows restricted-token read denial, synthetic-only proof
+
+17S-10 adds an **offline native Windows test** of \`CreateRestrictedToken\` with a real restricting SID, applied through a temporary thread impersonation in a disposable child process. It requires that a test-created synthetic file can be read by the normal user, but **cannot be read under the restricted token**. It fails closed if Win32 cannot attest the restriction, or if the restricted read still works. The probe never receives real personal files or AI-provider context and is not packaged with VARYN. A dedicated GitHub Actions step verifies the proof actually runs on Windows, while non-Windows is explicitly unsupported.
+
+**Important:** This does NOT create a restricted primary-token **production subprocess**; the existing public GitHub tool retains its Job Object + Low MIC behavior and must not be described as a private-read sandbox. Private/mutating tools remain disabled. The next major task is a native restricted-process startup with kernel-denied reads, no inherited sensitive handles, and owner-machine acceptance. [17S-10 native proof and threat boundary](docs/windows-restricted-read-proof-17s-10.md).
