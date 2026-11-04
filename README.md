@@ -461,6 +461,8 @@ This is **not proof of user authentication**, permission from a graphical dialog
 
 ### Checkpoint 16C: Desktop synthetic folder consent
 
+**Historical behavior, superseded by checkpoint 17F:** The folder chooser described below has now been removed from the desktop, which only creates VARYN-owned disposable synthetic samples. This section remains as an implementation history, not current usage instructions.
+
 The experimental Tkinter desktop now exposes **Grant synthetic test folder**, **Inspect test-folder count**, and **Revoke test-folder grant** actions. A trusted OS folder chooser and a separate explicit Yes/No dialog precede issuance of an ephemeral host-side read-only scope grant (default 5 minutes and 10 operations). The UI only shows a count of matching top-level test files; it does **not** display filenames or contents, attach files to a prompt, call models with folder data, or introduce file tools into the agent registry. Closing the desktop revokes active grants.
 
 Only select folders containing **synthetic test data**. This is **not authenticated access control or an OS sandbox**. Checkpoint 17C mitigates Windows path-redirection risks with native pinned directory handles; it does not establish general process isolation or validate all adversarial Windows filesystems. Headless automated tests do not prove that a user physically clicked the dialogs. See [development log](docs/progress-log.md) and [official-app sync feasibility](docs/product-contract-and-feasibility.md).
@@ -541,3 +543,13 @@ python -m unittest discover -s tests -p "test_file_grant_idle_timer.py" -v
 \`\`\`
 
 See [17E scope/limitations](docs/file-grants-17e.md) and [running progress log](docs/progress-log.md). Never use sensitive folders with this experimental prototype.
+
+
+### Checkpoint 17F: Desktop accepts only VARYN-generated synthetic fixtures
+
+The experimental desktop file-demo button now **creates a temporary directory containing exactly two fixed non-sensitive files** (`sample.txt` and `notes.md`) after explicit Yes/No consent. It **does not open a folder picker** and cannot choose Documents, Downloads or other user-selected folders through this UI. The original read-only, time-limited and quota-limited grant still applies. When revoked, replaced, inspected after expiry, or on normal desktop close, the granted handle is closed and the fixture is cleaned up. Ordinary expiry without another UI interaction closes the handle via 17E's timer, but the two harmless sample files may remain until the UI interacts or the app exits.
+
+This closes a meaningful gap between a *synthetic-only warning* and actual desktop behavior. It is **not** an OS process sandbox, authenticated Windows consent, or protection against same-user code. The trusted Python grant API remains experimental and callable by host code; it must not be exposed to model tool calls or sensitive inputs. Abnormal process death can leave benign temporary samples; physical laptop acceptance remains outstanding. No model or provider receives sample contents.
+
+See [17F security guard and test evidence](docs/desktop-synthetic-guard-17f.md) and [progress log](docs/progress-log.md).
+
