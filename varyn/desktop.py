@@ -8,7 +8,7 @@ import argparse
 import queue
 import threading
 import tkinter as tk
-from tkinter import filedialog, messagebox, ttk
+from tkinter import messagebox, ttk
 
 from varyn.desktop_controller import DesktopController, DEFAULT_MODELS, PROVIDERS
 from varyn.providers import ProviderError
@@ -19,6 +19,7 @@ from varyn.agent_runtime import AgentRejected, AgentLimitReached
 from varyn.tool_protocol import stage_tool_intent
 from varyn.native_tool_requests import NativeToolRequestClient
 from varyn.file_grants import ScopedFileGrants
+from varyn.synthetic_fixture import SyntheticFixture
 
 
 class VarynDesktop(tk.Tk):
@@ -41,6 +42,7 @@ class VarynDesktop(tk.Tk):
         self._native_client = NativeToolRequestClient(allow_network=True)
         self._file_grants = ScopedFileGrants(auto_expire=True)
         self._file_grant_id = None
+        self._file_fixture = None
         self._busy = False
         self._closing = False
         self._build()
@@ -137,7 +139,7 @@ class VarynDesktop(tk.Tk):
         file_controls = ttk.Frame(outer, style="V.TFrame")
         file_controls.pack(fill="x", pady=(2, 8))
         ttk.Button(
-            file_controls, text="Grant synthetic test folder",
+            file_controls, text="Create & grant VARYN demo folder",
             command=self._grant_synthetic_folder,
         ).pack(side="left")
         ttk.Button(
@@ -158,45 +160,67 @@ class VarynDesktop(tk.Tk):
             "of each individual request. Do not input private data."
         )
 
+    def _discard_synthetic_fixture(self):
+        """Reclaim only a VARYN-owned disposable sample folder."""
+        fixture, self._file_fixture = self._file_fixture, None
+        if fixture is not None:
+            try:
+                fixture.close()
+            except OSError:
+                self._append("FILES", "Synthetic sample cleanup incomplete")
+
     def _grant_synthetic_folder(self):
-        """Trusted desktop-only consent; this NEVER grants AI tools file access."""
+        """Never accept user-selected paths in this experimental desktop."""
         if self._busy or self._closing:
             return
-        folder = filedialog.askdirectory(
-            title="Choose a synthetic test folder ONLY", mustexist=True, parent=self,
-        )
-        if not folder:
-            return
         consent = messagebox.askyesno(
-            "Grant temporary read-only test access",
-            "Grant VARYN local-only access to top-level .txt/.md files in this "
-            "selected SYNTHETIC test folder for at most 5 minutes / 10 operations?\n\n"
-            "Do not select folders containing secrets, private, financial, or client "
-            "information. This feature only counts test filenames; it does not "
-            "read contents into chat or upload anything to an AI provider. "
-            "This is NOT an OS sandbox or authenticated security boundary.",
+            "Create a disposable VARYN sample folder?",
+            "Create exactly two VARYN-generated, non-sensitive sample text "
+            "files in a temporary folder, then grant local-only read access "
+            "for at most 5 minutes / 10 operations?\n\n"
+            "You cannot select Documents, Downloads, a cloud drive or any "
+            "other personal folder in this experimental build. "
+            "The temporary sample is deleted when revoked, replaced, "
+            "inspected after expiry, or the application closes. "
+            "No file names or contents are sent to any AI provider.",
             parent=self,
         )
         if not consent:
-            self._append("FILES", "Test-folder permission declined")
+            self._append("FILES", "Synthetic sample permission declined")
             return
+        fixture = None
         try:
-            preview = self._file_grants.grant(folder, user_confirmed=True)
+            fixture = SyntheticFixture()
+            preview = self._file_grants.grant(
+                fixture.root, user_confirmed=True,
+            )
         except (PermissionError, ValueError, OSError, AgentRejected):
-            self._append("FILES", "Test-folder scope denied or could not be validated")
+            if fixture is not None:
+                try:
+                    fixture.close()
+                except OSError:
+                    self._append("FILES", "Synthetic sample cleanup incomplete")
+            self._append("FILES", "Synthetic sample creation or grant denied")
             return
         previous = self._file_grant_id
+        old_fixture = self._file_fixture
         self._file_grant_id = preview.grant_id
+        self._file_fixture = fixture
         if previous is not None:
             try:
                 self._file_grants.revoke(previous)
             except AgentRejected:
                 pass
+        if old_fixture is not None:
+            try:
+                old_fixture.close()
+            except OSError:
+                self._append("FILES", "Previous synthetic sample cleanup incomplete")
         self._append(
             "FILES",
-            f"Temporary local test-folder access granted: "
+            f"Temporary VARYN-generated sample granted: "
             f"{preview.duration_seconds}s, {preview.max_operations} operations; "
-            "read-only, not exposed to models. No folder path saved in transcript.",
+            "read-only, not exposed to models. No folder path stored.",
         )
 
     def _inspect_synthetic_folder(self):
@@ -209,8 +233,15 @@ class VarynDesktop(tk.Tk):
         try:
             listing = self._file_grants.list_files(self._file_grant_id)
         except (PermissionError, AgentRejected):
+            previous = self._file_grant_id
             self._file_grant_id = None
-            self._append("FILES", "Test-folder access expired, revoked, or denied")
+            if previous is not None:
+                try:
+                    self._file_grants.revoke(previous)
+                except AgentRejected:
+                    pass
+            VarynDesktop._discard_synthetic_fixture(self)
+            self._append("FILES", "Synthetic sample access expired or denied")
             return
         self._append(
             "FILES",
@@ -226,7 +257,8 @@ class VarynDesktop(tk.Tk):
             except AgentRejected:
                 pass
             self._file_grant_id = None
-        self._append("FILES", "Synthetic test-folder grant revoked")
+        VarynDesktop._discard_synthetic_fixture(self)
+        self._append("FILES", "Synthetic sample grant revoked and cleaned")
 
     def _provider_changed(self, _event=None):
         self.model.set(DEFAULT_MODELS[self.provider.get()])
@@ -482,6 +514,7 @@ class VarynDesktop(tk.Tk):
         self._approval.reject_all_pending()
         self._file_grants.revoke_all()
         self._file_grant_id = None
+        VarynDesktop._discard_synthetic_fixture(self)
         if self._agent_journal is not None:
             self._agent_journal.close()
         self.controller.discard_pending_history()
