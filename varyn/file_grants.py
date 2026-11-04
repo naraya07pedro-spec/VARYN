@@ -1,4 +1,4 @@
-"""16B ephemeral explicit grants for a standalone read-only local reader.
+"""17E ephemeral grants with optional in-process idle-expiry timer.
 
 Grant creation must be called by TRUSTED host code after a real user decision;
 an AI model must never receive this object. No persistent token, no model tools,
@@ -7,7 +7,7 @@ no network and no recursive access. Not a cross-process or OS security boundary.
 from collections import deque
 from dataclasses import dataclass
 from secrets import token_urlsafe
-from threading import RLock
+from threading import RLock, Timer
 from time import monotonic
 
 from varyn.agent_runtime import AgentRejected
@@ -26,13 +26,49 @@ class FileGrantPreview:
 class ScopedFileGrants:
     """In-memory host-granted capability, fail-closed and revocable."""
 
-    def __init__(self, *, clock=monotonic, audit_limit=100):
+    def __init__(self, *, clock=monotonic, audit_limit=100,
+                 auto_expire=False, timer_factory=Timer):
         if not callable(clock) or type(audit_limit) is not int or not 1 <= audit_limit <= 1000:
             raise ValueError("Invalid clock or audit capacity")
+        if type(auto_expire) is not bool or not callable(timer_factory):
+            raise ValueError("Invalid timer configuration")
         self._clock = clock
         self._lock = RLock()
         self._grants = {}
         self._audit = deque(maxlen=audit_limit)
+        # Default-off for deterministic headless callers. Desktop opts in.
+        # At most one in-process daemon timer is scheduled per manager.
+        self._auto_expire = auto_expire
+        self._timer_factory = timer_factory
+        self._timer = None
+        self._timer_generation = 0
+
+    def _schedule_expiry_locked(self):
+        """Replace one pending timer; ignore cancelled stale callbacks."""
+        if not self._auto_expire:
+            return
+        self._timer_generation += 1
+        if self._timer is not None:
+            self._timer.cancel()
+            self._timer = None
+        active = [entry["expiry"] for entry in self._grants.values()
+                  if entry["remaining"] > 0]
+        if not active:
+            return
+        generation = self._timer_generation
+        delay = max(0.0, min(active) - self._clock())
+        timer = self._timer_factory(delay, self._expire_due, args=(generation,))
+        timer.daemon = True
+        self._timer = timer
+        timer.start()
+
+    def _expire_due(self, generation):
+        """Runs inside the desktop process; never reads file contents."""
+        with self._lock:
+            if generation != self._timer_generation:
+                return
+            self._sweep_expired(self._clock())
+            self._schedule_expiry_locked()
 
     def _sweep_expired(self, now):
         """Release stale handles on trusted host activity; no background timer."""
@@ -44,6 +80,7 @@ class ScopedFileGrants:
                 entry["reader"].close()
             finally:
                 self._audit.append(("expired", key[:8]))
+        return bool(stale)
 
     def grant(self, root, *, user_confirmed=False,
               duration_seconds=300, max_operations=10, max_bytes=16384):
@@ -65,6 +102,7 @@ class ScopedFileGrants:
                 "remaining": max_operations,
             }
             self._audit.append(("granted", grant_id[:8]))
+            self._schedule_expiry_locked()
         return FileGrantPreview(grant_id, duration_seconds,
                                 max_operations, (".txt", ".md"), False)
 
@@ -76,6 +114,7 @@ class ScopedFileGrants:
             entry = self._grants.pop(grant_id)
             entry["reader"].close()
             self._audit.append(("revoked", grant_id[:8]))
+            self._schedule_expiry_locked()
 
     def _take(self, grant_id, operation):
         entry = self._grants.get(grant_id) if isinstance(grant_id, str) else None
@@ -97,15 +136,23 @@ class ScopedFileGrants:
 
     def _perform(self, grant_id, operation, method, *args):
         with self._lock:
-            reader = self._take(grant_id, operation)
             try:
-                return getattr(reader, method)(*args)
-            finally:
-                # The final permitted operation may finish, but cannot leave
-                # the pinned OS directory handle open after quota exhaustion.
+                reader = self._take(grant_id, operation)
+                result = getattr(reader, method)(*args)
                 entry = self._grants.get(grant_id)
+                # Do not expose results from an operation crossing its lease.
+                # An OS read cannot be interrupted by this Python check.
+                if entry is None or self._clock() >= entry["expiry"]:
+                    raise PermissionError("Grant expired during operation")
+                return result
+            finally:
+                # Also handles expiry rejections from _take.
+                self._sweep_expired(self._clock())
+                entry = (self._grants.get(grant_id)
+                         if isinstance(grant_id, str) else None)
                 if entry is not None and entry["remaining"] == 0:
                     entry["reader"].close()
+                self._schedule_expiry_locked()
 
     def list_files(self, grant_id):
         return self._perform(grant_id, "list_attempt", "list_files")
@@ -116,7 +163,9 @@ class ScopedFileGrants:
     def status(self):
         with self._lock:
             now = self._clock()
-            self._sweep_expired(now)
+            changed = self._sweep_expired(now)
+            if changed:
+                self._schedule_expiry_locked()
             return {
                 "format": "varyn.file_grants.v1",
                 "active": sum(entry["remaining"] > 0 and now < entry["expiry"]
@@ -134,3 +183,4 @@ class ScopedFileGrants:
                 entry["reader"].close()
             self._grants.clear()
             self._audit.append(("revoked_all", ""))
+            self._schedule_expiry_locked()
