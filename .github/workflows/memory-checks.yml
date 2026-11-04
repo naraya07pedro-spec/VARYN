@@ -85,6 +85,8 @@ jobs:
       - name: Real hosted Windows Tk synthetic task plan review
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_task_planner_tk.py" -v
+      - name: Durable task checkpoint crash and no-replay regression
+        run: python -m unittest discover -s tests -p "test_task_journal.py" -v
       - name: Option C consumer-history proof gates stay blocked
         run: |
           python -m unittest discover -s tests -p "test_option_c_gate.py" -v
