@@ -57,6 +57,18 @@ class VarynDesktop(tk.Tk):
         self._closing = False
         self._build()
         self.protocol("WM_DELETE_WINDOW", self._close)
+        if self._task_recovery is not None and (
+            self._task_recovery["needs_review"] or
+            self._task_recovery["needs_reconciliation"]
+        ):
+            self._append(
+                "TASK RECOVERY",
+                "Previous incomplete task metadata: "
+                + str(self._task_recovery["needs_review"])
+                + " need review; "
+                + str(self._task_recovery["needs_reconciliation"])
+                + " need reconciliation. Nothing was automatically resumed.",
+            )
         self._refresh_status()
         if self._approval.recovered is not None:
             stale = self._approval.recovered
@@ -780,6 +792,12 @@ class VarynDesktop(tk.Tk):
             result["status"] + "; steps processed " + str(len(result["steps"]))
             + "; external actions: none",
         )
+        if result.get("task_journal_id"):
+            self._append(
+                "TASK CHECKPOINT",
+                "Metadata-only checkpoint ID: " + result["task_journal_id"]
+                + "; no automatic resume or replay",
+            )
         for step in result["steps"]:
             self._append(
                 "TASK STEP", str(step["index"] + 1) + " "
