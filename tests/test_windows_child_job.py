@@ -62,7 +62,7 @@ class PortableJobPolicyTests(unittest.TestCase):
             fetch(REPO)
         self.assertTrue(p.killed)
         self.assertFalse(p.communicated)
-        self.assertIsNone(fetch.status()["active"])
+        self.assertFalse(fetch.status()["active"])
         self.assertEqual(fetch.status()["attempts"], 1)
 
     def test_fake_guard_not_attached_fails_closed(self):
