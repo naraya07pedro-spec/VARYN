@@ -33,6 +33,8 @@ The code's demo approval/token and temporary file scope are not OS-enforced secu
 
 A future provider-specific capability should be accepted only with current official API documentation, permissions/terms check, a revocable consent model, and an end-to-end test showing an official-app-originated change appears in VARYN and a VARYN-originated change appears back in the official app without manual export.
 
+**Update, 2026-11-04 / Checkpoint 17A:** Offline gating and synthetic three-way change planning are now implemented in `varyn/official_sync.py`, with 23 synthetic tests. All three official-app capability reports remain blocked pending evidence of supported two-way endpoints. Claude's official export guide explicitly says exported data cannot be imported into another personal Claude account. See [source and acceptance evidence](official-sync-evidence-20261104.md). This is **not** a live application-history integration.
+
 ## 4. Product gates, ordered by risk rather than spectacle
 
 | Gate | Current evidence | Exit criterion |
