@@ -122,7 +122,9 @@ class CapturingProvider:
         return ModelReply("FAKE captured-stage output", "fake", model, {})
 
 
-class ContextEngineTests(MemoryHandoffTests):
+class ContextEngineTests(unittest.TestCase):
+    setUp = MemoryHandoffTests.setUp
+
     def test_selected_context_reaches_analyst_only_with_source_references(self):
         spy = CapturingProvider()
         engine = CollaborationEngine(
