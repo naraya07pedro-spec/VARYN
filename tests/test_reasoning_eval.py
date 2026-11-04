@@ -123,7 +123,8 @@ class ReasoningRubricTests(unittest.TestCase):
 
     def test_collaboration_report_uses_analyst_as_uncontrolled_baseline(self):
         report = {
-            "format": "varyn.collaboration.v1", "stages": [
+            "format": "varyn.collaboration.v1", "status": "completed",
+            "stages": [
                 {"role": "analyst", "text": "offline"},
                 {"role": "critic", "text": "need consent"},
                 {"role": "synthesizer", "text": "offline and consent"},
@@ -139,6 +140,21 @@ class ReasoningRubricTests(unittest.TestCase):
         self.assertFalse(result["controlled_baseline"])
         self.assertFalse(result["live_execution_independently_attested"])
         self.assertFalse(result["multi_model_review"])
+
+    def test_incomplete_collaboration_is_not_evaluable(self):
+        case = EvaluationCase("incomplete", ("consent",), ())
+        partial = {
+            "format": "varyn.collaboration.v1",
+            "status": "failed",
+            "stages": [
+                {"role": "analyst", "text": "consent"},
+                {"role": "critic", "text": "consent"},
+                {"role": "synthesizer", "text": "consent"},
+            ],
+            "final_answer": "consent",
+        }
+        with self.assertRaises(EvaluationError):
+            compare_collaboration_report(case, partial)
 
     def test_malformed_collaboration_provenance_cannot_be_scored(self):
         case = EvaluationCase("bad", ("consent",), ())
