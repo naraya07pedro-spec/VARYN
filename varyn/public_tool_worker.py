@@ -30,6 +30,7 @@ class PublicGithubToolWorker:
         self._lock = Lock()
         self._request_number = 0
         self._active = None
+        self._worker_finished = False
         self._visible = None
         self._closed = False
         self._completed = Queue(maxsize=1)
@@ -52,6 +53,7 @@ class PublicGithubToolWorker:
             self._request_number += 1
             number = self._request_number
             self._active = number
+            self._worker_finished = False
             self._visible = number
             try:
                 thread = self._thread_factory(
@@ -77,6 +79,7 @@ class PublicGithubToolWorker:
             # Never pass network exceptions or untrusted raw payloads to Tk.
             outcome = ToolCompletion(number, "failed_or_revoked", None)
         with self._lock:
+            self._worker_finished = True
             if self._closed or self._visible != number:
                 if self._active == number:
                     self._active = None
@@ -117,11 +120,10 @@ class PublicGithubToolWorker:
                 except Empty:
                     break
             self._gateway.revoke_active()
-            # A completed-but-unpolled request has no live underlying worker.
-            # It is safe to release the slot only when the completed packet
-            # existed. Otherwise the underlying request must finish first.
-            # _active remains occupied if an in-flight worker is running.
-            # See _execute for eventual release.
+            # A finished-but-unpolled result no longer has a running worker.
+            # A live request still owns the sole worker slot until it exits.
+            if self._worker_finished:
+                self._active = None
 
     def close(self):
         """Instant local shutdown. No join and no accidental UI callbacks."""
