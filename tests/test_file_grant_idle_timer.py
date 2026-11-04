@@ -237,6 +237,55 @@ class SyntheticIdleExpiryTests(unittest.TestCase):
             [t for t in self.timers.timers if t.started and not t.cancelled], []
         )
 
+    def test_timer_factory_failure_revokes_grant_instead_of_leaking_handle(self):
+        def broken_factory(*args, **kwargs):
+            raise RuntimeError("synthetic scheduler exhaustion")
+
+        manager = ScopedFileGrants(
+            clock=lambda: self.now[0], auto_expire=True,
+            timer_factory=broken_factory,
+        )
+        with self.assertRaises(PermissionError):
+            manager.grant(self.root, user_confirmed=True)
+        self.assertEqual(manager.status()["active"], 0)
+        self.assertEqual(manager._grants, {})
+        self.assertIn(("timer_unavailable", ""), manager.status()["audit"])
+
+    def test_timer_start_failure_revokes_all_approved_handles(self):
+        class BrokenStart(FakeTimer):
+            def start(self):
+                raise RuntimeError("synthetic thread launch failure")
+
+        manager = ScopedFileGrants(
+            clock=lambda: self.now[0], auto_expire=True,
+            timer_factory=lambda *args, **kwargs: BrokenStart(*args, **kwargs),
+        )
+        with self.assertRaises(PermissionError):
+            manager.grant(self.root, user_confirmed=True)
+        self.assertEqual(manager.status()["active"], 0)
+        self.assertIsNone(manager._timer)
+
+    def test_failed_reschedule_revokes_both_old_and_new_grants(self):
+        class FailsSecondTimer(FakeTimers):
+            def __call__(self, *args, **kwargs):
+                if len(self.timers) == 1:
+                    raise RuntimeError("synthetic reschedule refused")
+                return super().__call__(*args, **kwargs)
+
+        scheduler = FailsSecondTimer()
+        manager = ScopedFileGrants(
+            clock=lambda: self.now[0], auto_expire=True,
+            timer_factory=scheduler,
+        )
+        first = manager.grant(self.root, user_confirmed=True)
+        first_reader = manager._grants[first.grant_id]["reader"]
+        with self.assertRaises(PermissionError):
+            manager.grant(self.root, user_confirmed=True)
+        self.assertTrue(first_reader._closed)
+        self.assertTrue(scheduler.timers[0].cancelled)
+        self.assertEqual(manager.status()["active"], 0)
+        self.assertEqual(manager._grants, {})
+
     def test_invalid_timer_configuration_is_rejected(self):
         for options in (
             {"auto_expire": 1},
