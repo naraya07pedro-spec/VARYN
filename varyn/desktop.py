@@ -30,12 +30,14 @@ from varyn.desktop_collaboration import review_collaboration
 from varyn.desktop_memory import DesktopMemory
 from varyn.memory_handoff import parse_note_ids, selected_memory_context
 from varyn.task_planner import compile_plan, TaskPlanRunner
-from varyn.task_journal import TaskJournal
+from varyn.task_journal import TaskJournal, JournalConflict
+from varyn.public_comparison_journal import PublicComparisonJournal
+from sqlite3 import Error as SQLiteError
 from varyn.reasoning_eval import parse_rubric, compare_collaboration_report, EvaluationError
 
 
 class VarynDesktop(tk.Tk):
-    def __init__(self, controller=None, *, agent_journal=None, memory_db=None, task_journal=None):
+    def __init__(self, controller=None, *, agent_journal=None, memory_db=None, task_journal=None, comparison_journal=None):
         super().__init__()
         self.controller = controller or DesktopController(allow_live_providers=True)
         self.title("VARYN  |  Local AI Workspace (Opt-in Live MVP)")
@@ -53,6 +55,9 @@ class VarynDesktop(tk.Tk):
         self._agent_journal = agent_journal
         self._task_journal = task_journal
         self._task_recovery = task_journal.recover() if task_journal is not None else None
+        self._comparison_journal = comparison_journal
+        self._comparison_recovery = (comparison_journal.recover()
+                                     if comparison_journal is not None else None)
         self._memory = DesktopMemory(memory_db) if memory_db is not None else None
         self.memory_project = tk.StringVar(value="VARYN")
         self._approval = DesktopApprovalController(journal=agent_journal)
@@ -63,6 +68,7 @@ class VarynDesktop(tk.Tk):
         self._public_tool_worker = PublicGithubToolWorker(self._public_github_tools)
         self._public_comparison = None
         self._public_comparison_request = None
+        self._public_comparison_journal_ref = None
         self._file_grant_id = None
         self._file_fixture = None
         self._busy = False
@@ -82,6 +88,15 @@ class VarynDesktop(tk.Tk):
                 + str(self._task_recovery["needs_reconciliation"])
                 + " need reconciliation. Nothing was automatically resumed.",
             )
+        if self._comparison_recovery is not None and (
+            self._comparison_recovery['needs_review'] or
+            self._comparison_recovery['needs_reconciliation']
+        ):
+            self._append('GITHUB RECOVERY',
+                         str(self._comparison_recovery['needs_review'])
+                         + ' public comparison plans require fresh review; '
+                         + str(self._comparison_recovery['needs_reconciliation'])
+                         + ' have uncertain dispatch. No network request was replayed.')
         self._refresh_status()
         if self._approval.recovered is not None:
             stale = self._approval.recovered
@@ -565,6 +580,14 @@ class VarynDesktop(tk.Tk):
         plan = getattr(self, "_public_comparison", None)
         if plan is not None:
             plan.cancel()
+            journal = getattr(self, "_comparison_journal", None)
+            ref = getattr(self, "_public_comparison_journal_ref", None)
+            if journal is not None and ref is not None:
+                try:
+                    journal.abort(*ref)
+                except (JournalConflict, SQLiteError, ValueError):
+                    self._append("GITHUB RECOVERY", "Journal abort failed; inspect metadata manually")
+            self._public_comparison_journal_ref = None
             self._public_comparison = None
             self._public_comparison_request = None
             self._public_github_tools.reject_all_pending()
@@ -613,6 +636,18 @@ class VarynDesktop(tk.Tk):
         if not started:
             self._append("GITHUB PLAN", "Comparison declined; no network request")
             return
+        journal = getattr(self, "_comparison_journal", None)
+        if journal is not None:
+            try:
+                journal_id = journal.create(review.digest)
+            except (JournalConflict, SQLiteError, ValueError):
+                plan.cancel()
+                self._append("GITHUB RECOVERY",
+                             "Durable comparison journal unavailable; no network request")
+                return
+            self._public_comparison_journal_ref = (journal_id, review.digest)
+        else:
+            self._public_comparison_journal_ref = None
         self._public_comparison = plan
         self._public_comparison_request = None
         self._append("GITHUB PLAN", "Two-step plan staged; each GitHub read still needs its own approval")
@@ -665,6 +700,17 @@ class VarynDesktop(tk.Tk):
                 pass
             VarynDesktop._abort_public_comparison(self, "Tool step declined or permission removed")
             return
+        journal = getattr(self, "_comparison_journal", None)
+        ref = getattr(self, "_public_comparison_journal_ref", None)
+        if journal is not None:
+            if ref is None:
+                VarynDesktop._abort_public_comparison(self, "Missing durable comparison reference")
+                return
+            try:
+                journal.begin_step(*ref, step - 1)
+            except (JournalConflict, SQLiteError, ValueError):
+                VarynDesktop._abort_public_comparison(self, "Cannot durably mark request uncertain")
+                return
         try:
             request_id = worker.submit(preview, network_consent=permission)
         except (PublicToolRejected, PermissionError, OSError, RuntimeError):
@@ -691,12 +737,20 @@ class VarynDesktop(tk.Tk):
                 else:
                     try:
                         status = plan.commit(outcome.result)
+                        journal = getattr(self, "_comparison_journal", None)
+                        ref = getattr(self, "_public_comparison_journal_ref", None)
+                        if journal is not None:
+                            if ref is None:
+                                raise JournalConflict("Missing comparison journal identity")
+                            journal.complete_step(*ref, plan.status()["steps_done"] - 1)
                         self._append("GITHUB PLAN", "Verified metadata step "
                                      + str(plan.status()["steps_done"]) + "/2: "
                                      + outcome.result["repository"])
                         self._public_comparison_request = None
                         if status == "completed":
                             summary = plan.summary()
+                            if journal is not None:
+                                journal.finish(*ref)
                             a, b = summary["rows"]
                             self._append(
                                 "GITHUB COMPARISON",
@@ -712,11 +766,12 @@ class VarynDesktop(tk.Tk):
                                 + "Never sent to model.",
                             )
                             self._public_comparison = None
+                            self._public_comparison_journal_ref = None
                         else:
                             self.after(0, lambda p=plan:
                                        VarynDesktop._run_public_comparison_step(self, p))
-                    except (PublicToolRejected, KeyError, TypeError, ValueError):
-                        VarynDesktop._abort_public_comparison(self, "Untrusted comparison result refused")
+                    except (PublicToolRejected, JournalConflict, SQLiteError, KeyError, TypeError, ValueError):
+                        VarynDesktop._abort_public_comparison(self, "Comparison result or durable journal refused")
             elif outcome.status != "completed":
                 self._append("GITHUB TOOL", "Public read failed, expired or was revoked; no retry")
             else:
@@ -1291,6 +1346,8 @@ class VarynDesktop(tk.Tk):
             self._memory.close()
         if getattr(self, "_task_journal", None) is not None:
             self._task_journal.close()
+        if getattr(self, "_comparison_journal", None) is not None:
+            self._comparison_journal.close()
         self.controller.discard_pending_history()
         self._lifecycle.close()
         self._closing = True
@@ -1305,18 +1362,25 @@ def main():
                         help="Explicit opt-in UNENCRYPTED local SQLite for SYNTHETIC notes only")
     parser.add_argument("--task-journal", metavar="PATH",
                         help="Opt-in metadata-only durable task checkpoints; NEVER auto-resumes")
+    parser.add_argument("--comparison-journal", metavar="PATH",
+                        help="Opt-in metadata-only public GitHub task journal; NEVER replays GETs")
     args = parser.parse_args()
     journal = (AgentRecoveryJournal(args.agent_journal)
                if args.agent_journal else None)
     task_journal = TaskJournal(args.task_journal) if args.task_journal else None
+    comparison_journal = (PublicComparisonJournal(args.comparison_journal)
+                          if args.comparison_journal else None)
     try:
         window = VarynDesktop(agent_journal=journal, memory_db=args.memory_db,
-                              task_journal=task_journal)
+                              task_journal=task_journal,
+                              comparison_journal=comparison_journal)
     except tk.TclError:
         if journal is not None:
             journal.close()
         if task_journal is not None:
             task_journal.close()
+        if comparison_journal is not None:
+            comparison_journal.close()
         raise SystemExit("A graphical desktop session is required")
     try:
         window.mainloop()
@@ -1325,6 +1389,8 @@ def main():
             journal.close()
         if task_journal is not None:
             task_journal.close()
+        if comparison_journal is not None:
+            comparison_journal.close()
 
 
 if __name__ == "__main__":
