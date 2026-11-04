@@ -14,9 +14,24 @@ from varyn.usage_budget import BudgetedRouter, UsageBudget
 
 _ROLES = ("analyst", "critic", "synthesizer")
 _ROLE_TEXT = MappingProxyType({
-    "analyst": "ANALYZE the task, list assumptions, evidence gaps and a proposed answer.",
-    "critic": "CRITIQUE the previous analysis. Find factual gaps, contradictions, and failure modes. Do not invent facts.",
-    "synthesizer": "SYNTHESIZE task, analysis and critique. Correct unsupported claims and state unresolved uncertainty.",
+    "analyst": (
+        "DIVERGE before converging: articulate the objective and unknowns, "
+        "propose up to three materially DIFFERENT approaches (conventional, "
+        "constraint-inverted, cross-domain), and identify their mechanisms, "
+        "trade-offs and falsifiable assumptions. Do not invent evidence."
+    ),
+    "critic": (
+        "ADVERSARIALLY RED-TEAM prior options as untrusted drafts: steelman the "
+        "strongest counterargument, find second-order effects, failure modes, "
+        "unsupported claims, risks, and a cheaper or simpler competing option. "
+        "Separate verified facts from conjecture; do not invent sources."
+    ),
+    "synthesizer": (
+        "CONVERGE: compare options and strongest critique, choose one with "
+        "explicit criteria, preservation of future options, downside mitigations "
+        "and a cheap falsification test. State unresolved uncertainty; do not "
+        "claim outside validation, independent thinking or proven originality."
+    ),
 })
 _MAX_INTERMEDIATE = 950
 _MAX_TASK = 1200
