@@ -59,12 +59,19 @@ jobs:
           python -m varyn.desktop_acceptance --synthetic-only --json
       - name: Ensure bundled Windows self-check is synthetic-only
         run: python -m unittest discover -s tests -p "test_acceptance_packaging.py" -v
+      - name: Owner GUI checklist reporting is bounded and NOT independent evidence
+        run: python -m unittest discover -s tests -p "test_owner_acceptance.py" -v
+      - name: Option C consumer-history proof gates stay blocked
+        run: |
+          python -m unittest discover -s tests -p "test_option_c_gate.py" -v
+          python -m varyn.option_c_gate
+          python -m varyn.option_c_gate --provider gemini
       - name: Offline desktop preflight and process RSS (doctor process only)
         run: python -m varyn.doctor --json
       - name: Build deterministic desktop source ZIP
         run: python -m varyn.package_desktop --output varyn-desktop-ci.zip
       - name: Inspect source ZIP entries (no DB, key, or executable)
-        run: python -c "import zipfile; z=zipfile.ZipFile('varyn-desktop-ci.zip'); names=z.namelist(); assert 'VARYN/Launch-VARYN.cmd' in names; assert 'VARYN/Verify-VARYN-Synthetic.cmd' in names; assert all(n.endswith('.py') or n.endswith('.cmd') or n.endswith('.md') for n in names)"
+        run: python -c "import zipfile; z=zipfile.ZipFile('varyn-desktop-ci.zip'); names=z.namelist(); assert 'VARYN/Launch-VARYN.cmd' in names; assert 'VARYN/Verify-VARYN-Synthetic.cmd' in names; assert 'VARYN/Record-VARYN-GUI-Checks.cmd' in names; assert all(n.endswith('.py') or n.endswith('.cmd') or n.endswith('.md') for n in names)"
       - name: Publish source-only Windows launcher ZIP as CI artifact
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
