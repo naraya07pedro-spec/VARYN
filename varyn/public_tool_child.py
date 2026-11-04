@@ -24,6 +24,17 @@ def main():
                 "no_site": bool(sys.flags.no_site)}
         sys.stdout.buffer.write(json.dumps(data).encode("utf-8"))
         return 0
+    if sys.argv[1:] == ["--offline-stdin-self-test"]:
+        # Guard integration test: stay blocked until supervised stdin is sent.
+        # No public network, credentials, or model actions are used.
+        sys.stdin.buffer.read(MAX_INTENT_BYTES + 1)
+        sys.stdout.buffer.write(json.dumps({
+            "format": "varyn.public_tool_child.stdin_self_test.v1",
+            "network_used": False,
+            "isolated_mode": bool(sys.flags.isolated),
+            "no_site": bool(sys.flags.no_site),
+        }).encode("utf-8"))
+        return 0
     if len(sys.argv) != 1 or not sys.flags.isolated or not sys.flags.no_site:
         return 2
     try:
