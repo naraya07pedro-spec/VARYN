@@ -439,3 +439,15 @@ This checkpoint does **not** configure the live network adapters to advertise to
 `NativeToolRequestClient` defaults to network-disabled. To request a provider tool proposal, the **calling application** must explicitly construct the client with `allow_network=True`, set the provider's API key as an environment variable, and pass `confirm_external_request=True` for that individual request and an existing `DesktopApprovalController`. This may result in paid API usage. The client reserves output-token budget before sending and refuses all local memory/context uploads. After receiving a valid response with one native tool call, it **only stages a preview**, never executes or grants approval.
 
 This new code path is not wired into the Tkinter chat button yet. No real vendor account or API was used to verify request compatibility, tool availability or prices. The provider-specific API examples are source-backed by vendor documentation, not live interoperability tests. Do not use real secrets in prompts or rely on this for actual autonomous work.
+
+### Checkpoint 16A: Read-only local file scope (standalone)
+
+```python
+from pathlib import Path
+from varyn.scoped_files import ScopedLocalReader
+reader = ScopedLocalReader(Path('/absolute/synthetic-demo-folder'))
+print(reader.list_files())
+print(reader.read_text('example.txt'))
+```
+
+Supply an **existing absolute folder chosen by the host**, not from model text. Only nonrecursive `.txt`/`.md` file basenames are accepted with strict UTF-8 decoding and byte limits. This reader is **not connected to model tool calls or the desktop UI**; it has no filesystem write or network API. It is not an OS sandbox, particularly under Windows reparse-point/concurrent path changes, and must not be used with secrets or confidential files. Tests use synthetic folders only.
