@@ -23,6 +23,7 @@ from varyn.file_grants import ScopedFileGrants
 from varyn.synthetic_fixture import SyntheticFixture
 from varyn.desktop_collaboration import review_collaboration
 from varyn.desktop_memory import DesktopMemory
+from varyn.memory_handoff import parse_note_ids, selected_memory_context
 
 
 class VarynDesktop(tk.Tk):
@@ -451,7 +452,7 @@ class VarynDesktop(tk.Tk):
             return
         dialog = tk.Toplevel(self)
         dialog.title("VARYN | Three-role collaboration")
-        dialog.geometry("650x330")
+        dialog.geometry("690x385")
         dialog.resizable(True, False)
         dialog.transient(self)
         frame = ttk.Frame(dialog, padding=16)
@@ -482,26 +483,59 @@ class VarynDesktop(tk.Tk):
             )
             values.append((provider, model))
         frame.columnconfigure(2, weight=1)
+        note_ids = tk.StringVar(master=dialog, value="")
+        ttk.Label(frame, text="Selected memory IDs (optional)",).grid(
+            row=4, column=0, sticky="w", pady=(12, 4),
+        )
+        ttk.Entry(frame, textvariable=note_ids, width=27).grid(
+            row=4, column=1, columnspan=2, sticky="we", pady=(12, 4),
+        )
         ttk.Label(
             frame, text="Live model API requests may bill and share previous "
                         "stage results with later providers.",
-        ).grid(row=4, column=0, columnspan=3, sticky="w", pady=(15, 6))
+        ).grid(row=5, column=0, columnspan=3, sticky="w", pady=(10, 6))
 
         def submit():
             task = self.prompt.get("1.0", "end-1c")
             selections = tuple((p.get(), m.get()) for p, m in values)
-            if self._start_collaboration(task, selections):
+            if self._start_collaboration(
+                task, selections, memory_ids=note_ids.get().strip()
+            ):
                 dialog.destroy()
 
         ttk.Button(
             frame, text="Review and run 3 stages", command=submit,
-        ).grid(row=5, column=0, columnspan=3, sticky="w", pady=10)
+        ).grid(row=6, column=0, columnspan=3, sticky="w", pady=10)
 
-    def _start_collaboration(self, task, selections):
+    def _start_collaboration(self, task, selections, *, memory_ids=""):
         """Review on Tk thread, then transfer immutable snapshot to worker."""
         if self._busy or self._closing:
             return False
         try:
+            context = None
+            if memory_ids:
+                # Read only exactly selected project/IDs; no search or inference.
+                if getattr(self, "_memory", None) is None:
+                    raise PermissionError("Memory must be explicitly enabled")
+                if not self.consent_context.get() or not self.controller.status()["context_consent"]:
+                    raise PermissionError("Memory context permission is disabled")
+                project = self.memory_project.get()
+                context = selected_memory_context(
+                    self._memory, project, parse_note_ids(memory_ids),
+                )
+                preview = "\\n\\n".join(
+                    f"{row['ref']} | {row['project']}\\n{row['content']}"
+                    for row in context["items"]
+                )
+                if not messagebox.askyesno(
+                    "Approve EXACT selected memory for collaboration",
+                    "Share the selected SYNTHETIC notes with the analyst model? "
+                    "Later models may receive their contents indirectly in "
+                    "the analyst/critic outputs. Provider APIs may charge. "
+                    "No other project is included.\\n\\n" + preview,
+                    parent=self,
+                ):
+                    raise PermissionError("Selected memory transfer declined")
             stages, approvals = review_collaboration(
                 task, selections,
                 network_enabled=self.consent_network.get()
@@ -509,6 +543,7 @@ class VarynDesktop(tk.Tk):
                 ask_approval=lambda prompt: messagebox.askyesno(
                     "Confirm each external AI stage", prompt, parent=self,
                 ),
+                memory_attached=context is not None,
             )
             engine = self.controller.collaboration_engine()
             if self._closing or self._busy:
@@ -525,17 +560,20 @@ class VarynDesktop(tk.Tk):
         self._refresh_status()
         threading.Thread(
             target=self._collaboration_worker,
-            args=(request_id, task, stages, approvals, engine),
+            args=(request_id, task, stages, approvals, engine)
+                 + ((context,) if context is not None else ()),
             daemon=True,
         ).start()
         self.after(75, self._poll_result)
         return True
 
-    def _collaboration_worker(self, request_id, task, stages, approvals, engine):
+    def _collaboration_worker(self, request_id, task, stages, approvals, engine,
+                              context=None):
         """Background model work. Never access Tk from this thread."""
         try:
             result = engine.run(
                 task, stages, live_confirmations=approvals,
+                context=context, context_upload_confirmed=context is not None,
             )
             self._results.put((request_id, "collaboration", "", result))
         except Exception:
@@ -628,6 +666,13 @@ class VarynDesktop(tk.Tk):
                 self._append("AGENT", "Native proposal could not be staged or reviewed")
         elif kind == "collaboration":
             self._append("YOU", message["task"])
+            if message.get("context_source_refs"):
+                self._append(
+                    "MEMORY SOURCES",
+                    str(message.get("context_project")) + ": " +
+                    ", ".join(message["context_source_refs"]) +
+                    " (user-selected, untrusted; not independently verified)",
+                )
             for stage in message["stages"]:
                 self._append(
                     "COLLAB " + stage["role"].upper(),
