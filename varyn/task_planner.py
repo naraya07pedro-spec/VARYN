@@ -47,7 +47,10 @@ def compile_plan(raw):
             raise TaskPlanError("Invalid task tool or arguments")
         # Reuse existing exact allowlist and argument limits. No new tools.
         from varyn.agent_runtime import BoundedAgent
-        BoundedAgent._validate(tool, args)
+        try:
+            BoundedAgent._validate(tool, args)
+        except AgentRejected:
+            raise TaskPlanError("Invalid or unregistered task step") from None
         plan.append(TaskStep(tool, dict(args)))
     return tuple(plan)
 
