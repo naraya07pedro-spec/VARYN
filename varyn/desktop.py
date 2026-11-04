@@ -180,8 +180,8 @@ class VarynDesktop(tk.Tk):
             "for at most 5 minutes / 10 operations?\n\n"
             "You cannot select Documents, Downloads, a cloud drive or any "
             "other personal folder in this experimental build. "
-            "The temporary sample is deleted when revoked, replaced, "
-            "inspected after expiry, or the application closes. "
+            "The temporary sample is cleaned up when its lease expires, "
+            "is revoked or replaced, or the application closes. "
             "No file names or contents are sent to any AI provider.",
             parent=self,
         )
@@ -193,6 +193,7 @@ class VarynDesktop(tk.Tk):
             fixture = SyntheticFixture()
             preview = self._file_grants.grant(
                 fixture.root, user_confirmed=True,
+                on_release=fixture.close,
             )
         except (PermissionError, ValueError, OSError, AgentRejected):
             if fixture is not None:
