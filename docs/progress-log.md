@@ -525,3 +525,13 @@ Selected synthetic-only project note IDs now feed bounded analyst context after 
 - **Tests:** Added `tests/test_blind_benchmark.py` with **14 tests** covering A/B label redaction, blind key separation, stable shuffling, two-rater requirement, score bounds, case completeness, packet tampering, invalid metadata, budget parity flags, and a reproducible winner/loser synthetic demo. Added both the test and demo commands to Windows/Ubuntu GitHub CI.
 - **Documentation:** Added `docs/blinded-benchmark-17r.md` and README section explaining method, future independently reviewed matched experiment, cost/provenance caveats and blocked Option C official consumer app history sync.
 - **Scope and next gate:** This is a user-controlled offline study protocol, **not a funded live A/B run and not proof of multi-model superiority**. For rigorous live comparison, freeze tasks, judge criteria, independent raters, API consent, provider versions and budgets first; record all negative results. Draft PR #1 still unmerged. Final CI must be verified on the final commit SHA before declaring complete.
+
+
+## 2026-11-04 | Checkpoint 17S-1: reviewed local synthetic file tool bridge
+
+- **Goal:** First bounded Tool Integration & Permission slice, combining existing ephemeral scoped-file grant with a one-use desktop review before a real read from a VARYN-owned disposable synthetic file. This is NOT the entire 17S checkpoint.
+- **Changed:** varyn/tool_gateway.py, varyn/desktop.py, tests/test_tool_gateway.py, docs/tool-gateway-17s-1.md, .github/workflows/memory-checks.yml, README.md and this progress log.
+- **Safety:** No arbitrary user paths, no shell, no network, no AI provider or model tool registration, no file writes. Only exact VARYN-generated sample text is emitted after local consent. Unknown names, altered content, tampered review digests, grant expiry/revocation, replay and denial block the action. Metadata log excludes paths/tokens/contents.
+- **Test plan:** Full unittest discover and dedicated 17S-1 tests on Windows/Ubuntu hosted CI. Human Windows GUI owner acceptance remains separate; UI confirmation is a trusted caller assertion rather than authenticated consent.
+- **Verification:** CI on the exact final commit is pending at time of entry, and must be inspected after the last documentation commit. Do not present this as completed or product-accepted until observed.
+- **Next:** Review CI failures without weakening tests; then extend scoped tool permissions with a stronger identity/sandbox model and acceptance tests. Official app ChatGPT/Claude/Gemini consumer-history two-way sync Option C remains blocked; do not silently replace it.
