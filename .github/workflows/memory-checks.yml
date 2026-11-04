@@ -31,6 +31,12 @@ jobs:
         run: python -c "import tkinter; print('Tkinter module available')"
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
+      - name: Offline official-app sync capability gate (no provider request)
+        run: |
+          python -m varyn.official_sync
+          python -m varyn.official_sync --provider chatgpt
+          python -m varyn.official_sync --provider claude
+          python -m varyn.official_sync --provider gemini
       - name: Offline desktop preflight and process RSS (doctor process only)
         run: python -m varyn.doctor --json
       - name: Build deterministic desktop source ZIP
