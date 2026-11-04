@@ -63,6 +63,10 @@ def _native_apis():
     kernel.SetInformationJobObject.argtypes = [
         _HANDLE, ctypes.c_int, ctypes.c_void_p, _DWORD]
     kernel.SetInformationJobObject.restype = ctypes.c_int
+    kernel.QueryInformationJobObject.argtypes = [
+        _HANDLE, ctypes.c_int, ctypes.c_void_p, _DWORD,
+        ctypes.POINTER(_DWORD)]
+    kernel.QueryInformationJobObject.restype = ctypes.c_int
     kernel.AssignProcessToJobObject.argtypes = [_HANDLE, _HANDLE]
     kernel.AssignProcessToJobObject.restype = ctypes.c_int
     kernel.IsProcessInJob.argtypes = [
@@ -150,6 +154,22 @@ class WindowsChildJob:
                     _HANDLE(job), _EXTENDED_LIMIT_INFORMATION,
                     ctypes.byref(limits), ctypes.sizeof(limits)):
                 raise PublicToolRejected("Windows job limits refused")
+            observed = _ExtendedLimit()
+            length = _DWORD()
+            if not self._kernel.QueryInformationJobObject(
+                    _HANDLE(job), _EXTENDED_LIMIT_INFORMATION,
+                    ctypes.byref(observed), ctypes.sizeof(observed),
+                    ctypes.byref(length)):
+                raise PublicToolRejected("Windows Job Object limits unreadable")
+            required = (
+                _JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+                | _JOB_OBJECT_LIMIT_ACTIVE_PROCESS
+                | _JOB_OBJECT_LIMIT_PROCESS_MEMORY
+            )
+            if (observed.BasicLimitInformation.LimitFlags & required != required or
+                    observed.BasicLimitInformation.ActiveProcessLimit != 1 or
+                    observed.ProcessMemoryLimit != memory_cap):
+                raise PublicToolRejected("Windows Job Object limits not enforced")
             if not self._kernel.AssignProcessToJobObject(
                     _HANDLE(job), _HANDLE(int(process_handle))):
                 raise PublicToolRejected("Windows child job assignment denied")
