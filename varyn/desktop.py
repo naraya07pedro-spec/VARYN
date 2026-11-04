@@ -22,6 +22,7 @@ from varyn.native_tool_requests import NativeToolRequestClient
 from varyn.file_grants import ScopedFileGrants
 from varyn.synthetic_fixture import SyntheticFixture
 from varyn.tool_gateway import SyntheticReadToolGateway, ToolGatewayRejected
+from varyn.public_github_tool import PublicGithubToolGateway, PublicToolRejected
 from varyn.desktop_collaboration import review_collaboration
 from varyn.desktop_memory import DesktopMemory
 from varyn.memory_handoff import parse_note_ids, selected_memory_context
@@ -54,6 +55,7 @@ class VarynDesktop(tk.Tk):
         self._native_client = NativeToolRequestClient(allow_network=True)
         self._file_grants = ScopedFileGrants(auto_expire=True)
         self._synthetic_tools = SyntheticReadToolGateway(self._file_grants)
+        self._public_github_tools = PublicGithubToolGateway()
         self._file_grant_id = None
         self._file_fixture = None
         self._busy = False
@@ -192,6 +194,10 @@ class VarynDesktop(tk.Tk):
         ttk.Button(
             outer, text="Review one VARYN synthetic file read (local only)",
             command=self._read_reviewed_synthetic_sample,
+        ).pack(anchor="w", pady=(0, 8))
+        ttk.Button(
+            outer, text="Review public GitHub tool intent (JSON, network)",
+            command=self._review_public_github_intent,
         ).pack(anchor="w", pady=(0, 8))
         self._build_memory_controls(outer)
         ttk.Label(
@@ -442,6 +448,58 @@ class VarynDesktop(tk.Tk):
         self._append(
             "TOOL 17S", "Approved local sample (never uploaded):\n" +
             outcome["output"]["text"],
+        )
+
+    def _review_public_github_intent(self):
+        """Review untrusted JSON before ONE anonymous GitHub public GET.
+
+        No model output has authority to toggle consent or select an URL.
+        This synchronous 5-second-bounded beta can temporarily block Tk UI.
+        """
+        if self._busy or self._closing:
+            return
+        if not self.consent_network.get():
+            self._append("GITHUB TOOL", "Network consent disabled; no request sent")
+            return
+        try:
+            preview = self._public_github_tools.propose(
+                self.prompt.get("1.0", "end-1c"),
+                network_consent=self.consent_network.get() is True,
+            )
+        except (PublicToolRejected, PermissionError, ValueError):
+            self._append("GITHUB TOOL", "Invalid public GitHub tool intent; no request")
+            return
+        try:
+            approved = messagebox.askyesno(
+                "Review one public GitHub read-only request",
+                "Tool: " + preview.tool +
+                "\nPublic repository: " + preview.repository +
+                "\nEndpoint: https://api.github.com/repos/" + preview.repository +
+                "\nReview digest: " + preview.digest +
+                "\n\nOne anonymous GET (up to 5 seconds), no GitHub token, "
+                "no writes, no retry, no provider context upload. "
+                "This spends one VARYN tool request from its in-RAM quota. Approve?",
+                parent=self,
+            )
+            result = self._public_github_tools.decide(
+                preview.proposal_id, preview.digest, approved=approved,
+                network_consent=self.consent_network.get() is True,
+            )
+        except (PublicToolRejected, PermissionError, OSError):
+            self._public_github_tools.reject_all_pending()
+            self._append("GITHUB TOOL", "Public GitHub read failed or permission revoked; no retry")
+            return
+        if result["status"] == "rejected":
+            self._append("GITHUB TOOL", "Public GitHub request declined; no network dispatch")
+            return
+        repo = result["result"]
+        self._append(
+            "GITHUB TOOL",
+            "Public metadata, externally sourced/untrusted (local display only): "
+            + repo["repository"] + " | default branch " + repo["default_branch"]
+            + " | stars " + str(repo["stars"])
+            + " | open items (incl. PRs) " + str(repo["open_items_including_prs"])
+            + " | archived " + str(repo["archived"]),
         )
 
     def _revoke_synthetic_folder(self):
@@ -977,6 +1035,9 @@ class VarynDesktop(tk.Tk):
             return
         self._approval.reject_all_pending()
         gateway = getattr(self, "_synthetic_tools", None)
+        if gateway is not None:
+            gateway.reject_all_pending()
+        gateway = getattr(self, "_public_github_tools", None)
         if gateway is not None:
             gateway.reject_all_pending()
         self._file_grants.revoke_all()
