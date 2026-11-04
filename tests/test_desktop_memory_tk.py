@@ -66,6 +66,12 @@ class DesktopMemoryWidgetTests(unittest.TestCase):
                 matches = root._memory.search("VARYN", "alpha")
                 self.assertEqual(len(matches), 1)
                 memory_id = matches[0]["id"]
+                # Discarding an unrelated pending UI reply must NOT close the
+                # persistent memory handle; previous Windows CI caught this.
+                root._lifecycle.begin()
+                with patch("varyn.desktop.messagebox.askyesno", return_value=True):
+                    root._discard()
+                self.assertEqual(len(root._memory.search("VARYN", "alpha")), 1)
                 root.prompt.delete("1.0", "end")
                 root.prompt.insert("1.0", "alpha")
                 search.invoke()
