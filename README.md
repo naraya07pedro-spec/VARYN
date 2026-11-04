@@ -2,7 +2,7 @@
 
 **An open-source personal AI workspace for shared memory, multi-model collaboration, and reliable agent workflows.**
 
-> **Early prototype.** The only implemented component so far is a local memory experiment. No GPT, Claude, Gemini, provider authentication, model routing, agent orchestration, or full user interface is implemented.
+> **Experimental, non-production prototype.** Beyond the local SQLite memory experiment, this branch includes bounded context retrieval, opt-in provider API adapters, a Tkinter desktop, synthetic agent approvals and recovery, provider-native tool-intent adapters, and temporary read-only synthetic folder grants. These pieces are **not** an integrated personal AI product. There is no official ChatGPT/Claude/Gemini *app-history* bidirectional synchronization, no authenticated full agent permission boundary, no production-safe confidential storage, and no verified real-world autonomous execution. The default remains offline; paid API calls require explicit opt-in.
 
 ## First development checkpoint: local memory
 
@@ -39,12 +39,13 @@ The restore operation validates SQLite integrity and the expected memory schema,
 
 See [development evidence and limitations](docs/progress.md). Automated tests are provided and GitHub Actions is configured; do not assume they pass until CI reports results.
 
-## Product goals, not implemented features
+## Full-product goals that remain unimplemented
 
-- Independent memory and context shared across supported AI providers.
-- Explicit permission boundaries and separate owner/user workspaces.
-- Official provider integrations subject to eligibility, terms and quota.
-- A genuinely useful personal workspace, built incrementally without unapproved API spending.
+- Secure, user-authorized long-term memory and context usable across supported models. Current SQLite and desktop prototypes do not establish that security guarantee.
+- Verified owner/user isolation and real OS-backed access control. String labels and UI confirmations are not authentication.
+- Official-app conversation synchronization in both directions, only where providers expose documented supported capabilities. API calls and manual exports are **not** official-app synchronization.
+- Reliable real agent execution with recoverable actions, authorized tools, and independent end-to-end acceptance evidence.
+- Progressive local-first delivery without unapproved API spending or hosting costs.
 
 VARYN is a distinct project from [RepoPilot AI](https://github.com/naraya07pedro-spec/repopilot-ai), which focuses on bounded issue-to-PR engineering work.
 
@@ -457,3 +458,9 @@ Supply an **existing absolute folder chosen by the host**, not from model text. 
 `ScopedFileGrants` manages host-created read-only directory grants. A trusted caller provides an existing absolute folder and asserts `user_confirmed=True`. The default scope expires after five minutes or ten operations, whichever comes first. A caller may revoke a grant. Failed accesses also consume operations, and the audit records only event type and a shortened ID, not paths or contents. The model cannot request these grants through existing VARYN tools.
 
 This is **not proof of user authentication**, permission from a graphical dialog, or a secure Windows sandbox. Detected reparse points, hardlinks and Windows reserved names are denied, but OS-level handle/race protection remains incomplete. Only use synthetic test files.
+
+### Checkpoint 16C: Desktop synthetic folder consent
+
+The experimental Tkinter desktop now exposes **Grant synthetic test folder**, **Inspect test-folder count**, and **Revoke test-folder grant** actions. A trusted OS folder chooser and a separate explicit Yes/No dialog precede issuance of an ephemeral host-side read-only scope grant (default 5 minutes and 10 operations). The UI only shows a count of matching top-level test files; it does **not** display filenames or contents, attach files to a prompt, call models with folder data, or introduce file tools into the agent registry. Closing the desktop revokes active grants.
+
+Only select folders containing **synthetic test data**. This is **not authenticated access control or an OS sandbox**, and Windows concurrent reparse/path-swap attacks remain out of scope. Headless automated tests do not prove that a user physically clicked the dialogs. See [development log](docs/progress-log.md) and [official-app sync feasibility](docs/product-contract-and-feasibility.md).
