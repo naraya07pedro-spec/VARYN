@@ -95,6 +95,8 @@ jobs:
       - name: Native Windows Tk offline reasoning diagnostic button
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_reasoning_eval_tk.py" -v
+      - name: 17R blinded paired study, budget-matching and multi-rater fail-closed regressions
+        run: python -m unittest discover -s tests -p "test_blind_benchmark.py" -v
       - name: Option C consumer-history proof gates stay blocked
         run: |
           python -m unittest discover -s tests -p "test_option_c_gate.py" -v
