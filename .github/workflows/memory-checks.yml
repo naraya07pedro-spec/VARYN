@@ -149,6 +149,8 @@ jobs:
         run: python -m unittest discover -s tests -p "test_durable_broker_journal.py" -v
       - name: 17S-15 local-only Windows kernel pipe client PID attestation (not production)
         run: python -m unittest discover -s tests -p "test_windows_pipe_identity.py" -v
+      - name: 17S-16 native AppContainer explicit two-handle inherited IPC (not production)
+        run: python -m unittest discover -s tests -p "test_windows_appcontainer_trial.py" -v
       - name: Option C consumer-history proof gates stay blocked
         run: |
           python -m unittest discover -s tests -p "test_option_c_gate.py" -v
