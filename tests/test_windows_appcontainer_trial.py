@@ -55,6 +55,15 @@ class AppContainerFailClosedPolicyTests(unittest.TestCase):
         with self.assertRaises(PublicToolRejected):
             run_ci_only_zero_capability_trial(cancel_trial=True,
                                             inherited_trial=True)
+        with self.assertRaises(PublicToolRejected):
+            run_ci_only_zero_capability_trial(parent_read_trial="true")
+        with self.assertRaises(PublicToolRejected):
+            run_ci_only_zero_capability_trial(parent_read_trial=True,
+                                             inherited_trial=True)
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "false",
+                                     "VARYN_CI_APPCONTAINER_TRIAL": "1"}):
+            with self.assertRaises(PublicToolRejected):
+                run_ci_only_zero_capability_trial(parent_read_trial=True)
         with patch.dict(os.environ, {"GITHUB_ACTIONS": "false",
                                      "VARYN_CI_APPCONTAINER_TRIAL": "1"}):
             with self.assertRaises(PublicToolRejected):
@@ -179,6 +188,35 @@ class NativeWindowsAppContainerTrial(unittest.TestCase):
                 cls._inherited_trial_report = run_ci_only_zero_capability_trial(
                     inherited_trial=True)
         return cls._inherited_trial_report
+
+    def test_parent_approved_readonly_fixture_reaches_real_appcontainer(self):
+        # CI test simulates a decision in the trusted parent, not a human
+        # GUI click or blanket production authority. The child receives only
+        # bounded counts: NO host fixture path or file handle.
+        with patch.dict(os.environ, {"VARYN_CI_APPCONTAINER_TRIAL": "1"}):
+            proof = run_ci_only_zero_capability_trial(parent_read_trial=True)
+        self.assertTrue(proof["native_primary_appcontainer_attested"])
+        self.assertTrue(proof["zero_capability_sids_attested"])
+        self.assertTrue(proof["trusted_parent_read_trial"])
+        self.assertTrue(proof["owner_approval_simulated_in_ci"])
+        self.assertTrue(proof["owner_fixture_read_after_approval"])
+        self.assertTrue(proof["owner_file_path_not_sent_to_child"])
+        self.assertTrue(proof["parent_read_response_verified"])
+        self.assertTrue(proof["parent_journal_claimed_before_launch"])
+        self.assertTrue(proof["parent_journal_completed_after_verification"])
+        self.assertTrue(proof["native_pre_resume_fixture_handle_attested"])
+        self.assertTrue(proof["unlisted_decoy_handle_denied"])
+        self.assertTrue(proof["native_job_attested_before_resume"])
+        self.assertTrue(proof["synthetic_granted_read_ok"])
+        self.assertTrue(proof["synthetic_private_read_denied"])
+        self.assertTrue(proof["disposable_profile_deleted"])
+        self.assertEqual(proof["python_exit_status"], 73)
+        self.assertFalse(proof["production_tool_integrated"])
+        self.assertFalse(proof["network_used"])
+        print("17S-18 native AppContainer: CI-simulated parent approval, "
+              "one fixed host synthetic fixture read, bounded counts-only "
+              "IPC, nonce-correlated response and parent journal verified",
+              flush=True)
 
     def test_real_appcontainer_two_anonymous_handles_only(self):
         # Hard native Windows transport gate. Any failed execution, missing
