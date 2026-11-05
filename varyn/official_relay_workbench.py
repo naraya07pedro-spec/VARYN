@@ -10,6 +10,7 @@ from tkinter import ttk
 
 from varyn.official_manual_relay import OFFICIAL_APP_LINKS
 from varyn.native_history_import_gui import NativeHistoryImportGuide
+from varyn.owner_pilot_checklist_gui import OwnerPilotChecklist
 
 
 class OfficialRelayWorkbench(tk.Toplevel):
@@ -21,6 +22,7 @@ class OfficialRelayWorkbench(tk.Toplevel):
         super().__init__(parent)
         self._owner = parent
         self._native_history_window = None
+        self._owner_checklist_window = None
         self.title("VARYN | Official apps: manual workbench, NO sync")
         self.geometry("680x630")
         self.minsize(510, 430)
@@ -63,6 +65,10 @@ class OfficialRelayWorkbench(tk.Toplevel):
                  "for eligible personal accounts. No VARYN file reading or sync.",
             wraplength=630,
         ).pack(anchor="w", pady=(0, 3))
+        ttk.Button(
+            top, text="17S-32 | Owner PC acceptance checklist",
+            command=self._open_owner_checklist,
+        ).pack(anchor="w", pady=(3, 5))
 
         area = ttk.Frame(self)
         area.pack(fill="both", expand=True)
@@ -192,6 +198,16 @@ class OfficialRelayWorkbench(tk.Toplevel):
             return
         self._native_history_window = NativeHistoryImportGuide(self)
 
+    def _open_owner_checklist(self):
+        if not self._allowed():
+            return
+        prior = self._owner_checklist_window
+        if prior is not None and prior.winfo_exists():
+            prior.lift()
+            prior.focus_set()
+            return
+        self._owner_checklist_window = OwnerPilotChecklist(self)
+
     def _allowed(self):
         return not self._owner._closing and not self._owner._busy
 
@@ -301,6 +317,14 @@ class OfficialRelayWorkbench(tk.Toplevel):
             except tk.TclError:
                 pass
             self._native_history_window = None
+        checklist = getattr(self, "_owner_checklist_window", None)
+        if checklist is not None:
+            try:
+                if checklist.winfo_exists():
+                    checklist._dismiss()
+            except tk.TclError:
+                pass
+            self._owner_checklist_window = None
         if getattr(self._owner, "_relay_workbench", None) is self:
             self._owner._relay_workbench = None
         self.destroy()

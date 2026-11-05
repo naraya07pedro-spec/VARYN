@@ -44,3 +44,12 @@ repository commit before trusting the build.
 
 Source code and full provenance:
 https://github.com/naraya07pedro-spec/VARYN/pull/1
+
+OWNER ACCEPTANCE IN THE APP (17S-32)
+- In the workbench, select "17S-32 | Owner PC acceptance checklist".
+- Run its manual steps with harmless SYNTHETIC: inputs in official apps.
+- Mark each item pass/fail/not_checked, then Review fixed self-report.
+- Copy is optional and requires a SECOND explicit approval. No auto-upload.
+- This is an owner SELF-REPORT, NOT audited browser delivery/human identity.
+- Closing discards the report in RAM; approved Windows clipboard copy can persist.
+- No private ZIP, real conversations, tokens, or passwords for this test.

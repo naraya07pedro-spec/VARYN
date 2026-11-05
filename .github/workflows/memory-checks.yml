@@ -105,6 +105,11 @@ jobs:
       - name: 17S-31 hosted Windows two independent ZIP read consent gates
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_native_export_inventory_tk.py" -v
+      - name: 17S-32 owner device fixed-choice self-report and hard false proof flags
+        run: python -m unittest discover -s tests -p "test_owner_pilot_checklist_gui.py" -v
+      - name: 17S-32 hosted Windows Tk checklist review, consent, stale refusal
+        if: runner.os == 'Windows'
+        run: python -m unittest discover -s tests -p "test_owner_pilot_checklist_gui.py" -v
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
       - name: Synthetic-only desktop boundary and disposable sample cleanup
