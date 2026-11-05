@@ -61,6 +61,18 @@ class ManualRelayPreview:
     automatic_sync: bool = False
 
 
+@dataclass(frozen=True)
+class ManualReturnPreview:
+    """Exact, owner-visible return bound to one outbound copy, never app proof."""
+    provider: str
+    outbound_request_id: str
+    outbound_digest: str
+    reply_digest: str
+    reply_text: str
+    expires_at: int
+    origin_verified: bool = False
+
+
 class OfficialManualRelay:
     """Explicit single-threaded desktop flow; no provider capability granted."""
 
@@ -70,9 +82,17 @@ class OfficialManualRelay:
             raise ManualRelayRejected("Invalid trusted clock")
         self._pending = None
         self._awaiting_provider = None
+        self._awaiting_outbound = None
+        self._pending_return_review = None
+        self._last_return_receipt = None
+        self._chain_digest = "0" * 64
         self._previous_reply = None
         self._previous_provider = None
         self._hops = 0
+        self._awaiting_outbound = None
+        self._pending_return_review = None
+        self._last_return_receipt = None
+        self._chain_digest = "0" * 64
 
     def _now(self):
         value = self._clock()
@@ -102,6 +122,15 @@ class OfficialManualRelay:
                 "; provider identity and correctness NOT verified):\n" +
                 repr(self._previous_reply)
             )
+            if self._last_return_receipt is not None:
+                sections.append(
+                    "LOCAL OWNER-REVIEWED RETURN RECEIPT (NOT authenticated "
+                    "provider provenance):\n"
+                    "Outbound request: " +
+                    self._last_return_receipt["outbound_request_id"] +
+                    "\nLocal chain digest: " +
+                    self._last_return_receipt["local_chain_digest"]
+                )
         sections.append(
             "Please address the USER-AUTHORED REQUEST. Check relevant claims; "
             "do not claim access to other official apps or synchronized memory."
@@ -151,6 +180,8 @@ class OfficialManualRelay:
         if not copied or self._now() > preview.expires_at:
             raise ManualRelayRejected("Copy was not confirmed or review expired")
         self._awaiting_provider = preview.provider
+        self._awaiting_outbound = (preview.request_id, preview.digest)
+        self._pending_return_review = None
         self._hops += 1
         self._previous_reply = None
         self._previous_provider = None
@@ -161,15 +192,68 @@ class OfficialManualRelay:
             "official_account_access_verified": False,
         }
 
+    def begin_return_review(self, reply):
+        """Bind typed reply to the exact outgoing copy, before modal opens."""
+        if (self._pending is not None or self._awaiting_provider is None or
+                self._awaiting_outbound is None or
+                self._pending_return_review is not None):
+            raise ManualRelayRejected("No unreviewed bound outgoing handoff")
+        text = _bounded_text(reply, _MAX_REPLY)
+        request_id, outgoing_digest = self._awaiting_outbound
+        digest = hashlib.sha256(
+            (request_id + "\n" + outgoing_digest + "\n" + text).encode("utf-8")
+        ).hexdigest()
+        review = ManualReturnPreview(
+            self._awaiting_provider, request_id, outgoing_digest,
+            digest, text, self._now() + _TTL_SECONDS,
+        )
+        self._pending_return_review = review
+        return review
+
+    def finish_return_review(self, preview, *, approved):
+        """Strict one-shot return confirmation, including reentrant Tk closes."""
+        if type(approved) is not bool:
+            raise ManualRelayRejected("Explicit boolean return decision required")
+        if (type(preview) is not ManualReturnPreview or
+                self._pending_return_review is None or
+                preview is not self._pending_return_review or
+                self._awaiting_provider != preview.provider or
+                self._awaiting_outbound != (
+                    preview.outbound_request_id, preview.outbound_digest)):
+            raise ManualRelayRejected("Stale, forged or mismatched return receipt")
+        self._pending_return_review = None
+        if not approved:
+            return {"status": "return_declined", "origin_verified": False}
+        if self._now() > preview.expires_at:
+            raise ManualRelayRejected("Return review expired")
+        result = self.record_pasted_reply(preview.reply_text, reviewed=True)
+        self._chain_digest = hashlib.sha256(
+            (self._chain_digest + "\n" + preview.outbound_digest +
+             "\n" + preview.reply_digest).encode("ascii")
+        ).hexdigest()
+        self._last_return_receipt = {
+            "provider_claim": preview.provider,
+            "outbound_request_id": preview.outbound_request_id,
+            "outbound_digest": preview.outbound_digest,
+            "reply_digest": preview.reply_digest,
+            "local_chain_digest": self._chain_digest,
+            "provider_origin_verified": False,
+            "manual_only": True,
+        }
+        return {**result, "return_receipt": dict(self._last_return_receipt)}
+
     def record_pasted_reply(self, reply, *, reviewed):
         if type(reviewed) is not bool or not reviewed:
             raise ManualRelayRejected("Explicit owner review required")
         if self._pending is not None or self._awaiting_provider is None:
             raise ManualRelayRejected("No completed outgoing handoff")
+        if self._pending_return_review is not None:
+            raise ManualRelayRejected("Complete the pending exact reply review first")
         text = _bounded_text(reply, _MAX_REPLY)
         self._previous_reply = text
         self._previous_provider = self._awaiting_provider
         self._awaiting_provider = None
+        self._awaiting_outbound = None
         return {
             "status": "user_pasted_reply_ram_only",
             "claimed_provider": self._previous_provider,
@@ -191,6 +275,11 @@ class OfficialManualRelay:
         self.discard_pending()
         self._hops = 0
 
+    def last_return_receipt(self):
+        """Return receipt METADATA, not reply contents or remote verification."""
+        return (None if self._last_return_receipt is None
+                else dict(self._last_return_receipt))
+
     def status(self):
         return {
             "format": "varyn.official_manual_relay.v1",
@@ -203,4 +292,6 @@ class OfficialManualRelay:
             "hops_limit": _MAX_HOPS,
             "awaiting_user_pasteback": self._awaiting_provider is not None,
             "reply_in_ram": self._previous_reply is not None,
+            "return_review_pending": self._pending_return_review is not None,
+            "return_receipt_available": self._last_return_receipt is not None,
         }
