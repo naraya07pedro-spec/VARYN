@@ -576,6 +576,12 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False,
                     "AppContainer cancellation child never started")
             if not job_guard or not job_guard.attached:
                 raise PublicToolRejected("Cancellation Job missing")
+            live = wintypes.DWORD()
+            if (not kernel.GetExitCodeProcess(
+                    proc.hProcess, ctypes.byref(live))
+                    or live.value != _STILL_ACTIVE):
+                raise PublicToolRejected(
+                    "AppContainer process was not alive before Job close")
             job_guard.close()  # Native KILL_ON_JOB_CLOSE, not TerminateProcess
             job_close_killed_child = (
                 kernel.WaitForSingleObject(proc.hProcess, 3000)
