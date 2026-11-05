@@ -26,6 +26,7 @@ from varyn.desktop_parent_counts import DesktopParentCountsAction
 from varyn.official_manual_relay import OfficialManualRelay, ManualRelayRejected, OFFICIAL_APP_LINKS, official_destination
 from varyn.relay_working_context import WorkingContextBoard, WorkingContextRejected
 from varyn.local_pilot_audit import PilotLocalAudit, PilotAuditRejected
+from varyn.official_relay_workbench import OfficialRelayWorkbench
 from varyn.bounded_broker_protocol import BrokerRejected
 from varyn.tool_gateway import SyntheticReadToolGateway, ToolGatewayRejected
 from varyn.public_github_tool import PublicGithubToolGateway, PublicToolRejected
@@ -91,6 +92,7 @@ class VarynDesktop(tk.Tk):
         self._busy = False
         self._closing = False
         self._last_collaboration = None
+        self._relay_workbench = None
         self._build()
         self.protocol("WM_DELETE_WINDOW", self._close)
         if self._task_recovery is not None and (
@@ -163,6 +165,10 @@ class VarynDesktop(tk.Tk):
             outer, text="LOCAL-FIRST  |  OFFLINE BY DEFAULT  |  API LIVE IS OPT-IN",
             style="V.TLabel",
         ).pack(anchor="w", pady=(0, 14))
+        ttk.Button(
+            outer, text="17S-28 | Open official-app relay workbench",
+            command=self._open_relay_workbench,
+        ).pack(anchor="w", pady=(0, 9))
         pilot = ttk.Frame(outer, style="V.TFrame")
         pilot.pack(fill="x", pady=(0, 6))
         ttk.Button(
@@ -460,6 +466,17 @@ class VarynDesktop(tk.Tk):
             "In-RAM callback audit cleared. No local files or remote "
             "app content were modified.",
         )
+
+    def _open_relay_workbench(self):
+        """Single owner-focused manual handoff window, reusing existing gates."""
+        if self._busy or self._closing:
+            return
+        workbench = getattr(self, "_relay_workbench", None)
+        if workbench is not None and workbench.winfo_exists():
+            workbench.lift()
+            workbench.focus_set()
+            return
+        self._relay_workbench = OfficialRelayWorkbench(self)
 
     def _on_page_content_resize(self, _event=None):
         if not self._closing:
@@ -843,16 +860,16 @@ class VarynDesktop(tk.Tk):
             approve_label="Accept bound reply in RAM",
         )
 
-    def _review_project_working_note(self):
+    def _review_project_working_note(self, *, project=None, topic=None, note=None):
         """Owner must review exact synthetic note and any conflicting revision."""
         if self._busy or self._closing:
             return
         board = self._working_context
         relay = self._official_relay
         try:
-            project = self.memory_project.get()
-            topic = self.working_topic.get()
-            note = self.prompt.get("1.0", "end-1c")
+            project = self.memory_project.get() if project is None else project
+            topic = self.working_topic.get() if topic is None else topic
+            note = self.prompt.get("1.0", "end-1c") if note is None else note
             receipt = relay.last_return_receipt()
             preview = board.propose(
                 project, topic, note, source_receipt=receipt,
@@ -933,7 +950,7 @@ class VarynDesktop(tk.Tk):
             self, "working_context_discarded"
         )
 
-    def _open_selected_official_app(self):
+    def _open_selected_official_app(self, *, target=None):
         """Owner-initiated browser navigation to pinned official homepage only.
 
         Does not pass task text, model prompt, identity or credentials in URL.
@@ -943,7 +960,8 @@ class VarynDesktop(tk.Tk):
         if self._busy or self._closing:
             return
         try:
-            provider = self.official_relay_target.get()
+            provider = (self.official_relay_target.get()
+                        if target is None else target)
             url = official_destination(provider)
         except (ManualRelayRejected, ValueError):
             self._append(
@@ -981,19 +999,30 @@ class VarynDesktop(tk.Tk):
                 self, "homepage_launch_requested", provider=provider,
             )
 
-    def _copy_official_app_relay(self):
+    def _copy_official_app_relay(self, *, task=None, target=None,
+                                 project=None, include_context=None):
         """Review exact user-typed text before writing it to OS clipboard."""
         if self._busy or self._closing:
             return
         relay = self._official_relay
         try:
-            target = self.official_relay_target.get()
-            task = self.prompt.get("1.0", "end-1c")
+            target = (self.official_relay_target.get()
+                      if target is None else target)
+            task = self.prompt.get("1.0", "end-1c") if task is None else task
             reviewed_context = None
-            opt_in = getattr(self, "include_working_context", None)
-            if opt_in is not None and opt_in.get() is True:
+            if include_context is None:
+                opt_in = getattr(self, "include_working_context", None)
+                selected = opt_in is not None and opt_in.get() is True
+            elif type(include_context) is bool:
+                selected = include_context
+            else:
+                raise ManualRelayRejected("Explicit boolean context selection")
+            if selected:
+                working_project = (
+                    self.memory_project.get() if project is None else project
+                )
                 reviewed_context = self._working_context.selection(
-                    self.memory_project.get()
+                    working_project
                 )
             preview = relay.prepare(
                 target, task, reviewed_context=reviewed_context,
@@ -1047,13 +1076,13 @@ class VarynDesktop(tk.Tk):
                 "its contents manually.",
             )
 
-    def _review_official_app_reply(self):
+    def _review_official_app_reply(self, *, reply=None):
         """Human pastes and reviews optional unverified response: RAM only."""
         if self._busy or self._closing:
             return
         relay = self._official_relay
         try:
-            reply = self.prompt.get("1.0", "end-1c")
+            reply = self.prompt.get("1.0", "end-1c") if reply is None else reply
             # Validate before review to avoid oversized modal dialogs.
             from varyn.official_manual_relay import _bounded_text, _MAX_REPLY
             candidate = _bounded_text(reply, _MAX_REPLY)
@@ -1986,6 +2015,14 @@ class VarynDesktop(tk.Tk):
             return
         # Mark closed before cancellation so a nested event cannot queue new work.
         self._closing = True
+        workbench = getattr(self, "_relay_workbench", None)
+        if workbench is not None:
+            try:
+                if workbench.winfo_exists():
+                    workbench.destroy()
+            except tk.TclError:
+                pass
+            self._relay_workbench = None
         relay = getattr(self, "_official_relay", None)
         if relay is not None:
             relay.reset()
