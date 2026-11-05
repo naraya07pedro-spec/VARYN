@@ -4,6 +4,16 @@
 
 > **Experimental, non-production prototype.** Beyond the local SQLite memory experiment, this branch includes bounded context retrieval, opt-in provider API adapters, a Tkinter desktop, synthetic agent approvals and recovery, provider-native tool-intent adapters, and temporary read-only synthetic folder grants. These pieces are **not** an integrated personal AI product. There is no official ChatGPT/Claude/Gemini *app-history* bidirectional synchronization, no authenticated full agent permission boundary, no production-safe confidential storage, and no verified real-world autonomous execution. The default remains offline; paid API calls require explicit opt-in.
 
+## Optional local ZIP inventory, no conversations read (17S-31)
+
+Inside the official one-time import guide, click **`17S-31 | Inspect selected ZIP metadata locally (optional)`**. This is **NOT required** to use Gemini's native import. It is a private, offline inventory feature for people who want to inspect ZIP structure before deciding whether to upload an official export to Google.
+
+It has **two separate user approvals**, with a ZIP file picker between them. Only after both approvals does VARYN briefly open the selected local file to read **ZIP32 central-directory metadata**. It never opens or extracts archived members, parses conversation JSON, uploads data, keeps a file path, or writes history to the VARYN memory database. The report contains only numeric entry/size counts and an optional `conversations.json` filename-pattern hint for ChatGPT, without individual filenames, chat titles or content.
+
+Because your laptop may have limited RAM, the pilot deliberately refuses ZIPs larger than **128 MiB**, ZIP64/multipart archives, more than **5,000** members, more than **2 MiB** of ZIP directory metadata, potentially dangerous paths/symlinks, or suspicious compression ratios. **Gemini's own official import permits larger ZIPs**; failure of the VARYN inventory does NOT mean Gemini would reject the original export. This inventory **does not authenticate the provider, verify ZIP member payload integrity, or prove import compatibility**. You can skip the inventory entirely and use the original ZIP directly in the official Gemini site.
+
+The path exists transiently only while the local inspection is performed; no path, personal filenames or member data is included in the report. Reset/close clears its RAM summary. [Detailed bounds, source and tests](docs/official-zip-envelope-inventory-17s-31.md).
+
 ## Official ONE-TIME ChatGPT/Claude history import into Gemini (17S-30)
 
 A **provider-supported history migration** is now exposed in the 17S-28 workbench as **`17S-30 | Official one-time ChatGPT/Claude ZIP import to Gemini`**. It is different from VARYN's synthetic clipboard relay: Google's native Gemini Apps import may accept exported ChatGPT/Claude chat-history ZIP files from eligible users.
