@@ -10,7 +10,6 @@ import unittest
 from varyn.bounded_broker_protocol import BrokerRejected
 from varyn.desktop_parent_counts import DesktopParentCountsAction
 from varyn.parent_synthetic_read_broker import ParentSyntheticReadBroker
-from varyn.synthetic_fixture import SyntheticParentCountsFixture
 
 
 class DesktopParentCountsTests(unittest.TestCase):
@@ -70,6 +69,7 @@ class DesktopParentCountsTests(unittest.TestCase):
         self.action.close()
         now = [1000]
         self.action = DesktopParentCountsAction(clock=lambda: now[0])
+        self.addCleanup(self.action.close)
         preview = self.action.preview()
         now[0] = 1021
         with self.assertRaises(BrokerRejected):
