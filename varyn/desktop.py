@@ -21,6 +21,8 @@ from varyn.tool_protocol import stage_tool_intent
 from varyn.native_tool_requests import NativeToolRequestClient
 from varyn.file_grants import ScopedFileGrants
 from varyn.synthetic_fixture import SyntheticFixture
+from varyn.desktop_parent_counts import DesktopParentCountsAction
+from varyn.bounded_broker_protocol import BrokerRejected
 from varyn.tool_gateway import SyntheticReadToolGateway, ToolGatewayRejected
 from varyn.public_github_tool import PublicGithubToolGateway, PublicToolRejected
 from varyn.public_tool_worker import PublicGithubToolWorker
@@ -223,6 +225,10 @@ class VarynDesktop(tk.Tk):
         ttk.Button(
             outer, text="Review one VARYN synthetic file read (local only)",
             command=self._read_reviewed_synthetic_sample,
+        ).pack(anchor="w", pady=(0, 8))
+        ttk.Button(
+            outer, text="17S-20 | Review parent-only synthetic count",
+            command=self._review_parent_synthetic_counts,
         ).pack(anchor="w", pady=(0, 8))
         ttk.Button(
             outer, text="Review public GitHub tool intent (JSON, network)",
@@ -486,6 +492,50 @@ class VarynDesktop(tk.Tk):
             "TOOL 17S", "Approved local sample (never uploaded):\n" +
             outcome["output"]["text"],
         )
+
+    def _review_parent_synthetic_counts(self):
+        """Actual desktop confirmation, narrowly scoped to generated data."""
+        if self._busy or self._closing:
+            return
+        action = None
+        try:
+            action = DesktopParentCountsAction()
+            preview = action.preview()
+            approved = messagebox.askyesno(
+                "17S-20 | One-time parent-owned synthetic read",
+                preview.description +
+                "\\n\\nAction: read one generated counts-only JSON, then add "
+                "its validated integers INSIDE this trusted desktop parent."
+                "\\nPreview digest: " + preview.digest +
+                "\\nExpires at: " + str(preview.expires_at) +
+                "\\n\\nNo user-selected paths, private documents, AI, "
+                "network, or AppContainer subprocess are involved. "
+                "A temporary metadata-only journal is deleted with "
+                "this disposable fixture. Approve this one read?",
+                parent=self,
+            )
+            # A nested GUI event may have closed the app during the dialog.
+            if self._closing or self._busy:
+                action.close()
+                return
+            result = action.decide_and_run(preview, approved=approved)
+            if result["status"] == "rejected":
+                self._append("BROKER 17S-20", "Declined: no fixture content read")
+            else:
+                self._append(
+                    "BROKER 17S-20",
+                    "One approved VARYN-generated local integer sum: " +
+                    str(result["total"]) +
+                    ". No model, upload, private-file read or OS sandbox."
+                )
+        except (BrokerRejected, OSError, ValueError, PermissionError):
+            self._append(
+                "BROKER 17S-20",
+                "Denied or failed closed; no automatic retry."
+            )
+        finally:
+            if action is not None:
+                action.close()
 
     def _public_tool_permission_changed(self):
         """Tk-thread-only explicit revocation; no assumptions about API consent."""
