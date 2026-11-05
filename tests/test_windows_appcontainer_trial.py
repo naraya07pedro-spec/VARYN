@@ -70,21 +70,31 @@ class NativeWindowsAppContainerTrial(unittest.TestCase):
         self.assertTrue(result["process_terminated"])
         self.assertTrue(result["disposable_profile_deleted"])
         self.assertFalse(result["network_used"])
-        self.assertFalse(result["private_file_test_executed"])
+        self.assertTrue(result["private_file_test_executed"])
+        self.assertTrue(result["synthetic_owner_positive_control"])
+        self.assertTrue(result["synthetic_granted_read_ok"])
+        self.assertTrue(result["synthetic_private_read_denied"])
         self.assertFalse(result["production_tool_integrated"])
         self.assertIs(type(result["python_runtime_executed"]), bool)
         self.assertIs(type(result["python_exit_status"]), int)
-        print("17S-13 native AppContainer: token attested, caps=0, "
-              "temp profile deleted; Python runtime started="
+        print("17S-13 native AppContainer: actual primary token attested, "
+              "caps=0, profile deleted; Python executed="
               + str(result["python_runtime_executed"]) +
+              "; synthetic granted read=" + str(result["synthetic_granted_read_ok"]) +
+              "; synthetic owner-only read denied=" +
+              str(result["synthetic_private_read_denied"]) +
               "; exit_status=0x" + format(result["python_exit_status"], "x"),
               flush=True)
 
-    def test_python_reaches_known_exit_marker_or_explicitly_unavailable(self):
-        if not self.report["python_runtime_executed"]:
-            self.skipTest("AppContainer primary token attested but trusted "
-                          "Python runtime did not reach marker; no private "
-                          "file read-denial claim")
+    def test_native_python_denies_present_owner_only_file_after_granted_read(self):
+        # Hard FAIL, not SKIP: security proof is the entire 17S-13 gate.
+        # Exit 73 requires the verified owner file to exist, normal-owner
+        # read OK, granted in-container read OK and private read denied.
+        self.assertTrue(self.report["python_runtime_executed"])
+        self.assertTrue(self.report["synthetic_owner_positive_control"])
+        self.assertTrue(self.report["synthetic_granted_read_ok"])
+        self.assertTrue(self.report["private_file_test_executed"])
+        self.assertTrue(self.report["synthetic_private_read_denied"])
         self.assertEqual(self.report["python_exit_status"], 73)
 
 
