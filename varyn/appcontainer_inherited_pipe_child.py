@@ -70,25 +70,22 @@ def main(argv):
     except Exception:
         return 112  # Native library loader unavailable.
     try:
-        k.GetHandleInformation.argtypes = [
-            wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
-        k.GetHandleInformation.restype = wintypes.BOOL
+        # The unlisted handle refers to a deliberately unsignaled EVENT in
+        # the parent. If inherited, wait(0) returns TIMEOUT or signaled.
+        # If absent, the native kernel returns WAIT_FAILED + ERROR_INVALID_HANDLE.
+        k.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        k.WaitForSingleObject.restype = wintypes.DWORD
     except Exception:
-        return 113  # Kernel procedure could not be bound.
+        return 113
     try:
-        flags = wintypes.DWORD()
-        if k.GetHandleInformation(decoy, ctypes.byref(flags)):
-            return 92  # Unlisted decoy was unexpectedly inherited.
-    except ctypes.ArgumentError:
-        return 115  # Native argument marshaling failure.
-    except OSError:
-        return 116  # Runtime OS exception.
-    except TypeError:
-        return 117  # Python type mismatch.
-    except AttributeError:
-        return 118  # Native attribute unavailable.
+        observed = k.WaitForSingleObject(decoy, 0)
+        error = ctypes.get_last_error()
+        if observed in (0, 258):
+            return 92  # Decoy event is present in the sandbox child.
+        if observed != 0xffffffff or error != 6:
+            return 120  # Unknown OS result cannot certify no handle leak.
     except Exception:
-        return 119  # Remaining test-only exception category.
+        return 121  # No proof if the native invalid-handle check raises.
 
     try:
         with open(allowed, "rb") as resource:
