@@ -43,6 +43,13 @@ jobs:
         run: python -m unittest discover -s tests -p "test_desktop_scroll_tk.py" -v
       - name: 17S-21 owner acceptance self-report is not machine-attested
         run: python -m unittest discover -s tests -p "test_owner_acceptance.py" -v
+      - name: 17S-22 offline official-app user-mediated relay contracts (NO app access)
+        run: |
+          python -m unittest discover -s tests -p "test_official_manual_relay.py" -v
+          python -m unittest discover -s tests -p "test_official_manual_relay_desktop.py" -v
+      - name: 17S-22 hosted Windows real Tk manual relay and scrollable consent review
+        if: runner.os == 'Windows'
+        run: python -m unittest discover -s tests -p "test_official_manual_relay_tk.py" -v
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
       - name: Synthetic-only desktop boundary and disposable sample cleanup
