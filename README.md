@@ -751,3 +751,12 @@ The native Windows launcher \`varyn/windows_restricted_primary.py\` creates an e
 **Windows outcome is currently BLOCKED:** the copied runtime launches normally, but the child under \`NT AUTHORITY\RESTRICTED\` still fails startup with OS status \`0xC0000022\` (access denied). Other native startup status codes and failed mitigations are permanently recorded. Hosted Windows test records this unsupported capability as **SKIPPED, not a successful file read-denial proof**. \`ProcessRepoFetcher.status()['windows_restricted_primary_production_enabled']\` is explicitly \`False\`, and private/mutating tools remain disabled. A green CI at this stage must not be interpreted as production sandbox readiness.
 
 [17S-11 primary-token experiments, red CI evidence, and exact next gate](docs/windows-restricted-primary-17s-11.md).
+
+
+### Checkpoint 17S-12: Windows restricted-token startup resource triage
+
+A new **offline Windows-native** test probes resource accessibility under an actual restricted thread token and compares it against ordinary-token positive controls. Tests create only disposable synthetic files and copied trusted runtime binaries, then inspect read and minimal execute/traverse permission outcomes. No file contents, personal paths, or user SIDs appear in the diagnostic log.
+
+Hosted Windows results: Python EXE and DLL copies explicitly granted restricted SID read/execute access were accessible, while three ancestor directories and the fixed system `kernel32.dll` were denied for both generic read and a minimal traverse/execute request. The synthetic allowed/denied controls passed. This narrows the 17S-11 startup investigation but does **not** identify the actual denied loader object and does **not** prove restricted PRIMARY process startup or sandbox readiness.
+
+**Decision:** do not change System32 or user-folder ACLs to accommodate the current experiment. Investigate a dedicated isolation broker or Windows AppContainer approach with a supported resource-access model and prove native process startup plus private-file read denial before enabling sensitive tools. [17S-12 evidence and boundaries](docs/windows-resource-acl-triage-17s-12.md).
