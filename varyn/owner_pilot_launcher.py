@@ -154,6 +154,11 @@ def run_owner_pilot(*, windows=None, elevated=None,
         return 2
     write("Keep that desktop window open. This terminal asks ONLY yes/no/skip. "
           "No transcript or account data is collected.")
+    write("17S-27 optional stronger local evidence: click Start local event "
+          "audit in VARYN BEFORE performing the pilot. At the end, click "
+          "Review / copy audit, inspect the fixed JSON and separately "
+          "approve copying. It records local callback outcomes only; "
+          "do not confuse them with browser delivery or human attestation.")
     manual = collect_manual_pilot(
         read_input=input_fn, write=write, desktop_already_launched=True,
     )
