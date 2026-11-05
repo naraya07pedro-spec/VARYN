@@ -46,7 +46,7 @@ class RegistryTests(unittest.TestCase):
                          ("openrouter", "openrouter/free", 0))
         paid, estimated = choices.choose(
             input_estimate=100, output_limit=200,
-            ceiling_micro_usd=400, today=TODAY, provider="deepseek",
+            ceiling_micro_usd=500, today=TODAY, provider="deepseek",
         )
         self.assertEqual(paid.provider, "deepseek")
         self.assertEqual(estimated, 500)
