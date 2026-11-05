@@ -27,6 +27,8 @@ from varyn.official_manual_relay import OfficialManualRelay, ManualRelayRejected
 from varyn.relay_working_context import WorkingContextBoard, WorkingContextRejected
 from varyn.local_pilot_audit import PilotLocalAudit, PilotAuditRejected
 from varyn.official_relay_workbench import OfficialRelayWorkbench
+from varyn.model_control_center import ModelControlCenter
+from varyn.usage_budget import UsageBudget
 from varyn.bounded_broker_protocol import BrokerRejected
 from varyn.tool_gateway import SyntheticReadToolGateway, ToolGatewayRejected
 from varyn.public_github_tool import PublicGithubToolGateway, PublicToolRejected
@@ -93,6 +95,11 @@ class VarynDesktop(tk.Tk):
         self._closing = False
         self._last_collaboration = None
         self._relay_workbench = None
+        self._model_center = None
+        # One RAM-only quota across model-center reopenings. Not a bill cap.
+        self._universal_model_budget = UsageBudget(
+            max_requests=6, max_reserved_output_tokens=6144,
+        )
         self._build()
         self.protocol("WM_DELETE_WINDOW", self._close)
         if self._task_recovery is not None and (
@@ -168,6 +175,10 @@ class VarynDesktop(tk.Tk):
         ttk.Button(
             outer, text="17S-28 | Open official-app relay workbench",
             command=self._open_relay_workbench,
+        ).pack(anchor="w", pady=(0, 5))
+        ttk.Button(
+            outer, text="17S-40 | Open Model Control Center (owner opt-in)",
+            command=self._open_model_control_center,
         ).pack(anchor="w", pady=(0, 9))
         pilot = ttk.Frame(outer, style="V.TFrame")
         pilot.pack(fill="x", pady=(0, 6))
@@ -465,6 +476,18 @@ class VarynDesktop(tk.Tk):
             "PILOT AUDIT",
             "In-RAM callback audit cleared. No local files or remote "
             "app content were modified.",
+        )
+
+    def _open_model_control_center(self):
+        if self._busy or self._closing:
+            return
+        center = getattr(self, "_model_center", None)
+        if center is not None and center.winfo_exists():
+            center.lift()
+            center.focus_set()
+            return
+        self._model_center = ModelControlCenter(
+            self, budget=self._universal_model_budget,
         )
 
     def _open_relay_workbench(self):
@@ -2018,6 +2041,14 @@ class VarynDesktop(tk.Tk):
             return
         # Mark closed before cancellation so a nested event cannot queue new work.
         self._closing = True
+        center = getattr(self, "_model_center", None)
+        if center is not None:
+            try:
+                if center.winfo_exists():
+                    center._dismiss()
+            except tk.TclError:
+                pass
+            self._model_center = None
         workbench = getattr(self, "_relay_workbench", None)
         if workbench is not None:
             try:
