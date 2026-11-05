@@ -298,7 +298,9 @@ class NativeHistoryImportGuide(tk.Toplevel):
             "\nOfficial import guide: " + info["official_help_url"] +
             "\n\n" + info["privacy_warning"] +
             "\n\nAll four acknowledgements were explicitly checked. "
-            "No file or account will be read or uploaded by VARYN."
+            "No file is uploaded or account accessed by VARYN. "
+            "An optional prior local ZIP envelope read, if you chose it, "
+            "did not read messages and did not upload data."
         )
         approved = self._workbench._owner._review_scrollable_manual_text(
             title="VARYN | Review Gemini native import and privacy",
