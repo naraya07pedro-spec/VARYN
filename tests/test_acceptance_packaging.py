@@ -19,6 +19,9 @@ class SyntheticAcceptancePackageTests(unittest.TestCase):
                 names = set(z.namelist())
                 self.assertIn("VARYN/Verify-VARYN-Synthetic.cmd", names)
                 self.assertIn("VARYN/Record-VARYN-GUI-Checks.cmd", names)
+                self.assertIn("VARYN/Try-VARYN-Official-Apps.cmd", names)
+                self.assertIn("VARYN/varyn/owner_pilot_launcher.py", names)
+                self.assertIn("VARYN/varyn/official_relay_pilot.py", names)
                 self.assertIn("VARYN/varyn/owner_acceptance.py", names)
                 self.assertIn("VARYN/varyn/desktop_acceptance.py", names)
                 self.assertIn("VARYN/varyn/official_app_evidence.py", names)
@@ -45,6 +48,16 @@ class SyntheticAcceptancePackageTests(unittest.TestCase):
         self.assertIn("-m varyn.owner_acceptance", source)
         self.assertIn("SELF-REPORT", source)
         for forbidden in ("runas", "Invoke-WebRequest", "curl ", "powershell -enc"):
+            self.assertNotIn(forbidden.lower(), source.lower())
+
+    def test_one_click_owner_pilot_is_explicit_and_never_launches_privileged_code(self):
+        source = (Path(__file__).resolve().parent.parent /
+                  "Try-VARYN-Official-Apps.cmd").read_text(encoding="utf-8")
+        self.assertIn("-m varyn.owner_pilot_launcher", source)
+        self.assertIn("--manual-only --interactive", source)
+        self.assertIn("SELF-REPORTED", source)
+        for forbidden in ("runas", "ExecutionPolicy Bypass", "Invoke-WebRequest",
+                          "curl ", "powershell -enc", "schtasks", "reg add"):
             self.assertNotIn(forbidden.lower(), source.lower())
 
     def test_source_zip_never_contains_data_export_files(self):
