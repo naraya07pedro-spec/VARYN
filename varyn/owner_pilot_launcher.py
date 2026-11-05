@@ -154,7 +154,9 @@ def run_owner_pilot(*, windows=None, elevated=None,
         return 2
     write("Keep that desktop window open. This terminal asks ONLY yes/no/skip. "
           "No transcript or account data is collected.")
-    manual = collect_manual_pilot(read_input=input_fn, write=write)
+    manual = collect_manual_pilot(
+        read_input=input_fn, write=write, desktop_already_launched=True,
+    )
     write("Now verify reviewed project notes and explicit opt-in, "
           "using only SYNTHETIC: sample text.")
     project = collect_project_checks(input_fn=input_fn, write=write)
