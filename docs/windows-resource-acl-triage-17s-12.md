@@ -30,3 +30,27 @@ The next step after evaluating this report is to investigate **the specific deni
 - https://learn.microsoft.com/en-us/windows-hardware/drivers/ifs/checking-for-traverse-privilege-on-irp-mj-create
 - https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew
 - https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-impersonateloggedonuser
+
+## Verified hosted-Windows finding: 2026-11-05
+
+The full native Windows suite on commit `d17f2db892c29e0d36daa061422cfaf03fe71520` passed in [GitHub Actions #41955113388](https://github.com/naraya07pedro-spec/VARYN/actions/runs/41955113388). It reported **755 discovered tests, no failures, 16 skipped** on Windows; Ubuntu also passed (Windows-native checks are skipped on Ubuntu).
+
+The native diagnostic executed twice in the Windows full and dedicated checks. Its output, by CATEGORY only, was:
+
+| Category | `GENERIC_READ` | Minimal `FILE_TRAVERSE` (directory) or `FILE_EXECUTE` (file) |
+|---|---|---|
+| Trusted Python executable copy | allowed | allowed |
+| Trusted Python DLL copy | allowed | allowed |
+| Granted runtime directory | allowed | allowed |
+| Ancestor directories 1, 2, 3 | denied | denied |
+| Fixed Windows `kernel32.dll` | denied | denied |
+| Granted synthetic test file | allowed | allowed |
+| Separate owner-readable synthetic file | denied | denied |
+
+All resources were openable in normal-token controls; the synthetic owner-only file existed and remained unchanged. `CreateFileW` performs a real kernel access check. The tests did **not** read any resource contents under the restricted identity.
+
+**Inference, not certainty:** the tested restricted SID has insufficient open rights for several classes of startup resources even when executable and Python DLL copies are allowed. That is consistent with restricted-primary-process startup failing with `0xC0000022` in 17S-11, but it does NOT demonstrate which specific OS object the actual loader was trying to access. The loader may use image sections, KnownDlls, registry, window-station/session objects or different access masks; the test does not cover all those paths. `FILE_TRAVERSE` being denied on a directory in a direct open does not alone prove path traversal of a descendant would fail, especially given `SeChangeNotifyPrivilege`.
+
+**Engineering verdict:** do not change system or account directory ACLs to make an ad hoc `S-1-5-12` process boot. Preserve this exact negative evidence and pivot to an isolated broker/AppContainer or other dedicated security identity whose runtime and object access are explicitly provisioned. The product's private-file and mutating tools remain disabled until an actual primary process starts securely, denies a known-existing synthetic file read and passes an independent owner-PC acceptance test.
+
+This result is **a verified diagnostic checkpoint, not a successful sandbox rollout**. The production public GitHub worker is unchanged.
