@@ -110,6 +110,11 @@ jobs:
       - name: 17S-32 hosted Windows Tk checklist review, consent, stale refusal
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_owner_pilot_checklist_gui.py" -v
+      - name: 17S-33 synthetic draft DPAPI schema, non-overwrite, false authority
+        run: python -m unittest discover -s tests -p "test_official_draft_resume.py" -v
+      - name: 17S-33 hosted Windows Tk encrypted save/restore, denial and no relay restore
+        if: runner.os == 'Windows'
+        run: python -m unittest discover -s tests -p "test_official_draft_resume_tk.py" -v
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
       - name: Synthetic-only desktop boundary and disposable sample cleanup

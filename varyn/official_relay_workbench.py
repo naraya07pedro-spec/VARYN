@@ -6,7 +6,13 @@ delegates to the existing VarynDesktop owner approval, TTL, provenance
 and clipboard gates. This class never talks to a browser/AI model itself.
 """
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, filedialog
+
+from varyn.official_draft_resume import (
+    make_draft, save_new, load_existing, review_text, digest,
+    SyntheticDraftRejected,
+)
+from varyn.dpapi_vault import SealedDataError, UnsupportedPlatformError
 
 from varyn.official_manual_relay import OFFICIAL_APP_LINKS
 from varyn.native_history_import_gui import NativeHistoryImportGuide
@@ -69,6 +75,14 @@ class OfficialRelayWorkbench(tk.Toplevel):
             top, text="17S-32 | Owner PC acceptance checklist",
             command=self._open_owner_checklist,
         ).pack(anchor="w", pady=(3, 5))
+        ttk.Button(
+            top, text="17S-33 | Save encrypted synthetic draft (manual)",
+            command=self._save_encrypted_draft,
+        ).pack(anchor="w", pady=(2, 3))
+        ttk.Button(
+            top, text="17S-33 | Restore encrypted draft (manual)",
+            command=self._restore_encrypted_draft,
+        ).pack(anchor="w", pady=(0, 4))
 
         area = ttk.Frame(self)
         area.pack(fill="both", expand=True)
@@ -187,6 +201,120 @@ class OfficialRelayWorkbench(tk.Toplevel):
             bottom, text="Close workbench (RAM relay stays until Discard)",
             command=self._dismiss,
         ).pack(anchor="w")
+
+    def _draft_from_fields(self):
+        return make_draft(
+            target=self.target.get(),
+            project=self.project.get(),
+            topic=self.topic.get(),
+            task=self.task.get("1.0", "end-1c").strip(),
+            note=self.note.get("1.0", "end-1c").strip(),
+        )
+
+    def _review_draft(self, draft, *, restoring=False):
+        return self._owner._review_scrollable_manual_text(
+            title="VARYN | Review exact local encrypted draft",
+            heading=("RESTORE owner-selected local draft; NO relay approval"
+                     if restoring else
+                     "SAVE only the five synthetic owner-authored fields"),
+            digest=digest(draft),
+            content=review_text(draft),
+            warning="Windows DPAPI, bound to your Windows profile. "
+                    "No reply, provider credentials, permission or sync state. "
+                    "Never use sensitive or real customer content.",
+            approve_label=("Approve replace of displayed draft fields"
+                           if restoring else "Approve new encrypted file"),
+        )
+
+    def _save_encrypted_draft(self):
+        if not self._allowed():
+            return
+        try:
+            draft = self._draft_from_fields()
+            approved = self._review_draft(draft)
+            if not approved or not self._allowed():
+                self.detail_label.set("Encrypted draft save declined.")
+                return
+            # Modal callbacks may be reentrant. Never save a changed draft.
+            if self._draft_from_fields() != draft:
+                self.detail_label.set("BLOCKED: fields changed after review.")
+                return
+            path = filedialog.asksaveasfilename(
+                parent=self,
+                title="Choose NEW local encrypted .varyn file (no overwrite)",
+                defaultextension=".varyn",
+                filetypes=[("Encrypted VARYN draft", "*.varyn")],
+            )
+            if not path or not self._allowed():
+                return
+            if self._draft_from_fields() != draft:
+                self.detail_label.set("BLOCKED: fields changed after file picker.")
+                return
+            save_new(path, draft)
+            self.detail_label.set(
+                "New Windows DPAPI encrypted synthetic draft saved locally. "
+                "Not a synced conversation or restored relay permission."
+            )
+        except (SyntheticDraftRejected, SealedDataError,
+                UnsupportedPlatformError, OSError, ValueError):
+            self.detail_label.set(
+                "BLOCKED: synthetic draft invalid or encrypted save failed. "
+                "Existing files are never overwritten."
+            )
+
+    def _restore_encrypted_draft(self):
+        if not self._allowed():
+            return
+        relay = self._owner._official_relay.status()
+        notes = self._owner._working_context.status()
+        if (relay["hops_used"] or relay["awaiting_user_pasteback"] or
+                relay["reply_in_ram"] or relay["return_review_pending"] or
+                notes["saved_count"] or
+                self.reply.get("1.0", "end-1c").strip()):
+            self.detail_label.set(
+                "BLOCKED: discard active relay/notes and clear pasted-reply "
+                "editor before restoring draft fields."
+            )
+            return
+        try:
+            original = self._draft_from_fields()
+            path = filedialog.askopenfilename(
+                parent=self, title="Select one encrypted synthetic .varyn draft",
+                filetypes=[("Encrypted VARYN draft", "*.varyn")],
+            )
+            if not path or not self._allowed():
+                return
+            draft = load_existing(path)
+            if not self._review_draft(draft, restoring=True):
+                self.detail_label.set("Encrypted draft restore declined.")
+                return
+            if not self._allowed() or self._draft_from_fields() != original:
+                self.detail_label.set("BLOCKED: active fields changed during restore.")
+                return
+            current_relay = self._owner._official_relay.status()
+            current_notes = self._owner._working_context.status()
+            if (current_relay != relay or current_notes != notes or
+                    self.reply.get("1.0", "end-1c").strip()):
+                self.detail_label.set("BLOCKED: relay or notes changed during restore.")
+                return
+            self.target.set(draft["target"])
+            self.project.set(draft["project"])
+            self.topic.set(draft["topic"])
+            for widget, content in ((self.task, draft["task"]),
+                                    (self.note, draft["note"])):
+                widget.delete("1.0", "end")
+                widget.insert("1.0", content)
+            self.include_context.set(False)
+            self.refresh()
+            self.detail_label.set(
+                "Restored five synthetic draft fields only. Relay approvals, "
+                "unverified replies and context sharing were NOT restored."
+            )
+        except (SyntheticDraftRejected, SealedDataError,
+                UnsupportedPlatformError, OSError, ValueError):
+            self.detail_label.set(
+                "BLOCKED: selected DPAPI draft invalid, inaccessible or incompatible."
+            )
 
     def _open_native_history_import(self):
         if not self._allowed():

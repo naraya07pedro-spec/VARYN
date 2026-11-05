@@ -53,3 +53,15 @@ OWNER ACCEPTANCE IN THE APP (17S-32)
 - This is an owner SELF-REPORT, NOT audited browser delivery/human identity.
 - Closing discards the report in RAM; approved Windows clipboard copy can persist.
 - No private ZIP, real conversations, tokens, or passwords for this test.
+
+17S-33 | OPTIONAL ENCRYPTED SYNTHETIC DRAFT CONTINUITY
+- In the workbench, choose Save encrypted synthetic draft. Review exactly,
+  choose a NEW .varyn file; existing files are never overwritten.
+- Later on the SAME Windows user profile, choose Restore encrypted draft,
+  select that .varyn file and review the exact contents before applying.
+- Only current synthetic task/note, project/topic and destination are saved.
+- NO pasted provider reply, approval token, clipboard content, history,
+  memory board, relay hop state or app connection is persisted or restored.
+- DPAPI is tied to Windows user/profile; this is NOT cross-device portable,
+  ransomware-proof, a complete backup or a production secret vault.
+- Save is never automatic. No API calls or native provider sync are made.
