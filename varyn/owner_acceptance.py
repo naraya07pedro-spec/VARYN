@@ -17,6 +17,8 @@ _STEPS = (
     ("no_private_data", "No personal folders, file paths, filenames or contents appeared in chat"),
     ("revoke_denies", "After Revoke, Inspect reported no active access"),
     ("restart_denies", "After closing and reopening, the old grant was unavailable"),
+    ("parent_count_denied", "Scroll to 17S-20 parent-only synthetic count; select No. Transcript states Declined, with no local integer sum or model request"),
+    ("parent_count_approved", "Select 17S-20 parent-only synthetic count again and Yes. Transcript shows local integer sum: 21; no provider/network request occurred"),
 )
 _ALLOWED = {"yes": "pass", "no": "fail", "skip": "not_checked"}
 
@@ -64,6 +66,7 @@ def collect_owner_observations(read_input=input, *, write=print):
     write("Perform the real GUI steps manually. Do not use real user files.")
     write("Open a second normal-user terminal: py -3 -m varyn.desktop")
     write("Leave provider on fake, network OFF, and test only the generated samples.")
+    write("Scroll the main window to reach late-stage consent buttons.")
     write("Answer each item with yes, no or skip (skip = not independently checked).")
     answers = {}
     for key, prompt in _STEPS:
