@@ -119,8 +119,32 @@ class VarynDesktop(tk.Tk):
                         font=("Segoe UI", 10))
         style.configure("Title.V.TLabel", background="#111827",
                         foreground="#f9fafb", font=("Segoe UI", 17, "bold"))
-        outer = ttk.Frame(self, style="V.TFrame", padding=18)
-        outer.pack(fill="both", expand=True)
+        # 17S-21: every tool/consent control must remain reachable on a
+        # 480px-high owner laptop. A fixed-height unscrollable window hid
+        # late-stage controls even though Tk registered their commands.
+        viewport = ttk.Frame(self, style="V.TFrame")
+        viewport.pack(fill="both", expand=True)
+        self._page_canvas = tk.Canvas(
+            viewport, bg="#111827", highlightthickness=0,
+            borderwidth=0, takefocus=True,
+        )
+        page_scrollbar = ttk.Scrollbar(
+            viewport, orient="vertical", command=self._page_canvas.yview,
+        )
+        self._page_canvas.configure(
+            yscrollcommand=page_scrollbar.set,
+        )
+        page_scrollbar.pack(side="right", fill="y")
+        self._page_canvas.pack(side="left", fill="both", expand=True)
+        outer = ttk.Frame(self._page_canvas, style="V.TFrame", padding=18)
+        self._page_window_id = self._page_canvas.create_window(
+            (0, 0), window=outer, anchor="nw",
+        )
+        outer.bind("<Configure>", self._on_page_content_resize)
+        self._page_canvas.bind("<Configure>", self._on_page_viewport_resize)
+        # Tk's toplevel binding is reached through widget bindtags.
+        # Never steal the wheel from the transcript/prompt's own scroll.
+        self.bind("<MouseWheel>", self._on_page_mousewheel)
         ttk.Label(outer, text="VARYN", style="Title.V.TLabel").pack(anchor="w")
         ttk.Label(
             outer, text="LOCAL-FIRST  |  OFFLINE BY DEFAULT  |  API LIVE IS OPT-IN",
@@ -252,6 +276,29 @@ class VarynDesktop(tk.Tk):
             "SYSTEM", "Only fake mode is free and offline. Live mode requires an "
             "API key set outside this app, network consent, and confirmation "
             "of each individual request. Do not input private data."
+        )
+
+    def _on_page_content_resize(self, _event=None):
+        if not self._closing:
+            self._page_canvas.configure(
+                scrollregion=self._page_canvas.bbox("all"),
+            )
+
+    def _on_page_viewport_resize(self, event):
+        if not self._closing:
+            self._page_canvas.itemconfigure(
+                self._page_window_id, width=event.width,
+            )
+
+    def _on_page_mousewheel(self, event):
+        if self._closing or isinstance(event.widget, tk.Text):
+            return
+        delta = getattr(event, "delta", 0)
+        if type(delta) is not int or delta == 0:
+            return
+        steps = max(1, min(8, abs(delta) // 120))
+        self._page_canvas.yview_scroll(
+            -steps if delta > 0 else steps, "units",
         )
 
     def _build_memory_controls(self, outer):
