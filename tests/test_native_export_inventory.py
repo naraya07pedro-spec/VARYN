@@ -118,12 +118,26 @@ class MetadataOnlyExportZipTests(unittest.TestCase):
 
     def test_unsafe_member_paths_duplicate_names_and_symlink_refused(self):
         for name in ("../escape.txt", "folder/../outside.txt",
-                     "/absolute.txt", "C:private.txt", "dir\\outside.txt",
+                     "/absolute.txt", "C:private.txt",
                      "folder/./file.txt"):
             with self.subTest(name=name):
                 self._zip(members={name: b"data"})
                 with self.assertRaises(ExportInventoryRejected):
                     inspect_export_zip_metadata(str(self.path), "chatgpt")
+        # zipfile's writer converts '\\' to '/' on Windows. Change the
+        # RAW central-directory bytes so the test covers what an untrusted
+        # ZIP actually contains on both operating systems.
+        self._zip(members={"dir/outside.txt": b"payload"})
+        raw = bytearray(self.path.read_bytes())
+        central = raw.find(b"PK\\x01\\x02")
+        self.assertGreaterEqual(central, 0)
+        raw_name_at = central + 46
+        self.assertEqual(raw[raw_name_at:raw_name_at + 15],
+                         b"dir/outside.txt")
+        raw[raw_name_at + 3] = ord("\\")
+        self.path.write_bytes(raw)
+        with self.assertRaises(ExportInventoryRejected):
+            inspect_export_zip_metadata(str(self.path), "chatgpt")
         with zipfile.ZipFile(self.path, "w") as z:
             z.writestr("same.txt", b"one")
             z.writestr("same.txt", b"two")
