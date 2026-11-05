@@ -86,10 +86,14 @@ def inspect_export_zip_metadata(path, source):
                 recognized = 0
                 for info in infos:
                     name = info.filename
+                    # zipfile normalizes backslashes on Windows: validate
+                    # its original central-directory name as well.
+                    raw_name = info.orig_filename
                     # Member names are read transiently to classify the
                     # envelope; NEVER emitted in reports or error text.
                     if (not name or name.startswith("/") or
-                            "\\" in name or ":" in name or
+                            "\\" in raw_name or "\\x00" in raw_name or
+                            ":" in raw_name or
                             any(part in ("", ".", "..")
                                 for part in name.rstrip("/").split("/")) or
                             len(name) > 256 or name in seen or
