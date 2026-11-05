@@ -117,7 +117,7 @@ class OfficialManualRelay:
             raise ManualRelayRejected("Explicit boolean owner decision required")
         if (type(preview) is not ManualRelayPreview or
                 self._pending is None or
-                preview != self._pending):
+                preview is not self._pending):
             raise ManualRelayRejected("Stale or forged manual handoff preview")
         self._pending = None  # burn the proposed copy once
         if not approved:
