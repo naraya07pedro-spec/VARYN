@@ -15,6 +15,7 @@ from ctypes import wintypes
 import os
 from pathlib import Path
 import secrets
+import shutil
 import subprocess
 import sys
 
@@ -113,6 +114,18 @@ def _native():
     a.IsValidSid.restype = wintypes.BOOL
     a.FreeSid.argtypes = [wintypes.HANDLE]
     a.FreeSid.restype = ctypes.c_void_p
+    a.ConvertSidToStringSidW.argtypes = [
+        wintypes.HANDLE, ctypes.POINTER(wintypes.LPWSTR)]
+    a.ConvertSidToStringSidW.restype = wintypes.BOOL
+    k.LocalFree.argtypes = [wintypes.HANDLE]
+    k.LocalFree.restype = wintypes.HANDLE
+    u.GetAppContainerFolderPath.argtypes = [
+        wintypes.LPCWSTR, ctypes.POINTER(wintypes.LPWSTR)]
+    u.GetAppContainerFolderPath.restype = ctypes.c_long
+    ole = ctypes.WinDLL("ole32", use_last_error=True)
+    ole.CoTaskMemFree.argtypes = [ctypes.c_void_p]
+    ole.CoTaskMemFree.restype = None
+    u._varyn_ole32 = ole
     u.CreateAppContainerProfile.argtypes = [
         wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.LPCWSTR,
         ctypes.c_void_p, wintypes.DWORD, ctypes.POINTER(wintypes.HANDLE)]
@@ -158,6 +171,56 @@ def _attest_child(process, expected_sid, advapi, kernel):
             kernel.CloseHandle(token)
 
 
+
+def _copy_runtime_into_owned_profile(exe, sid, kernel, advapi, userenv):
+    """Only a disposable CI-created AppContainer's OS-approved storage.
+
+    Do not grant broad access to host Python, account directories or System32.
+    """
+    as_text = wintypes.LPWSTR()
+    folder_text = wintypes.LPWSTR()
+    try:
+        if not advapi.ConvertSidToStringSidW(sid, ctypes.byref(as_text)):
+            raise PublicToolRejected("Cannot convert CI profile SID to folder key")
+        hr = userenv.GetAppContainerFolderPath(
+            as_text, ctypes.byref(folder_text))
+        if hr != 0 or not folder_text:
+            raise PublicToolRejected("AppContainer owned storage unavailable")
+        local_root = Path(os.environ["LOCALAPPDATA"]).resolve()
+        folder = Path(folder_text.value).resolve()
+        if (not folder.is_relative_to(local_root)
+                or "packages" not in (p.lower() for p in folder.parts)):
+            raise PublicToolRejected("Unexpected AppContainer storage location")
+        runtime = folder / "varyn_offline_python_copy"
+        if runtime.exists():
+            raise PublicToolRejected("CI runtime copy path already exists")
+        runtime.mkdir()
+        # Minimal ordinary-Python bootstrap dependencies, only owned copy.
+        shutil.copy2(exe, runtime / exe.name)
+        dll_count = 0
+        for item in exe.parent.iterdir():
+            if (item.is_file() and item.suffix.lower() == ".dll" and
+                    item.name.lower().startswith(("python", "vcruntime"))):
+                shutil.copy2(item, runtime / item.name)
+                dll_count += 1
+        if dll_count == 0:
+            raise PublicToolRejected("CI Python runtime DLL not found")
+        standard = Path(sys.base_prefix) / "Lib"
+        if not (standard / "encodings").is_dir():
+            raise PublicToolRejected("CI Python basic encodings unavailable")
+        shutil.copytree(standard / "encodings", runtime / "Lib" / "encodings")
+        for name in ("os.py", "codecs.py"):
+            if (standard / name).is_file():
+                shutil.copy2(standard / name, runtime / "Lib" / name)
+        return runtime / exe.name
+    finally:
+        if folder_text:
+            userenv._varyn_ole32.CoTaskMemFree(
+                ctypes.cast(folder_text, ctypes.c_void_p))
+        if as_text:
+            kernel.LocalFree(ctypes.cast(as_text, wintypes.HANDLE))
+
+
 def run_ci_only_zero_capability_trial():
     """One fixed, no-network test action. NEVER call from production UI."""
     if (os.name != "nt" or os.environ.get("GITHUB_ACTIONS") != "true"
@@ -179,6 +242,7 @@ def run_ci_only_zero_capability_trial():
     completed = False
     exit_code = None
     cleaned = False
+    runtime_parent = None
     try:
         hr = userenv.CreateAppContainerProfile(
             name, name, "Disposable offline VARYN CI restricted process test",
@@ -190,6 +254,9 @@ def run_ci_only_zero_capability_trial():
         created = True
         if not sid or not advapi.IsValidSid(sid):
             raise PublicToolRejected("Created CI AppContainer SID invalid")
+        trusted_copy = _copy_runtime_into_owned_profile(
+            exe, sid, kernel, advapi, userenv)
+        runtime_parent = trusted_copy.parent
         length = ctypes.c_size_t()
         measured = kernel.InitializeProcThreadAttributeList(
             None, 1, 0, ctypes.byref(length))
@@ -219,7 +286,7 @@ def run_ci_only_zero_capability_trial():
         # Python reaching the fixed returncode 73 proves runtime bootstrap.
         source = "import sys; sys.exit(73)"
         command = ctypes.create_unicode_buffer(
-            subprocess.list2cmdline([str(exe), "-I", "-S", "-c", source]))
+            subprocess.list2cmdline([str(trusted_copy), "-I", "-S", "-c", source]))
         systemroot = os.environ.get("SystemRoot")
         localappdata = os.environ.get("LOCALAPPDATA")
         if not systemroot or not localappdata:
@@ -232,8 +299,9 @@ def run_ci_only_zero_capability_trial():
         flags = (_EXTENDED_STARTUPINFO_PRESENT | _CREATE_SUSPENDED |
                  _CREATE_NO_WINDOW | _CREATE_UNICODE_ENV)
         if not kernel.CreateProcessW(
-                str(exe), command, None, None, False, flags,
-                ctypes.cast(environment, ctypes.c_void_p), str(exe.parent),
+                str(trusted_copy), command, None, None, False, flags,
+                ctypes.cast(environment, ctypes.c_void_p),
+                str(trusted_copy.parent),
                 ctypes.byref(si), ctypes.byref(proc)):
             code = ctypes.get_last_error()
             # The Win32 numeric status is safe to report in an OFFLINE CI
@@ -265,6 +333,9 @@ def run_ci_only_zero_capability_trial():
             kernel.CloseHandle(proc.hProcess)
         if initialized:
             kernel.DeleteProcThreadAttributeList(attr_buf)
+        if runtime_parent is not None:
+            # Deleting only the known child of our newly created profile.
+            shutil.rmtree(runtime_parent)
         if sid:
             advapi.FreeSid(sid)
         if created:
