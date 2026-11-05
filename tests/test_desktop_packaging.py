@@ -18,6 +18,7 @@ class DesktopPackagingTests(unittest.TestCase):
         (self.root / "Launch-VARYN.cmd").write_text("@echo off\n", encoding="utf-8")
         (self.root / "Verify-VARYN-Synthetic.cmd").write_text("@echo off\n", encoding="utf-8")
         (self.root / "Record-VARYN-GUI-Checks.cmd").write_text("@echo off\n", encoding="utf-8")
+        (self.root / "Try-VARYN-Official-Apps.cmd").write_text("@echo off\n", encoding="utf-8")
         (self.root / "README.md").write_text("synthetic", encoding="utf-8")
         (self.root / "varyn" / "desktop.py").write_text("print('fake')\n", encoding="utf-8")
         (self.root / "varyn" / "providers.py").write_text("MODEL = 1\n", encoding="utf-8")
@@ -38,6 +39,7 @@ class DesktopPackagingTests(unittest.TestCase):
             self.assertIn("VARYN/Launch-VARYN.cmd", names)
             self.assertIn("VARYN/Verify-VARYN-Synthetic.cmd", names)
             self.assertIn("VARYN/Record-VARYN-GUI-Checks.cmd", names)
+            self.assertIn("VARYN/Try-VARYN-Official-Apps.cmd", names)
             self.assertIn("VARYN/varyn/desktop.py", names)
             self.assertNotIn("VARYN/.env", names)
             self.assertNotIn("VARYN/memory.sqlite3", names)
@@ -51,6 +53,11 @@ class DesktopPackagingTests(unittest.TestCase):
 
     def test_missing_required_gui_report_launcher_is_denied(self):
         (self.root / "Record-VARYN-GUI-Checks.cmd").unlink()
+        with self.assertRaises(ValueError):
+            archive_entries(self.root)
+
+    def test_missing_owner_pilot_launcher_is_denied(self):
+        (self.root / "Try-VARYN-Official-Apps.cmd").unlink()
         with self.assertRaises(ValueError):
             archive_entries(self.root)
 
