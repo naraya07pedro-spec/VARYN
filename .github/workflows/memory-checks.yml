@@ -146,6 +146,11 @@ jobs:
       - name: 17S-40 native Windows Tk fake/denied/approved mock live request with key never in UI
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_model_control_center_tk.py" -v
+      - name: 17S-41 offline API readiness, privacy-safe receipt, localhost HTTP proxy-bypass protocol
+        run: python -m unittest discover -s tests -p "test_provider_readiness.py" -v
+      - name: 17S-41 native Windows Tk owner-reviewed content-free provider evidence
+        if: runner.os == 'Windows'
+        run: python -m unittest discover -s tests -p "test_provider_readiness_tk.py" -v
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
       - name: Synthetic-only desktop boundary and disposable sample cleanup
