@@ -9,6 +9,7 @@ from unittest.mock import patch
 from varyn.desktop import VarynDesktop
 from varyn.official_manual_relay import OfficialManualRelay
 from varyn.relay_working_context import WorkingContextBoard
+from varyn.local_pilot_audit import PilotLocalAudit
 
 
 class FakeFlag:
@@ -29,6 +30,8 @@ class FakeRelayDesktop:
         self._closing = False
         self._official_relay = OfficialManualRelay(clock=lambda: 1000)
         self._working_context = WorkingContextBoard(clock=lambda: 1000)
+        self._pilot_audit = PilotLocalAudit()
+        self.pilot_audit_line = FakeFlag("")
         self.working_topic = SimpleNamespace(get=lambda: "next_step")
         self.memory_project = SimpleNamespace(get=lambda: "VARYN")
         self.include_working_context = FakeFlag(False)
@@ -53,6 +56,102 @@ class FakeRelayDesktop:
 
 
 class OfficialManualDesktopTests(unittest.TestCase):
+    def test_audit_records_only_successful_local_handoff_callbacks(self):
+        ui = FakeRelayDesktop(task="SYNTHETIC: first task")
+        self.assertFalse(ui._pilot_audit.snapshot()["active"])
+        VarynDesktop._copy_official_app_relay(ui)
+        self.assertEqual(ui._pilot_audit.snapshot()["events_observed"], 0)
+        ui._official_relay.reset()
+        VarynDesktop._start_pilot_audit(ui)
+        self.assertTrue(ui._pilot_audit.snapshot()["active"])
+        with patch("varyn.desktop.messagebox.askyesno",
+                   return_value=False), \\
+             patch("varyn.desktop.webbrowser.open_new_tab") as browser:
+            VarynDesktop._open_selected_official_app(ui)
+        browser.assert_not_called()
+        self.assertEqual(ui._pilot_audit.snapshot()["events_observed"], 0)
+
+        with patch("varyn.desktop.messagebox.askyesno",
+                   return_value=True), \\
+             patch("varyn.desktop.webbrowser.open_new_tab",
+                   return_value=True) as browser:
+            VarynDesktop._open_selected_official_app(ui)
+        browser.assert_called_once_with("https://chatgpt.com/")
+        VarynDesktop._copy_official_app_relay(ui)
+        counts = ui._pilot_audit.snapshot()["event_counts"]
+        self.assertEqual(counts["homepage_launch_requested"], 1)
+        self.assertEqual(counts["approved_packet_copied"], 1)
+        self.assertEqual(counts["reviewed_reply_staged"], 0)
+
+        ui.prompt = SimpleNamespace(get=lambda *args: "SYNTHETIC: reply")
+        VarynDesktop._review_official_app_reply(ui)
+        ui.official_relay_target = SimpleNamespace(get=lambda: "claude")
+        ui.prompt = SimpleNamespace(get=lambda *args: "SYNTHETIC: second task")
+        VarynDesktop._copy_official_app_relay(ui)
+        state = ui._pilot_audit.snapshot()
+        self.assertTrue(state["local_two_target_attempt_observed"])
+        self.assertEqual(
+            state["approved_clipboard_targets"], ["chatgpt", "claude"]
+        )
+        self.assertFalse(state["remote_paste_or_delivery_verified"])
+        self.assertFalse(state["automatic_bidirectional_sync_verified"])
+
+    def test_audit_includes_project_notes_only_after_explicit_copy(self):
+        ui = FakeRelayDesktop(task="SYNTHETIC: board note")
+        VarynDesktop._start_pilot_audit(ui)
+        VarynDesktop._review_project_working_note(ui)
+        self.assertEqual(ui._pilot_audit.snapshot()["event_counts"][
+            "working_note_reviewed"], 1)
+        ui.prompt = SimpleNamespace(get=lambda *args: "SYNTHETIC: new task")
+        VarynDesktop._copy_official_app_relay(ui)
+        self.assertEqual(ui._pilot_audit.snapshot()["event_counts"][
+            "project_context_included_in_copy"], 0)
+        VarynDesktop._discard_official_app_relay(ui)
+        ui.include_working_context.set(True)
+        VarynDesktop._copy_official_app_relay(ui)
+        self.assertEqual(ui._pilot_audit.snapshot()["event_counts"][
+            "project_context_included_in_copy"], 1)
+        VarynDesktop._discard_project_working_notes(ui)
+        self.assertEqual(ui._pilot_audit.snapshot()["event_counts"][
+            "working_context_discarded"], 1)
+
+    def test_fixed_audit_clipboard_requires_review_and_unchanged_snapshot(self):
+        ui = FakeRelayDesktop()
+        VarynDesktop._start_pilot_audit(ui)
+        old = ui._clipboard
+        ui._review_scrollable_manual_text = lambda **kw: False
+        VarynDesktop._show_pilot_audit(ui)
+        self.assertEqual(ui._clipboard, old)
+        ui._review_scrollable_manual_text = lambda **kw: True
+        VarynDesktop._show_pilot_audit(ui)
+        self.assertIn("varyn.local_pilot_callbacks.v1", ui._clipboard)
+        self.assertNotIn("SYNTHETIC: handoff test", ui._clipboard)
+        self.assertIn("automatic_bidirectional_sync_verified", ui._clipboard)
+        self.assertIn(": false", ui._clipboard)
+
+        ui._clipboard = old
+        def mutate_during_review(**kw):
+            ui._pilot_audit.record("working_note_reviewed")
+            return True
+        ui._review_scrollable_manual_text = mutate_during_review
+        VarynDesktop._show_pilot_audit(ui)
+        self.assertEqual(ui._clipboard, old)
+        self.assertIn("changed during review", ui.messages[-1][1])
+
+    def test_reset_audit_is_separate_and_owner_confirmed(self):
+        ui = FakeRelayDesktop()
+        VarynDesktop._start_pilot_audit(ui)
+        ui._pilot_audit.record("working_note_reviewed")
+        with patch("varyn.desktop.messagebox.askyesno",
+                   return_value=False):
+            VarynDesktop._reset_pilot_audit(ui)
+        self.assertEqual(ui._pilot_audit.snapshot()["events_observed"], 1)
+        with patch("varyn.desktop.messagebox.askyesno",
+                   return_value=True):
+            VarynDesktop._reset_pilot_audit(ui)
+        self.assertFalse(ui._pilot_audit.snapshot()["active"])
+        self.assertEqual(ui._pilot_audit.snapshot()["events_observed"], 0)
+
     def test_open_official_site_requires_separate_owner_consent(self):
         ui = FakeRelayDesktop(task="SYNTHETIC: never passed in URL",
                               provider="claude")
