@@ -9,6 +9,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from varyn.official_manual_relay import OFFICIAL_APP_LINKS
+from varyn.native_history_import_gui import NativeHistoryImportGuide
 
 
 class OfficialRelayWorkbench(tk.Toplevel):
@@ -19,6 +20,7 @@ class OfficialRelayWorkbench(tk.Toplevel):
             raise RuntimeError("Cannot open relay workbench while desktop closes")
         super().__init__(parent)
         self._owner = parent
+        self._native_history_window = None
         self.title("VARYN | Official apps: manual workbench, NO sync")
         self.geometry("680x630")
         self.minsize(510, 430)
@@ -50,6 +52,17 @@ class OfficialRelayWorkbench(tk.Toplevel):
         ttk.Label(
             top, textvariable=self.stage_label, wraplength=630,
         ).pack(anchor="w")
+        ttk.Button(
+            top,
+            text="17S-30 | Official one-time ChatGPT/Claude ZIP import to Gemini",
+            command=self._open_native_history_import,
+        ).pack(anchor="w", pady=(8, 4))
+        ttk.Label(
+            top,
+            text="New: Gemini supports user-driven native history ZIP import "
+                 "for eligible personal accounts. No VARYN file reading or sync.",
+            wraplength=630,
+        ).pack(anchor="w", pady=(0, 3))
 
         area = ttk.Frame(self)
         area.pack(fill="both", expand=True)
@@ -169,6 +182,16 @@ class OfficialRelayWorkbench(tk.Toplevel):
             command=self._dismiss,
         ).pack(anchor="w")
 
+    def _open_native_history_import(self):
+        if not self._allowed():
+            return
+        prior = self._native_history_window
+        if prior is not None and prior.winfo_exists():
+            prior.lift()
+            prior.focus_set()
+            return
+        self._native_history_window = NativeHistoryImportGuide(self)
+
     def _allowed(self):
         return not self._owner._closing and not self._owner._busy
 
@@ -270,6 +293,14 @@ class OfficialRelayWorkbench(tk.Toplevel):
     def _dismiss(self):
         # A closed workbench removes only its own editable widgets.
         # The owner can explicitly discard relay/board state in the main UI.
+        child = getattr(self, "_native_history_window", None)
+        if child is not None:
+            try:
+                if child.winfo_exists():
+                    child._dismiss()
+            except tk.TclError:
+                pass
+            self._native_history_window = None
         if getattr(self._owner, "_relay_workbench", None) is self:
             self._owner._relay_workbench = None
         self.destroy()
