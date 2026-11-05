@@ -59,7 +59,11 @@ class GuidedTrioTkTests(unittest.TestCase):
                 self.assertEqual(wb._guided_flow.phase, "awaiting_reply")
                 self.assertIn("SYNTHETIC:", ui.clipboard_get())
                 if provider != "chatgpt":
-                    self.assertIn("claimed source:", ui.clipboard_get())
+                    self.assertIn("GUIDED THREE-APP HISTORY", ui.clipboard_get())
+                    self.assertIn("claimed source: chatgpt", ui.clipboard_get())
+                if provider == "gemini":
+                    self.assertIn("claimed source: claude", ui.clipboard_get())
+                    self.assertEqual(ui.clipboard_get().count("UNTRUSTED USER-PASTED CONTENT:"), 2)
                 advance.invoke()
                 self.assertEqual(wb.target.get(), provider)
                 wb.reply.delete("1.0", "end")
@@ -83,12 +87,21 @@ class GuidedTrioTkTests(unittest.TestCase):
                         wb.target.get(), ("claude", "gemini")[ix]
                     )
                     self.assertEqual(wb.reply.get("1.0", "end-1c"), "")
+            self.assertEqual(wb._guided_flow.ledger.count, 3)
+            self.assertIn("USER PASTED UNVERIFIED chatgpt",
+                          wb._guided_flow.ledger.full_review_text())
+            self.assertIn("USER PASTED UNVERIFIED gemini",
+                          wb._guided_flow.ledger.full_review_text())
+            button(wb, "17S-36 | View complete locally reviewed replies (RAM)").invoke()
+            self.assertTrue(wb._guided_ledger_window.winfo_exists())
             self.assertEqual(ui.controller.status()["requests_used"], 0)
             self.assertEqual(ui._official_relay.status()["provider_requests"], 0)
             self.assertFalse(wb._guided_flow.status()["browser_delivery_verified"])
             self.assertFalse(wb._guided_flow.status()["consumer_history_sync_verified"])
             button(wb, "17S-35 | Discard guided flow and relay RAM").invoke()
             self.assertFalse(wb._guided_flow.active)
+            self.assertEqual(wb._guided_flow.ledger.count, 0)
+            self.assertIsNone(wb._guided_ledger_window)
             self.assertEqual(ui._official_relay.status()["hops_used"], 0)
         finally:
             ui._close()

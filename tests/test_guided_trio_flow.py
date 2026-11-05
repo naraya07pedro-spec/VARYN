@@ -16,7 +16,10 @@ def copied_and_reviewed(relay, guided, provider, answer):
     guided.require_reply(before_reply)
     review = relay.begin_return_review(answer)
     relay.finish_return_review(review, approved=True)
-    guided.reviewed_reply(before_reply, relay.status())
+    guided.reviewed_reply(
+        before_reply, relay.status(), reply_text=answer,
+        receipt=relay.last_return_receipt(),
+    )
 
 
 class GuidedTrioContractTests(unittest.TestCase):
@@ -67,7 +70,11 @@ class GuidedTrioContractTests(unittest.TestCase):
                 "SYNTHETIC: unverified response " + provider
             )
             self.relay.finish_return_review(receipt, approved=True)
-            self.flow.reviewed_reply(before_reply, self.relay.status())
+            self.flow.reviewed_reply(
+                before_reply, self.relay.status(),
+                reply_text="SYNTHETIC: unverified response " + provider,
+                receipt=self.relay.last_return_receipt(),
+            )
             if stage < 2:
                 upcoming = self.flow.prepare_next(self.relay.status())
                 self.assertEqual(upcoming["provider"],
@@ -76,6 +83,7 @@ class GuidedTrioContractTests(unittest.TestCase):
         self.assertEqual(self.flow.phase, "completed")
         self.assertEqual(self.flow.status()["stage"], 3)
         self.assertEqual(self.relay.status()["hops_used"], 3)
+        self.assertEqual(self.flow.ledger.count, 3)
         self.assertFalse(self.flow.status()["browser_delivery_verified"])
         self.assertFalse(self.flow.status()["consumer_history_sync_verified"])
         self.assertEqual(self.flow.status()["provider_requests"], 0)

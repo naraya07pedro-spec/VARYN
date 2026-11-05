@@ -89,3 +89,14 @@ OWNER ACCEPTANCE IN THE APP (17S-32)
   Gemini receives the last reviewed reply, NOT all account histories.
 - All three stage flags are transient RAM only; no native app history sync.
 - "Discard guided flow and relay RAM" revokes this local temporary state.
+
+17S-36 | FULL GUIDED REPLY RECORD IN RAM, BOUNDED NEXT-APP EXCERPTS
+- The guided flow keeps all three exactly reviewed synthetic pasted replies
+  in RAM with local return digests and unverified claimed source names.
+- "17S-36 | View complete locally reviewed replies (RAM)" shows full replies.
+- Claude/Gemini handoff packets use separately labeled up-to-540-character
+  excerpts of prior replies; Gemini includes both ChatGPT and Claude.
+  TRUNCATED notices show when original content is not fully transferred.
+- All copies still require fresh EXACT packet review and owner approval.
+- No native provider account sync, auto-export, disk save or background read.
+- Discard/close clears full RAM ledger, but cannot retract OS clipboard data.

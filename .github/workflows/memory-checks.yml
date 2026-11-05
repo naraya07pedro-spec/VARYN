@@ -122,6 +122,11 @@ jobs:
       - name: 17S-35 hosted Windows Tk three real widget hops with individual owner-review gates
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_guided_trio_flow_tk.py" -v
+      - name: 17S-36 complete RAM reply ledger, local digest and bounded quoted excerpts
+        run: python -m unittest discover -s tests -p "test_guided_reply_ledger.py" -v
+      - name: 17S-36 hosted Windows Tk full staged record display and discard
+        if: runner.os == 'Windows'
+        run: python -m unittest discover -s tests -p "test_guided_trio_flow_tk.py" -v
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
       - name: Synthetic-only desktop boundary and disposable sample cleanup
