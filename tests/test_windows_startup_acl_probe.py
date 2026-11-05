@@ -98,23 +98,40 @@ class NativeWindowsResourceAccessTriage(unittest.TestCase):
             self.assertFalse(observed["private_bytes_read"])
             self.assertEqual(set(observed["normal"]), set(targets))
             self.assertEqual(set(observed["restricted"]), set(targets))
+            self.assertEqual(set(observed["normal_minimal"]), set(targets))
+            self.assertEqual(set(observed["restricted_minimal"]), set(targets))
+            self.assertEqual(
+                observed["minimal_mode"],
+                "FILE_TRAVERSE(directory)/FILE_EXECUTE(file)")
             self.assertTrue(all(x == "allowed" for x in
                                 observed["normal"].values()))
+            self.assertTrue(all(x == "allowed" for x in
+                                observed["normal_minimal"].values()))
             # BOTH controls are required. An inaccessible/missing target
             # cannot be misclassified as an effective restricted access check.
             self.assertEqual(observed["restricted"]["synthetic_allowed"],
                              "allowed", observed["restricted"])
             self.assertEqual(observed["restricted"]["synthetic_denied"],
                              "denied", observed["restricted"])
-            for value in observed["restricted"].values():
+            self.assertEqual(
+                observed["restricted_minimal"]["synthetic_allowed"],
+                "allowed", observed["restricted_minimal"])
+            self.assertEqual(
+                observed["restricted_minimal"]["synthetic_denied"],
+                "denied", observed["restricted_minimal"])
+            for value in (list(observed["restricted"].values()) +
+                          list(observed["restricted_minimal"].values())):
                 self.assertIn(value, ("allowed", "denied", "missing", "other"))
             report = outcome.stdout.decode("utf-8")
             self.assertNotIn(str(root), report)
             self.assertNotIn(str(original), report)
             self.assertNotIn("varyn-no-private-data", report)
             # Explainable, bounded summary only; not a path or user-SID dump.
-            print("17S-12 resource classes (restricted THREAD only): "
+            print("17S-12 GENERIC_READ by category (restricted THREAD): "
                   + json.dumps(observed["restricted"], sort_keys=True),
+                  flush=True)
+            print("17S-12 TRAVERSE/EXECUTE by category (restricted THREAD): "
+                  + json.dumps(observed["restricted_minimal"], sort_keys=True),
                   flush=True)
             self.assertEqual(denied.read_bytes(), b"varyn-no-private-data")
             self.assertEqual(allowed.read_bytes(), b"varyn-no-private-data")
