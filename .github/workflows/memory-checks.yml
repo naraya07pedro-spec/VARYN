@@ -50,6 +50,14 @@ jobs:
       - name: 17S-22 hosted Windows real Tk manual relay and scrollable consent review
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_official_manual_relay_tk.py" -v
+      - name: 17S-23 official consumer URL, post-review clipboard and owner pilot contracts
+        run: |
+          python -m unittest discover -s tests -p "test_official_manual_relay.py" -v
+          python -m unittest discover -s tests -p "test_official_manual_relay_desktop.py" -v
+          python -m unittest discover -s tests -p "test_official_relay_pilot.py" -v
+      - name: 17S-23 hosted Windows actual Tk official homepage launch consent
+        if: runner.os == 'Windows'
+        run: python -m unittest discover -s tests -p "test_official_relay_open_tk.py" -v
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
       - name: Synthetic-only desktop boundary and disposable sample cleanup
