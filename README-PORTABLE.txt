@@ -203,3 +203,19 @@ OWNER ACCEPTANCE IN THE APP (17S-32)
 - CI exercises a real local TCP HTTP mock server for wire acceptance; that
   server is NOT actual 9Router or a remote AI account. No real provider key
   or payment is used by CI. Signed-in consumer memory sync stays BLOCKED.
+
+17S-42 | REAL FROZEN EXE MODEL CENTER FIXED SYNTHETIC ACCEPTANCE
+- Windows Portable build CI now uses the ACTUAL frozen VARYN-Portable.exe
+  --smoke-only to run the real Model Control Center Tk widgets through:
+  reject unreviewed fictional price, offline preview, missing-key-free FAKE
+  readiness, denied owner-modal fixture, ONE CI-approved fake response,
+  in-memory request counter, no real-provider receipt, refusal of a
+  fictional DeepSeek request with the desktop live capability still OFF,
+  and full RAM quote cleanup. NO external AI/9Router connection.
+- Review approval is entirely CI-SIMULATED for a fixed harmless FAKE task,
+  NOT a human approval and never permits a paid, remote, or actual API request.
+- Use normal VARYN-Portable.exe (without --smoke-only) for interactive
+  owner use; the user must still review and approve every live request.
+- This smoke proves real frozen Tk fake-workflow wiring, NOT real model API,
+  current free quotas, a signed executable, owner PC acceptance, or native
+  ChatGPT/Claude/Gemini history/memory sync.
