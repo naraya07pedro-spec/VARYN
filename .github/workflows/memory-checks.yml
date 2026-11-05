@@ -84,6 +84,13 @@ jobs:
       - name: 17S-27 actual Windows Tk button wiring and fixed event report
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_local_pilot_audit_tk.py" -v
+      - name: 17S-28 workbench overrides still use existing reviewed relay and project gates
+        run: |
+          python -m unittest discover -s tests -p "test_official_manual_relay_desktop.py" -v
+          python -m unittest discover -s tests -p "test_official_manual_relay.py" -v
+      - name: 17S-28 hosted Windows actual focused manual official-app UI
+        if: runner.os == 'Windows'
+        run: python -m unittest discover -s tests -p "test_official_relay_workbench_tk.py" -v
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
       - name: Synthetic-only desktop boundary and disposable sample cleanup
