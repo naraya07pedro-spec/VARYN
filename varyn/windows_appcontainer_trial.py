@@ -236,10 +236,12 @@ def _copy_runtime_into_owned_profile(exe, sid, kernel, advapi, userenv, *, broke
             kernel.LocalFree(ctypes.cast(as_text, wintypes.HANDLE))
 
 
-def run_ci_only_zero_capability_trial(*, broker_trial=False):
+def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False):
     """One fixed, no-network test action. NEVER call from production UI."""
-    if type(broker_trial) is not bool:
-        raise PublicToolRejected("Broker trial flag must be boolean")
+    if type(broker_trial) is not bool or type(pipe_trial) is not bool:
+        raise PublicToolRejected("CI AppContainer trial flag must be boolean")
+    if broker_trial and pipe_trial:
+        raise PublicToolRejected("CI trial modes cannot share one child")
     if (os.name != "nt" or os.environ.get("GITHUB_ACTIONS") != "true"
             or os.environ.get("RUNNER_OS") != "Windows"
             or os.environ.get("VARYN_CI_APPCONTAINER_TRIAL") != "1"):
@@ -267,6 +269,8 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False):
     broker_response = None
     broker_total = None
     broker_replay_refused = False
+    pipe_guard = None
+    pipe_attested = False
     try:
         hr = userenv.CreateAppContainerProfile(
             name, name, "Disposable offline VARYN CI restricted process test",
@@ -279,7 +283,8 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False):
         if not sid or not advapi.IsValidSid(sid):
             raise PublicToolRejected("Created CI AppContainer SID invalid")
         trusted_copy = _copy_runtime_into_owned_profile(
-            exe, sid, kernel, advapi, userenv, broker_trial=broker_trial)
+            exe, sid, kernel, advapi, userenv,
+            broker_trial=(broker_trial or pipe_trial))
         runtime_parent = trusted_copy.parent
         length = ctypes.c_size_t()
         measured = kernel.InitializeProcThreadAttributeList(
@@ -323,7 +328,29 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False):
         # CHILD cannot receive provider credentials, model input or real files.
         # Exit 73 only after read-granted, owner-private denied and (when
         # requested) a single authenticated synthetic IPC round-trip.
-        if broker_trial:
+        if pipe_trial:
+            from varyn.windows_pipe_identity import OneShotWindowsPipe
+            sid_text = wintypes.LPWSTR()
+            try:
+                if not advapi.ConvertSidToStringSidW(
+                        sid, ctypes.byref(sid_text)):
+                    raise PublicToolRejected("CI AppContainer package SID unavailable")
+                pipe_guard = OneShotWindowsPipe(
+                    appcontainer_sid=sid_text.value)
+            finally:
+                if sid_text:
+                    kernel.LocalFree(
+                        ctypes.cast(sid_text, wintypes.HANDLE))
+            root = trusted_copy.parent
+            shutil.copy2(
+                Path(__file__).resolve().parent / "appcontainer_pipe_child.py",
+                root / "appcontainer_pipe_child.py")
+            args = [
+                str(trusted_copy), "-I", "-S",
+                str(root / "appcontainer_pipe_child.py"),
+                str(allowed), str(owner_file), pipe_guard.name,
+            ]
+        elif broker_trial:
             from varyn.bounded_broker_protocol import (
                 new_request, canonical,
             )
@@ -392,6 +419,16 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False):
         resumed = kernel.ResumeThread(proc.hThread)
         if resumed == 0xffffffff or resumed != 1:
             raise PublicToolRejected("AppContainer child resume refused")
+        if pipe_trial:
+            if pipe_guard is None:
+                raise PublicToolRejected("Missing AppContainer pipe listener")
+            proof = pipe_guard.verify_one_client(proc.dwProcessId)
+            pipe_attested = bool(
+                proof["os_client_pid_verified"] and
+                proof["package_sid_scoped_dacl"] and
+                proof["local_only"] and not proof["inherited_handles"])
+            if not pipe_attested:
+                raise PublicToolRejected("AppContainer named pipe OS identity rejected")
         wait = kernel.WaitForSingleObject(proc.hProcess, 8000)
         if wait != _WAIT_OBJECT_0:
             raise PublicToolRejected("AppContainer child timeout or wait failure")
@@ -422,6 +459,9 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False):
                 raise PublicToolRejected("Synthetic broker verification failed")
         completed = True
     finally:
+        # Do not leave an IPC endpoint live while tearing down a profile.
+        if pipe_guard is not None:
+            pipe_guard.close()
         # Terminate unresponsive/test-crashed child before profile deletion.
         if process_created:
             if not completed:
@@ -463,6 +503,8 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False):
         "private_file_test_executed": exit_code in (73, 83, 84, 85),
         "production_tool_integrated": False,
         "one_shot_broker_trial": broker_trial,
+        "named_pipe_trial": pipe_trial,
+        "os_named_pipe_client_pid_attested": pipe_attested,
         "authenticated_response_verified": broker_total == 21,
         "replayed_response_refused": broker_replay_refused,
         "synthetic_broker_total": broker_total,
