@@ -112,6 +112,8 @@ class NativeWindowsAppContainerTrial(unittest.TestCase):
         self.assertTrue(report["synthetic_private_read_denied"])
         self.assertTrue(report["authenticated_response_verified"])
         self.assertTrue(report["replayed_response_refused"])
+        self.assertTrue(report["parent_journal_claimed_before_launch"])
+        self.assertTrue(report["parent_journal_completed_after_verification"])
         self.assertEqual(report["synthetic_broker_total"], 21)
         self.assertEqual(report["python_exit_status"], 73)
         self.assertFalse(report["network_used"])
