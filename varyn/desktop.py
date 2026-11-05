@@ -22,6 +22,7 @@ from varyn.native_tool_requests import NativeToolRequestClient
 from varyn.file_grants import ScopedFileGrants
 from varyn.synthetic_fixture import SyntheticFixture
 from varyn.desktop_parent_counts import DesktopParentCountsAction
+from varyn.official_manual_relay import OfficialManualRelay, ManualRelayRejected, OFFICIAL_APP_LINKS
 from varyn.bounded_broker_protocol import BrokerRejected
 from varyn.tool_gateway import SyntheticReadToolGateway, ToolGatewayRejected
 from varyn.public_github_tool import PublicGithubToolGateway, PublicToolRejected
@@ -62,6 +63,8 @@ class VarynDesktop(tk.Tk):
                                      if comparison_journal is not None else None)
         self._memory = DesktopMemory(memory_db) if memory_db is not None else None
         self.memory_project = tk.StringVar(value="VARYN")
+        self.official_relay_target = tk.StringVar(value="chatgpt")
+        self._official_relay = OfficialManualRelay()
         self._approval = DesktopApprovalController(journal=agent_journal)
         self._native_client = NativeToolRequestClient(allow_network=True)
         self._file_grants = ScopedFileGrants(auto_expire=True)
@@ -253,6 +256,29 @@ class VarynDesktop(tk.Tk):
         ttk.Button(
             outer, text="17S-20 | Review parent-only synthetic count",
             command=self._review_parent_synthetic_counts,
+        ).pack(anchor="w", pady=(0, 8))
+        relay_controls = ttk.Frame(outer, style="V.TFrame")
+        relay_controls.pack(fill="x", pady=(2, 8))
+        ttk.Label(
+            relay_controls, text="Official app relay (manual; no sync)",
+            style="V.TLabel",
+        ).pack(side="left", padx=(0, 5))
+        ttk.Combobox(
+            relay_controls, values=tuple(OFFICIAL_APP_LINKS),
+            textvariable=self.official_relay_target, state="readonly",
+            width=10,
+        ).pack(side="left", padx=(0, 8))
+        ttk.Button(
+            outer, text="17S-22 | Review and copy task to official app",
+            command=self._copy_official_app_relay,
+        ).pack(anchor="w", pady=(0, 4))
+        ttk.Button(
+            outer, text="17S-22 | Review pasted reply (RAM-only)",
+            command=self._review_official_app_reply,
+        ).pack(anchor="w", pady=(0, 4))
+        ttk.Button(
+            outer, text="17S-22 | Discard manual relay RAM state",
+            command=self._discard_official_app_relay,
         ).pack(anchor="w", pady=(0, 8))
         ttk.Button(
             outer, text="Review public GitHub tool intent (JSON, network)",
@@ -583,6 +609,120 @@ class VarynDesktop(tk.Tk):
         finally:
             if action is not None:
                 action.close()
+
+    def _copy_official_app_relay(self):
+        """Review exact user-typed text before writing it to OS clipboard."""
+        if self._busy or self._closing:
+            return
+        relay = self._official_relay
+        try:
+            target = self.official_relay_target.get()
+            task = self.prompt.get("1.0", "end-1c")
+            preview = relay.prepare(target, task)
+        except (ManualRelayRejected, ValueError):
+            self._append(
+                "OFFICIAL APP RELAY",
+                "Cannot prepare: use a bounded typed task, or complete/discard "
+                "the previous handoff. No clipboard action.",
+            )
+            return
+        try:
+            approved = messagebox.askyesno(
+                "VARYN | Review manual official-app handoff",
+                "Destination: " + preview.provider + " (" +
+                preview.destination_url + ")\\n" +
+                "Digest: " + preview.digest +
+                "\\n\\nExact text to copy to OS clipboard:\\n\\n" +
+                preview.packet +
+                "\\n\\nThis is MANUAL: VARYN cannot read/write your "
+                "official app's account history. Clipboard contents may "
+                "remain after exit; do not include secrets or private files. "
+                "Approve copying this text?",
+                parent=self,
+            )
+            if self._closing or self._busy:
+                relay.discard_pending()
+                return
+            if not approved:
+                relay.decide(preview, approved=False)
+                self._append(
+                    "OFFICIAL APP RELAY", "Declined; clipboard unchanged."
+                )
+                return
+            # No network or clipboard operation occurs before exact review.
+            self.clipboard_clear()
+            self.clipboard_append(preview.packet)
+            result = relay.decide(preview, approved=True, copied=True)
+            self._append(
+                "OFFICIAL APP RELAY",
+                "Copied reviewed task for " + result["provider"] +
+                ". Open its OFFICIAL app manually and paste. Then paste "
+                "the reply into VARYN's Message field for optional review. "
+                "No app account access or automatic sync occurred.",
+            )
+        except (ManualRelayRejected, tk.TclError, ValueError):
+            relay.discard_pending()
+            self._append(
+                "OFFICIAL APP RELAY",
+                "Manual copy failed/expired; no official app state changed. "
+                "If OS clipboard accepted bytes before failure, replace "
+                "its contents manually.",
+            )
+
+    def _review_official_app_reply(self):
+        """Human pastes and reviews optional unverified response: RAM only."""
+        if self._busy or self._closing:
+            return
+        relay = self._official_relay
+        try:
+            reply = self.prompt.get("1.0", "end-1c")
+            # Validate before review to avoid oversized modal dialogs.
+            from varyn.official_manual_relay import _bounded_text, _MAX_REPLY
+            candidate = _bounded_text(reply, _MAX_REPLY)
+            if not relay.status()["awaiting_user_pasteback"]:
+                raise ManualRelayRejected("No outgoing manual handoff")
+            approved = messagebox.askyesno(
+                "VARYN | Review user-pasted external reply",
+                "The provider origin cannot be verified. This reply is "
+                "UNTRUSTED reference text, not memory or instructions. "
+                "It stays only in VARYN RAM and may be included if you "
+                "explicitly approve a later manual handoff.\\n\\n" +
+                "Exact pasted text:\\n\\n" + candidate +
+                "\\n\\nAccept this reference text?",
+                parent=self,
+            )
+            if self._closing or self._busy:
+                relay.discard_pending()
+                return
+            if not approved:
+                self._append(
+                    "OFFICIAL APP RELAY", "Pasted reply declined; not stored."
+                )
+                return
+            result = relay.record_pasted_reply(candidate, reviewed=True)
+            self._append(
+                "OFFICIAL APP RELAY",
+                "User-pasted reply staged in RAM (claimed source: " +
+                result["claimed_provider"] +
+                "; origin NOT verified). To relay onward: choose another "
+                "official app, type a new non-sensitive task and review "
+                "a fresh clipboard preview.",
+            )
+        except (ManualRelayRejected, ValueError):
+            self._append(
+                "OFFICIAL APP RELAY",
+                "No valid pending handoff or reply too large; no reply stored.",
+            )
+
+    def _discard_official_app_relay(self):
+        if self._busy or self._closing:
+            return
+        self._official_relay.reset()
+        self._append(
+            "OFFICIAL APP RELAY",
+            "All manual relay text discarded from VARYN RAM. "
+            "OS clipboard is NOT automatically cleared.",
+        )
 
     def _public_tool_permission_changed(self):
         """Tk-thread-only explicit revocation; no assumptions about API consent."""
@@ -1468,6 +1608,7 @@ class VarynDesktop(tk.Tk):
             return
         # Mark closed before cancellation so a nested event cannot queue new work.
         self._closing = True
+        self._official_relay.reset()
         VarynDesktop._abort_public_comparison(self, "Desktop closing")
         VarynDesktop._cancel_public_scheduled_callbacks(self)
         self._approval.reject_all_pending()
