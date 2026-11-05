@@ -183,15 +183,20 @@ def run_ci_only_zero_capability_trial():
         hr = userenv.CreateAppContainerProfile(
             name, name, "Disposable offline VARYN CI restricted process test",
             None, 0, ctypes.byref(sid))
-        if hr != 0 or not sid or not advapi.IsValidSid(sid):
+        if hr != 0:
             # Any failure including "already exists" is fail-closed. Never
             # delete profiles that this invocation did not itself create.
             raise PublicToolRejected("Could not create unique CI AppContainer profile")
         created = True
+        if not sid or not advapi.IsValidSid(sid):
+            raise PublicToolRejected("Created CI AppContainer SID invalid")
         length = ctypes.c_size_t()
-        kernel.InitializeProcThreadAttributeList(
+        measured = kernel.InitializeProcThreadAttributeList(
             None, 1, 0, ctypes.byref(length))
-        if not 64 <= length.value <= 65536:
+        last_error = ctypes.get_last_error()
+        # Microsoft's documented size query returns FALSE with
+        # ERROR_INSUFFICIENT_BUFFER (122), even on success of size discovery.
+        if measured or last_error != 122 or not 16 <= length.value <= 65536:
             raise PublicToolRejected("Unexpected AppContainer attribute size")
         attr_buf = ctypes.create_string_buffer(length.value)
         if not kernel.InitializeProcThreadAttributeList(
