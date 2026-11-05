@@ -77,6 +77,13 @@ jobs:
           python -m unittest discover -s tests -p "test_owner_pilot_launcher.py" -v
           python -m unittest discover -s tests -p "test_desktop_packaging.py" -v
           python -m unittest discover -s tests -p "test_acceptance_packaging.py" -v
+      - name: 17S-27 opt-in local action events, bounded report and no remote app proof
+        run: |
+          python -m unittest discover -s tests -p "test_local_pilot_audit.py" -v
+          python -m unittest discover -s tests -p "test_official_manual_relay_desktop.py" -v
+      - name: 17S-27 actual Windows Tk button wiring and fixed event report
+        if: runner.os == 'Windows'
+        run: python -m unittest discover -s tests -p "test_local_pilot_audit_tk.py" -v
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
       - name: Synthetic-only desktop boundary and disposable sample cleanup
