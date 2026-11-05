@@ -43,8 +43,8 @@ class ScrollableOwnerDesktopTests(unittest.TestCase):
             total_height = limits[3] - limits[1]
             max_scroll = total_height - canvas.winfo_height()
             self.assertGreater(max_scroll, 0)
-            desired = max(0, control.winfo_y() - 30)
-            canvas.yview_moveto(min(1.0, desired / max_scroll))
+            desired = max(0, min(max_scroll, control.winfo_y() - 30))
+            canvas.yview_moveto(desired / total_height)
             ui.update()
             self.assertGreaterEqual(control.winfo_rooty(), canvas.winfo_rooty())
             self.assertLessEqual(
