@@ -159,6 +159,53 @@ class OfficialManualDesktopTests(unittest.TestCase):
         self.assertTrue(ui._official_relay.status()["reply_in_ram"])
         self.assertIn("origin NOT verified", ui.messages[-1][1])
 
+    def test_review_ui_receipt_matches_only_active_outgoing_request(self):
+        ui = FakeRelayDesktop(task="SYNTHETIC: handoff", provider="gemini")
+        VarynDesktop._copy_official_app_relay(ui)
+        outbound_id = ui._official_relay._awaiting_outbound[0]
+        ui.prompt = SimpleNamespace(get=lambda *args: "SYNTHETIC: reply")
+        observed = []
+        def review(preview):
+            observed.append(preview)
+            self.assertEqual(preview.provider, "gemini")
+            self.assertEqual(preview.outbound_request_id, outbound_id)
+            self.assertEqual(preview.reply_text, "SYNTHETIC: reply")
+            self.assertFalse(preview.origin_verified)
+            return True
+        ui._review_manual_reply_text = review
+        VarynDesktop._review_official_app_reply(ui)
+        self.assertEqual(len(observed), 1)
+        receipt = ui._official_relay.last_return_receipt()
+        self.assertEqual(receipt["outbound_request_id"], outbound_id)
+        self.assertFalse(receipt["provider_origin_verified"])
+        self.assertIn("locally bound receipt", ui.messages[-1][1])
+
+    def test_discard_during_nested_return_modal_refuses_stale_receipt(self):
+        ui = FakeRelayDesktop(task="SYNTHETIC: handoff")
+        VarynDesktop._copy_official_app_relay(ui)
+        ui.prompt = SimpleNamespace(get=lambda *args: "SYNTHETIC: reply")
+        def discard_during_modal(preview):
+            ui._official_relay.discard_pending()
+            return True
+        ui._review_manual_reply_text = discard_during_modal
+        VarynDesktop._review_official_app_reply(ui)
+        self.assertIsNone(ui._official_relay.last_return_receipt())
+        self.assertFalse(ui._official_relay.status()["reply_in_ram"])
+        self.assertIn("No valid pending handoff", ui.messages[-1][1])
+
+    def test_return_review_expired_while_modal_open_refuses_untrusted_reply(self):
+        ui = FakeRelayDesktop(task="SYNTHETIC: handoff")
+        VarynDesktop._copy_official_app_relay(ui)
+        ui.prompt = SimpleNamespace(get=lambda *args: "SYNTHETIC: late return")
+        def wait_too_long(preview):
+            ui._official_relay._clock = lambda: preview.expires_at + 2
+            return True
+        ui._review_manual_reply_text = wait_too_long
+        VarynDesktop._review_official_app_reply(ui)
+        self.assertFalse(ui._official_relay.status()["reply_in_ram"])
+        self.assertIsNone(ui._official_relay.last_return_receipt())
+        self.assertIn("No valid pending handoff", ui.messages[-1][1])
+
     def test_no_pending_reply_never_prompts_for_consent(self):
         ui = FakeRelayDesktop()
         ui._review_manual_reply_text = lambda _: self.fail(
