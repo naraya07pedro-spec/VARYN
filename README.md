@@ -780,3 +780,16 @@ On hosted Windows, the actual child first reads a granted synthetic file inside 
 **Security distinction:** This is **test-only file-mediated authenticated correlation**, not a production IPC broker. The ephemeral HMAC key is readable by the child, so it does **not** protect against a malicious child fabricating its own authenticated response. The one-use verifier is not durable cross-restart replay prevention. The production tool's \`os_sandbox\` remains \`False\`; no private/mutating tools or automatic consumer AI app history sync are enabled. A future production broker needs OS-authenticated endpoints, broker-held keys, crash-safe no-replay state, task approval, bounded process and network policies and real owner-device acceptance.
 
 [17S-14 detailed proof, limitations and next gates](docs/appcontainer-broker-17s-14.md).
+
+
+### Checkpoint 17S-15: durable no-replay journal and native Windows PID broker proof
+
+\`varyn/durable_broker_journal.py\` commits each synthetic broker request as **claimed BEFORE dispatch** in a parent-owned SQLite WAL journal. A claimed request cannot be replayed, including after SQLite close/reopen; a verified result can transition once to completed/failed. Only SHA-256 request-ID digests, states and timestamps are saved, never prompts, files, output or tokens. Tests cover competing connections, corrupt DB and crash-style reopen; the actual offline AppContainer file broker now uses a disposable parent-side journal for the same ordering.
+
+\`varyn/windows_pipe_identity.py\` proves that a genuine **ordinary Windows child** can connect to a unique local-only named pipe and the owner checks \`GetNamedPipeClientProcessId\` against the exact process PID, rejecting PID mismatch and reuse. It uses explicit protected ACLs and bounded overlapped I/O. A separate attempted AppContainer pipe uses **only the exact package SID** and avoids granting \`FILE_CREATE_PIPE_INSTANCE\`.
+
+**Blocked integration:** Hosted Windows AppContainer could not find the full-trust parent's \`LOCAL\` pipe (child exit \`0x5C\`, path/file not found), even though the ordinary-child named-pipe test passed. This specific native AppContainer test is marked **SKIP/UNAVAILABLE**, not a security proof, while other errors still fail. Current 17S-14 file-mediated HMAC protocol remains test-only and its child-readable signing key is **not a production authentication boundary**. No sensitive tools, provider sessions, private files or automatic consumer-app histories are enabled.
+
+**Recommended next design:** a Windows \`STARTUPINFOEX\` restricted **handle allowlist** using \`PROC_THREAD_ATTRIBUTE_HANDLE_LIST\`, delivering only two explicitly created anonymous pipe ends to the already-attested AppContainer child. This avoids relying on cross-namespace named-pipe discovery. It must still pass native OS security, cancellation, no-leak, no-replay and owner-device tests before production activation.
+
+[17S-15 audit, failures and next trust boundary](docs/windows-broker-journal-pipe-17s-15.md).
