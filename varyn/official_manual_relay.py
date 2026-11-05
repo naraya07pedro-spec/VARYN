@@ -89,10 +89,6 @@ class OfficialManualRelay:
         self._previous_reply = None
         self._previous_provider = None
         self._hops = 0
-        self._awaiting_outbound = None
-        self._pending_return_review = None
-        self._last_return_receipt = None
-        self._chain_digest = "0" * 64
 
     def _now(self):
         value = self._clock()
@@ -263,12 +259,20 @@ class OfficialManualRelay:
         }
 
     def discard_pending(self):
-        """Cancel pending review or awaiting return, retaining no reply."""
-        had_pending = self._pending is not None or self._awaiting_provider is not None
+        """Revoke pending work and erase ALL transient return/receipt state."""
+        had_pending = (self._pending is not None or
+                       self._awaiting_provider is not None or
+                       self._pending_return_review is not None or
+                       self._previous_reply is not None or
+                       self._last_return_receipt is not None)
         self._pending = None
         self._awaiting_provider = None
+        self._awaiting_outbound = None
+        self._pending_return_review = None
         self._previous_reply = None
         self._previous_provider = None
+        self._last_return_receipt = None
+        self._chain_digest = "0" * 64
         return had_pending
 
     def reset(self):
