@@ -1608,7 +1608,9 @@ class VarynDesktop(tk.Tk):
             return
         # Mark closed before cancellation so a nested event cannot queue new work.
         self._closing = True
-        self._official_relay.reset()
+        relay = getattr(self, "_official_relay", None)
+        if relay is not None:
+            relay.reset()
         VarynDesktop._abort_public_comparison(self, "Desktop closing")
         VarynDesktop._cancel_public_scheduled_callbacks(self)
         self._approval.reject_all_pending()
