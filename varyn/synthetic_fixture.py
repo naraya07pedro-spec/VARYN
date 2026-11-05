@@ -46,3 +46,27 @@ class SyntheticFixture:
             if tempdir is not None:
                 tempdir.cleanup()
                 self._tempdir = None
+
+
+class SyntheticParentCountsFixture:
+    """17S-20: only VARYN-generated counts, never a caller-selected file."""
+
+    def __init__(self):
+        self._tempdir = None
+        self._close_lock = Lock()
+        tempdir = TemporaryDirectory(prefix="varyn-owner-counts-")
+        try:
+            root = Path(tempdir.name)
+            (root / "synthetic-parent-counts.json").write_bytes(
+                b'{"counts":[4,6,11]}')
+        except BaseException:
+            tempdir.cleanup()
+            raise
+        self._tempdir = tempdir
+        self.root = root
+
+    def close(self):
+        with self._close_lock:
+            if self._tempdir is not None:
+                self._tempdir.cleanup()
+                self._tempdir = None
