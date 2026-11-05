@@ -1747,6 +1747,24 @@ class VarynDesktop(tk.Tk):
         self._lifecycle.close()
         self._closing = True
         self.destroy()
+        # On Windows, Tk Variables finalized by a later *worker-thread*
+        # cyclic GC can crash Tcl even after the Tk root was destroyed.
+        # Release the desktop-owned variable wrappers on the Tk owner thread
+        # rather than leaving them attached to a closed root.
+        if isinstance(self, tk.Tk):
+            for name in (
+                "provider", "model", "consent_network",
+                "consent_public_tools", "consent_context", "status_line",
+                "memory_project", "official_relay_target",
+            ):
+                variable = getattr(self, name, None)
+                if isinstance(variable, tk.Variable):
+                    setattr(self, name, None)
+                del variable
+            # Other widget/closure cycles are also finalized here on the
+            # UI thread, before background test workers can run GC.
+            import gc
+            gc.collect()
 
 
 def main():
