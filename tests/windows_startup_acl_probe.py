@@ -20,6 +20,7 @@ _CATEGORIES = frozenset({
 })
 _BAD_HANDLE = ctypes.c_void_p(-1).value
 _GENERIC_READ = 0x80000000
+_FILE_EXECUTE_OR_TRAVERSE = 0x0020
 _SHARE = 1 | 2 | 4
 _OPEN_EXISTING = 3
 _DIR_FLAG = 0x02000000
@@ -69,9 +70,9 @@ def _native_apis():
     return k, a
 
 
-def _open_disposition(path, kind, k):
+def _open_disposition(path, kind, k, desired_access=_GENERIC_READ):
     # No contents are read; the kernel performs a real ACL check on open.
-    handle = k.CreateFileW(path, _GENERIC_READ, _SHARE, None,
+    handle = k.CreateFileW(path, desired_access, _SHARE, None,
                            _OPEN_EXISTING, _DIR_FLAG if kind == "directory" else 0,
                            None)
     if handle is not None and int(handle) != _BAD_HANDLE:
@@ -109,6 +110,13 @@ def probe(targets):
             name: _open_disposition(resource["path"], resource["kind"], k)
             for name, resource in targets.items()
         }
+        # FILE_TRAVERSE on directories and FILE_EXECUTE on images require
+        # fewer permissions than GENERIC_READ. Do not conflate them.
+        baseline_minimal = {
+            name: _open_disposition(resource["path"], resource["kind"], k,
+                                    _FILE_EXECUTE_OR_TRAVERSE)
+            for name, resource in targets.items()
+        }
         if not a.OpenProcessToken(k.GetCurrentProcess(),
                                   _TOKEN_DUPLICATE | _TOKEN_QUERY |
                                   _TOKEN_IMPERSONATE,
@@ -131,12 +139,20 @@ def probe(targets):
             name: _open_disposition(resource["path"], resource["kind"], k)
             for name, resource in targets.items()
         }
+        observed_minimal = {
+            name: _open_disposition(resource["path"], resource["kind"], k,
+                                    _FILE_EXECUTE_OR_TRAVERSE)
+            for name, resource in targets.items()
+        }
         if not a.RevertToSelf():
             raise RuntimeError("Cannot revert restricted impersonation")
         impersonating = False
         return {"format": SCHEMA, "restricted_thread_token": True,
                 "restricted_primary_runtime_executed": False,
                 "normal": baseline, "restricted": observed,
+                "normal_minimal": baseline_minimal,
+                "restricted_minimal": observed_minimal,
+                "minimal_mode": "FILE_TRAVERSE(directory)/FILE_EXECUTE(file)",
                 "raw_paths_persisted": False, "private_bytes_read": False}
     finally:
         if impersonating and not a.RevertToSelf():
