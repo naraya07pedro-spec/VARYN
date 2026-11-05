@@ -145,6 +145,10 @@ jobs:
         run: python -m unittest discover -s tests -p "test_windows_appcontainer_trial.py" -v
       - name: 17S-14 signed one-shot synthetic broker protocol and replay regressions
         run: python -m unittest discover -s tests -p "test_bounded_broker_protocol.py" -v
+      - name: 17S-15 durable parent broker claim journal and corrupted-db refusal
+        run: python -m unittest discover -s tests -p "test_durable_broker_journal.py" -v
+      - name: 17S-15 local-only Windows kernel pipe client PID attestation (not production)
+        run: python -m unittest discover -s tests -p "test_windows_pipe_identity.py" -v
       - name: Option C consumer-history proof gates stay blocked
         run: |
           python -m unittest discover -s tests -p "test_option_c_gate.py" -v
