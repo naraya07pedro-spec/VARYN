@@ -178,3 +178,28 @@ OWNER ACCEPTANCE IN THE APP (17S-32)
   RAM request count limits reset after the application restarts.
 - Neither developer tests nor the EXE smoke verify real external API delivery.
   Native app ChatGPT/Claude/Gemini two-way memory sync (Option C) remains BLOCKED.
+
+17S-41 | CHECK MODEL API READINESS LOCALLY AND SAVE METADATA-ONLY EVIDENCE
+- In Model Control Center choose and register an explicitly dated/reviewed
+  model quote. Press "17S-41 | Check readiness (NO network)".
+- VARYN only checks if the correct OS environment variable is nonempty,
+  whether the current window's one-shot network permission is ON, and
+  whether local 9Router upstream authorization was explicitly granted.
+  This check NEVER sends requests and NEVER displays the actual API key.
+  READY means "eligible to ATTEMPT", NOT account/provider verified.
+- Only a real owner-confirmed SYNTHETIC: test task may initiate a model
+  request. Actual charges, quotas and model availability are NOT guaranteed.
+  Both 9Router and OpenRouter may independently use provider routing/fallback.
+- The model returned in the response's own metadata may differ from the
+  selected model. VARYN shows an UNVERIFIED label and mismatch warning.
+- Once a non-FAKE API response is locally parsed without a test transport,
+  choose "17S-41 | Review & save content-free receipt". Explicit review and
+  NEW JSON filename are required. It refuses overwrites. Only local time,
+  selected/claimed model names, reported usage, estimated cost, and explicit
+  NOT-VERIFIED status are written. NO prompt, answer, API key, or chat history.
+  The receipt is not encrypted and is NOT signed proof of provider identity.
+- No receipt is generated in FAKE mode. No acceptance receipt is auto-uploaded
+  to GitHub, chat, or other providers. Owner manually keeps local receipt.
+- CI exercises a real local TCP HTTP mock server for wire acceptance; that
+  server is NOT actual 9Router or a remote AI account. No real provider key
+  or payment is used by CI. Signed-in consumer memory sync stays BLOCKED.
