@@ -159,7 +159,10 @@ class OneShotWindowsPipe:
             # Client PID must STILL match the attested child process.
             sddl = "D:P(A;;GA;;;SY)(A;;GA;;;" + sid + ")"
             if appcontainer_sid is not None:
-                sddl += "(A;;GRGW;;;" + appcontainer_sid + ")"
+                # Grant only file data read/write, attributes, read-control,
+                # synchronize. GENERIC_WRITE also grants bit 0x4
+                # FILE_CREATE_PIPE_INSTANCE and is intentionally NOT allowed.
+                sddl += "(A;;0x00120183;;;" + appcontainer_sid + ")"
             if not advapi.ConvertStringSecurityDescriptorToSecurityDescriptorW(
                     sddl, 1, ctypes.byref(descriptor), None):
                 raise PublicToolRejected("Pipe DACL creation refused")
