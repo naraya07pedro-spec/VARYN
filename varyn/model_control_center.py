@@ -1,0 +1,414 @@
+"""17S-40: owner-operated cost-quote review and model API control window.
+
+Quotes are operator assertions, NOT fetched/verifiable market prices.
+No API keys are entered, shown, or written here. No persistent memory.
+"""
+from datetime import date
+from decimal import Decimal, InvalidOperation
+import hashlib
+import json
+import queue
+import threading
+import tkinter as tk
+from tkinter import ttk
+
+from varyn.gateway_chat import KEY_ENVS
+from varyn.model_registry import Offer, Registry, RegistryRejected
+from varyn.providers import ProviderError
+from varyn.universal_gateway import UniversalGateway
+from varyn.usage_budget import BudgetExceeded, UsageBudget
+
+PROVIDERS = ("fake", "openrouter", "deepseek", "9router")
+_TASK = "SYNTHETIC: classify a fictional widget as a harmless test."
+_MAX_QUOTES = 12
+
+
+class ModelCenterRejected(ValueError):
+    """Reject without echoing untrusted model/user content."""
+
+
+def price_to_micro(value):
+    """Owner-entered USD per million tokens, exact to six decimals."""
+    if type(value) is not str or not 1 <= len(value) <= 24:
+        raise ModelCenterRejected("Invalid price field")
+    try:
+        d = Decimal(value)
+        micro = d * 1000000
+        if not d.is_finite() or not 0 <= d <= 10000 or micro != micro.to_integral_value():
+            raise ModelCenterRejected("Price must be 0..10000 USD, <=6 decimals")
+        return int(micro)
+    except InvalidOperation as exc:
+        raise ModelCenterRejected("Invalid price field") from exc
+
+
+def create_reviewed_offer(*, provider, model, input_usd, output_usd,
+                          date_text, reviewed, fixed):
+    if reviewed is not True or fixed is not True:
+        raise ModelCenterRejected("Explicit price and route review required")
+    return Offer(
+        provider, model,
+        price_to_micro(input_usd), price_to_micro(output_usd),
+        date_text, owner_reviewed=True, route_fixed=True, enabled=True,
+    )
+
+
+def build_exact_preview(offer, task, input_estimate, output_limit, estimated):
+    if type(offer) is not Offer or type(task) is not str:
+        raise ModelCenterRejected("Invalid reviewed offer")
+    if type(estimated) is not int or estimated < 0:
+        raise ModelCenterRejected("Invalid estimated cost")
+    data = {
+        "format": "varyn.model_center_request.v1",
+        "provider": offer.provider, "model": offer.model,
+        "task": task,
+        "input_tokens_ESTIMATED_NOT_ACTUAL": input_estimate,
+        "max_output_tokens": output_limit,
+        "maximum_ESTIMATED_USD": str(Decimal(estimated) / 1000000),
+        "operator_price_date": offer.price_date,
+        "quote_owner_reviewed": offer.owner_reviewed,
+        "provider_price_independently_verified": False,
+        "native_consumer_memory_sync": False,
+        "actual_bill_hard_cap": False,
+    }
+    if offer.provider == "9router":
+        data["warning"] = (
+            "9Router is a localhost gateway and may switch UPSTREAM "
+            "models/credentials despite the locally selected route."
+        )
+    return json.dumps(data, indent=2, sort_keys=True, ensure_ascii=False)
+
+
+class ModelControlCenter(tk.Toplevel):
+    def __init__(self, owner, *, budget=None, transport=None):
+        super().__init__(owner)
+        self._owner = owner
+        self._budget = budget if budget is not None else UsageBudget(
+            max_requests=6, max_reserved_output_tokens=6144,
+        )
+        self._transport = transport
+        self._offers = []
+        self._running = False
+        self._closed = False
+        self._results = queue.Queue()
+        self._poll_id = None
+        self.title("VARYN 17S-40 | Model Control Center")
+        self.geometry("760x640")
+        self.minsize(540, 440)
+        self.transient(owner)
+        self.provider = tk.StringVar(master=self, value="fake")
+        self.model = tk.StringVar(master=self, value="fake-test")
+        self.input_price = tk.StringVar(master=self, value="0")
+        self.output_price = tk.StringVar(master=self, value="0")
+        self.price_date = tk.StringVar(master=self, value=date.today().isoformat())
+        self.reviewed = tk.BooleanVar(master=self, value=False)
+        self.fixed = tk.BooleanVar(master=self, value=False)
+        self.network = tk.BooleanVar(master=self, value=False)
+        self.upstream = tk.BooleanVar(master=self, value=False)
+        self.selection = tk.StringVar(master=self, value="auto")
+        self.input_tokens = tk.StringVar(master=self, value="128")
+        self.output_tokens = tk.StringVar(master=self, value="128")
+        self.ceiling = tk.StringVar(master=self, value="0")
+        self.status = tk.StringVar(
+            master=self, value="OFFLINE. Enter OWN verified quote; no live calls."
+        )
+        self._build()
+        self.protocol("WM_DELETE_WINDOW", self._dismiss)
+
+    def _build(self):
+        shell = ttk.Frame(self, padding=10)
+        shell.pack(fill="both", expand=True)
+        ttk.Label(shell, text="17S-40 | Owner-reviewed model registry (RAM only)").pack(anchor="w")
+        ttk.Label(
+            shell, wraplength=695,
+            text="No provider price feed, no unlimited-free guarantee. "
+                 "Only fictional SYNTHETIC: requests. Billing cap NOT enforced. "
+                 "Never enter an API key here; use your own OS environment.",
+        ).pack(anchor="w", pady=(2, 7))
+        quote = ttk.LabelFrame(shell, text="1. Register exact model and owner-reviewed prices")
+        quote.pack(fill="x", pady=(0, 6))
+        line = ttk.Frame(quote)
+        line.pack(fill="x", padx=6, pady=4)
+        ttk.Label(line, text="Provider").pack(side="left")
+        ttk.Combobox(line, textvariable=self.provider, state="readonly",
+                     values=PROVIDERS, width=12).pack(side="left", padx=5)
+        ttk.Label(line, text="Model ID").pack(side="left")
+        ttk.Entry(line, textvariable=self.model, width=27).pack(side="left", padx=5)
+        line = ttk.Frame(quote)
+        line.pack(fill="x", padx=6, pady=4)
+        ttk.Label(line, text="Input USD / 1M").pack(side="left")
+        ttk.Entry(line, textvariable=self.input_price, width=10).pack(side="left", padx=3)
+        ttk.Label(line, text="Output USD / 1M").pack(side="left")
+        ttk.Entry(line, textvariable=self.output_price, width=10).pack(side="left", padx=3)
+        ttk.Label(line, text="Quote date").pack(side="left")
+        ttk.Entry(line, textvariable=self.price_date, width=12).pack(side="left", padx=3)
+        ttk.Checkbutton(
+            quote, text="I personally checked BOTH prices (not a provider guarantee)",
+            variable=self.reviewed,
+        ).pack(anchor="w", padx=6)
+        ttk.Checkbutton(
+            quote, text="I reviewed the fixed local route (upstream 9Router may differ)",
+            variable=self.fixed,
+        ).pack(anchor="w", padx=6)
+        buttons = ttk.Frame(quote)
+        buttons.pack(fill="x", padx=6, pady=4)
+        ttk.Button(buttons, text="Add reviewed quote", command=self._add).pack(side="left")
+        ttk.Button(buttons, text="Clear quotes (RAM)", command=self._clear).pack(
+            side="left", padx=(6, 0),
+        )
+        self.listbox = tk.Listbox(quote, height=4)
+        self.listbox.pack(fill="x", padx=6, pady=(0, 6))
+
+        control = ttk.LabelFrame(shell, text="2. Inspect the selected model and request")
+        control.pack(fill="x", pady=(0, 6))
+        line = ttk.Frame(control)
+        line.pack(fill="x", padx=6, pady=4)
+        ttk.Label(line, text="Selection").pack(side="left")
+        self.combo = ttk.Combobox(
+            line, textvariable=self.selection, state="readonly",
+            values=("auto",), width=24,
+        )
+        self.combo.pack(side="left", padx=5)
+        for text, var, width in (
+            ("Input estimate", self.input_tokens, 7),
+            ("Max output", self.output_tokens, 7),
+            ("Est. ceiling USD", self.ceiling, 9),
+        ):
+            ttk.Label(line, text=text).pack(side="left")
+            ttk.Entry(line, textvariable=var, width=width).pack(side="left", padx=3)
+        ttk.Checkbutton(
+            control, text="Allow one approved live model API request (OFF by default)",
+            variable=self.network,
+        ).pack(anchor="w", padx=6)
+        ttk.Checkbutton(
+            control, text="9Router ONLY: I verified and authorize its upstream account use",
+            variable=self.upstream,
+        ).pack(anchor="w", padx=6)
+        ttk.Label(control, text="Fictional task to transmit; no local memory included").pack(
+            anchor="w", padx=6,
+        )
+        self.task = tk.Text(control, height=3, wrap="word")
+        self.task.pack(fill="x", padx=6, pady=4)
+        self.task.insert("1.0", _TASK)
+        buttons = ttk.Frame(control)
+        buttons.pack(fill="x", padx=6, pady=4)
+        ttk.Button(
+            buttons, text="Preview cheapest eligible route (NO network)",
+            command=self._preview,
+        ).pack(side="left")
+        self.send_button = ttk.Button(
+            buttons, text="Review exact request & send ONCE",
+            command=self._send,
+        )
+        self.send_button.pack(side="left", padx=(6, 0))
+        ttk.Label(shell, textvariable=self.status, wraplength=710).pack(
+            anchor="w", pady=(4, 6),
+        )
+        self.answer = tk.Text(shell, height=7, wrap="word")
+        self.answer.pack(fill="both", expand=True)
+        self.answer.insert("1.0", "No model was called.")
+        self.answer.configure(state="disabled")
+        ttk.Button(shell, text="Close and discard RAM quotes", command=self._dismiss).pack(
+            anchor="e", pady=(5, 0),
+        )
+
+    def _allowed(self):
+        return not self._closed and not self._owner._closing and not self._owner._busy
+
+    def _refresh_options(self):
+        items = ["auto"] + [x.provider + ":" + x.model for x in self._offers]
+        self.combo.configure(values=tuple(items))
+        self.listbox.delete(0, "end")
+        for x in self._offers:
+            self.listbox.insert("end", x.provider + " | " + x.model +
+                                " | owner quote " + x.price_date)
+        if self.selection.get() not in items:
+            self.selection.set("auto")
+
+    def _add(self):
+        if not self._allowed() or self._running:
+            return
+        try:
+            entry = create_reviewed_offer(
+                provider=self.provider.get(), model=self.model.get(),
+                input_usd=self.input_price.get(), output_usd=self.output_price.get(),
+                date_text=self.price_date.get(), reviewed=self.reviewed.get(),
+                fixed=self.fixed.get(),
+            )
+            if len(self._offers) >= _MAX_QUOTES:
+                raise ModelCenterRejected("Maximum 12 RAM quotes")
+            Registry(self._offers + [entry])
+            self._offers.append(entry)
+            self.reviewed.set(False)
+            self.fixed.set(False)
+            self._refresh_options()
+            self.status.set("Quote added to RAM. Owner assertions, not verified prices.")
+        except (ValueError, RegistryRejected, ModelCenterRejected):
+            self.status.set("BLOCKED: invalid, duplicate or unreviewed model/price.")
+
+    def _clear(self):
+        if not self._allowed() or self._running:
+            return
+        self._offers.clear()
+        self._refresh_options()
+        self.network.set(False)
+        self.upstream.set(False)
+        self.status.set("Quotes cleared; network and upstream opt-in reset OFF.")
+
+    def _plan(self):
+        if not self._offers:
+            raise ModelCenterRejected("Add at least one owner-reviewed quote")
+        provider_model = self.selection.get()
+        if provider_model != "auto":
+            exact = [x for x in self._offers if x.provider + ":" + x.model == provider_model]
+            if len(exact) != 1:
+                raise ModelCenterRejected("Invalid explicit model selection")
+            candidates = Registry(exact)
+        else:
+            candidates = Registry(self._offers)
+        input_estimate = int(self.input_tokens.get())
+        output_limit = int(self.output_tokens.get())
+        ceiling_micro = price_to_micro(self.ceiling.get())
+        chosen, estimated = candidates.choose(
+            input_estimate=input_estimate, output_limit=output_limit,
+            ceiling_micro_usd=ceiling_micro, today=date.today(),
+        )
+        task = self.task.get("1.0", "end-1c")
+        if not task.startswith("SYNTHETIC:") or len(task) > 4000:
+            raise ModelCenterRejected("Only bounded synthetic tasks")
+        return chosen, estimated, task, input_estimate, output_limit, ceiling_micro
+
+    def _preview(self):
+        if not self._allowed() or self._running:
+            return
+        try:
+            chosen, estimated, task, input_estimate, out, ceiling = self._plan()
+            message = (
+                "PREVIEW ONLY: " + chosen.provider + "/" + chosen.model +
+                " | est. $" + str(Decimal(estimated) / 1000000) +
+                " | ceiling est. $" + str(Decimal(ceiling) / 1000000) +
+                " | not a billing cap | no network call."
+            )
+            self.status.set(message)
+        except (ValueError, RegistryRejected, ModelCenterRejected):
+            self.status.set("BLOCKED: no fresh approved quote within estimate ceiling.")
+
+    def _send(self):
+        if not self._allowed() or self._running:
+            return
+        try:
+            selection = self._plan()
+            chosen, estimated, task, input_estimate, out, ceiling = selection
+            live = chosen.provider != "fake"
+            if live and (not self.network.get() or
+                         not self._owner.controller.allow_live_providers):
+                raise PermissionError("Network disabled in this window or desktop")
+            if chosen.provider == "9router" and not self.upstream.get():
+                raise PermissionError("Local 9Router upstream authorization missing")
+            snapshot = (
+                tuple(self._offers), self.selection.get(), self.task.get("1.0", "end-1c"),
+                self.input_tokens.get(), self.output_tokens.get(), self.ceiling.get(),
+                self.network.get(), self.upstream.get(),
+            )
+            content = build_exact_preview(chosen, task, input_estimate, out, estimated)
+            digest = hashlib.sha256(content.encode()).hexdigest()
+            approved = self._owner._review_scrollable_manual_text(
+                title="VARYN | EXACT model API request review",
+                heading="One NEW " + chosen.provider + " model request, NOT consumer app sync",
+                digest=digest,
+                content=content,
+                warning="Potential REAL BILLING; quote/estimated tokens are NOT caps. "
+                        "For 9Router, upstream provider may change. "
+                        "No provider account history, clipboard or memory sync. "
+                        "No retry or fallback at VARYN layer.",
+                approve_label="Approve ONE exact model request",
+            )
+            if not approved or not self._allowed():
+                self.status.set("Request declined. No dispatch or reserved quota.")
+                return
+            new_snapshot = (
+                tuple(self._offers), self.selection.get(), self.task.get("1.0", "end-1c"),
+                self.input_tokens.get(), self.output_tokens.get(), self.ceiling.get(),
+                self.network.get(), self.upstream.get(),
+            )
+            if new_snapshot != snapshot or self._plan() != selection:
+                raise ModelCenterRejected("Request changed during approval")
+            self.network.set(False)
+            self.upstream.set(False)
+            self._running = True
+            self.send_button.configure(state="disabled")
+            self.status.set("Approved one request. Awaiting result; no automatic retry.")
+            registry = Registry([chosen])
+            gateway = UniversalGateway(
+                registry, allow_network=live, budget=self._budget,
+                transport=self._transport,
+            )
+            thread = threading.Thread(
+                target=self._worker,
+                args=(gateway, selection, chosen.provider == "9router"),
+                daemon=True,
+            )
+            thread.start()
+            self._poll_id = self.after(80, self._poll)
+        except (ValueError, PermissionError, RegistryRejected, ModelCenterRejected):
+            self.status.set(
+                "BLOCKED: consent, quote, budget preview or request changed. "
+                "No dispatch."
+            )
+
+    def _worker(self, gateway, selection, upstream_approved):
+        chosen, estimated, task, input_estimate, out, ceiling = selection
+        try:
+            result = gateway.generate(
+                task, input_estimate=input_estimate, max_output_tokens=out,
+                ceiling_micro_usd=ceiling, provider=chosen.provider,
+                approve_request=True, authorized_upstream=upstream_approved,
+            )
+            self._results.put(("ok", result))
+        except (ProviderError, RegistryRejected, BudgetExceeded,
+                PermissionError, ValueError, OSError):
+            self._results.put(("error", None))
+        except BaseException:
+            self._results.put(("error", None))
+
+    def _poll(self):
+        self._poll_id = None
+        if self._closed or self._owner._closing:
+            return
+        try:
+            kind, data = self._results.get_nowait()
+        except queue.Empty:
+            self._poll_id = self.after(80, self._poll)
+            return
+        self._running = False
+        self.send_button.configure(state="normal")
+        if kind == "ok":
+            self.answer.configure(state="normal")
+            self.answer.delete("1.0", "end")
+            self.answer.insert("1.0", data["reply"].text)
+            self.answer.configure(state="disabled")
+            self.status.set(
+                "Completed: " + data["reply"].provider + "/" + data["reply"].model +
+                ". Owner-reviewable UNTRUSTED output, RAM only. "
+                "Actual charges and model origin NOT independently verified."
+            )
+        else:
+            self.status.set(
+                "Provider failed or response denied. Budget reservation retained; "
+                "actual billing unknown. No retry attempted."
+            )
+
+    def _dismiss(self):
+        if self._closed:
+            return
+        self._closed = True
+        if self._poll_id is not None:
+            try:
+                self.after_cancel(self._poll_id)
+            except tk.TclError:
+                pass
+            self._poll_id = None
+        if getattr(self._owner, "_model_center", None) is self:
+            self._owner._model_center = None
+        self._offers.clear()
+        self.destroy()
+        # In-flight requests, if any, cannot be unsent; never redispatch.
