@@ -69,7 +69,7 @@ class BoundedHumanAttestationTests(unittest.TestCase):
                 build_owner_report(value, answers())
 
     def test_collector_only_accepts_exact_yes_no_skip(self):
-        values = iter(["yes", "no", "skip", "yes please", "", " YES "])
+        values = iter(["yes", "no", "skip", "yes please", "", " YES ", "yes", "no"])
         spoken = []
         got = collect_owner_observations(
             read_input=lambda _prompt: next(values),
@@ -77,9 +77,23 @@ class BoundedHumanAttestationTests(unittest.TestCase):
         )
         self.assertEqual(
             list(got.values()),
-            ["pass", "fail", "not_checked", "not_checked", "not_checked", "pass"],
+            ["pass", "fail", "not_checked", "not_checked", "not_checked", "pass", "pass", "fail"],
         )
         self.assertTrue(any("normal-user terminal" in line for line in spoken))
+
+    def test_parent_review_is_required_for_full_owner_self_report(self):
+        reports = answers()
+        reports["parent_count_denied"] = "not_checked"
+        self.assertEqual(
+            build_owner_report({"passed": True}, reports)["acceptance_status"],
+            "incomplete_or_failed",
+        )
+        reports = answers()
+        reports["parent_count_approved"] = "fail"
+        self.assertEqual(
+            build_owner_report({"passed": True}, reports)["acceptance_status"],
+            "incomplete_or_failed",
+        )
 
     def test_eof_marks_remaining_observation_unchecked(self):
         report = collect_owner_observations(
@@ -89,7 +103,7 @@ class BoundedHumanAttestationTests(unittest.TestCase):
         self.assertEqual(list(report.values()), ["not_checked"] * len(_STEPS))
 
     def test_output_does_not_echo_raw_free_text_or_paths(self):
-        user_answers = iter(["yes", "yes", "yes", "SECRET_PASSWORD", "yes", "yes"])
+        user_answers = iter(["yes", "yes", "yes", "SECRET_PASSWORD", "yes", "yes", "yes", "yes"])
         spoken = []
         obs = collect_owner_observations(
             read_input=lambda _prompt: next(user_answers),
