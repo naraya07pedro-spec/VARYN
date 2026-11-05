@@ -42,6 +42,7 @@ class PortableEntryContractTests(unittest.TestCase):
         ctrl.status.return_value = {"mode": "offline_simulation"}
         with patch.object(portable_entry, "DesktopController",
                           return_value=ctrl) as controller, \
+             patch.object(portable_entry, "synthetic_center_acceptance") as acceptance, \
              patch.object(portable_entry, "VarynDesktop",
                           return_value=mocked_window):
             self.assertIsNone(
@@ -50,7 +51,8 @@ class PortableEntryContractTests(unittest.TestCase):
         mocked_window.withdraw.assert_called_once()
         mocked_window._open_relay_workbench.assert_called_once()
         mocked_window._open_model_control_center.assert_called_once()
-        mocked_window.update_idletasks.assert_called_once()
+        acceptance.assert_called_once_with(mocked_window)
+        mocked_window.update_idletasks.assert_not_called()
         mocked_window._close.assert_called_once()
         mocked_window.mainloop.assert_not_called()
 
