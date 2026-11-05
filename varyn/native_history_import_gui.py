@@ -5,9 +5,12 @@ selection, reading and upload. VARYN only opens pinned official support pages
 and Gemini homepage after explicit, exact owner review. No background sync.
 """
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, filedialog
 import webbrowser
 
+from varyn.native_export_inventory import (
+    ExportInventoryRejected, inspect_export_zip_metadata,
+)
 from varyn.native_history_import import (
     NativeHistoryRejected, NativeHistoryTransfer,
     native_destination_info, source_export_instructions,
@@ -19,6 +22,7 @@ class NativeHistoryImportGuide(tk.Toplevel):
         super().__init__(workbench)
         self._workbench = workbench
         self._session = NativeHistoryTransfer()
+        self._metadata_inventory = None
         self.title("VARYN | Official one-time chat import TO Gemini")
         self.geometry("670x650")
         self.minsize(500, 440)
@@ -71,9 +75,15 @@ class NativeHistoryImportGuide(tk.Toplevel):
         ).pack(side="left")
         info = native_destination_info()
         ttk.Label(
-            body, text="2. Download your source provider's ZIP yourself. "
-                       "Do NOT select or open that file in VARYN.",
+            body, text="2. Download the official export ZIP yourself. "
+                       "Optional: explicitly inspect only its ZIP directory "
+                       "metadata locally. This does not read chat messages, "
+                       "validate file contents, or upload anything.",
             wraplength=590,
+        ).pack(anchor="w", pady=(0, 5))
+        ttk.Button(
+            body, text="17S-31 | Inspect selected ZIP metadata locally (optional)",
+            command=self._inspect_selected_zip,
         ).pack(anchor="w", pady=(0, 10))
         ttk.Label(
             body, text="3. Gemini's Settings > Import memory to Gemini > "
@@ -99,7 +109,8 @@ class NativeHistoryImportGuide(tk.Toplevel):
         ).pack(anchor="w", pady=3)
         ttk.Checkbutton(
             body, variable=self.ack_zip,
-            text="I obtained the provider export ZIP myself; VARYN will not open it",
+            text="I obtained the export ZIP; any optional local metadata scan "
+                 "requires separate consent",
         ).pack(anchor="w", pady=3)
         ttk.Checkbutton(
             body, variable=self.ack_privacy,
@@ -139,8 +150,9 @@ class NativeHistoryImportGuide(tk.Toplevel):
             command=self._reset,
         ).pack(anchor="w", pady=(10, 4))
         ttk.Label(
-            body, text="No app account read/write permission, no cookies, "
-                       "no ZIP/path/transcript access, no automatic sync.",
+            body, text="No account write permission, cookies, message-body "
+                       "reading, saved file paths or automatic sync. Optional "
+                       "metadata-only ZIP inspection is entirely local.",
             wraplength=590,
         ).pack(anchor="w", pady=(6, 5))
         ttk.Button(
@@ -159,6 +171,80 @@ class NativeHistoryImportGuide(tk.Toplevel):
     def _allowed(self):
         return (not getattr(self._workbench._owner, "_closing", True)
                 and not getattr(self._workbench._owner, "_busy", True))
+
+    def _inspect_selected_zip(self):
+        """Separate opt-in, file picker + exact review BEFORE touching ZIP."""
+        if not self._allowed():
+            return
+        source = self.source.get()
+        if source not in ("chatgpt", "claude"):
+            self.status_line.set("Unsupported source for metadata inspection.")
+            return
+        self._metadata_inventory = None
+        if not messagebox.askyesno(
+            "VARYN | Optional local ZIP metadata",
+            "This is OPTIONAL. Choose a local exported ZIP using the file "
+            "picker. VARYN will see the chosen file path transiently and "
+            "read ONLY bounded ZIP central-directory metadata after a second "
+            "approval. It will NOT extract ZIP members, read conversation "
+            "bodies, save the path, upload the ZIP or check Gemini. "
+            "Pilot limit: 128 MiB / ZIP32. Continue to file selection?",
+            parent=self,
+        ):
+            self.status_line.set("Local inventory cancelled; no ZIP selected.")
+            return
+        if not self._allowed() or self.source.get() != source:
+            self.status_line.set("Source changed before file selection; refused.")
+            return
+        try:
+            selected = filedialog.askopenfilename(
+                parent=self,
+                title="Select a ChatGPT/Claude export ZIP for metadata only",
+                filetypes=[("ZIP archives", "*.zip")],
+            )
+        except (tk.TclError, OSError, ValueError):
+            selected = ""
+        if not selected or not self._allowed() or self.source.get() != source:
+            self.status_line.set("No ZIP inspected; selection cancelled/changed.")
+            return
+        approved = self._workbench._owner._review_scrollable_manual_text(
+            title="VARYN | Confirm local ZIP metadata read",
+            heading="Local ZIP metadata only. No member data, account access "
+                    "or network upload.",
+            digest="17S-31: ZIP32 bounded inventory, no archive extraction",
+            content="Selected ZIP via YOUR local file picker. Declared source: " +
+                    source + "\n\nInspect ZIP central-directory metadata "
+                    "without opening any archived file payload. Hard limits: "
+                    "128 MiB ZIP size, 2 MiB directory, 5,000 entries; "
+                    "ZIP64 not supported. Does not expose filenames, chat "
+                    "titles, messages, metadata IDs or local paths in report. "
+                    "May detect unsafe/malformed ZIP; will NOT prove the "
+                    "export was issued by a provider, or is importable.",
+            warning="VARYN briefly receives your chosen local file path in "
+                    "memory to open it. The result is metadata-only, RAM-only; "
+                    "no file upload, content extraction, disk output or "
+                    "background file scan. No consent means NO read.",
+            approve_label="Approve LOCAL ZIP envelope inspection only",
+        )
+        if not approved or not self._allowed() or self.source.get() != source:
+            self.status_line.set("No ZIP read; review declined or changed.")
+            return
+        try:
+            report = inspect_export_zip_metadata(selected, source)
+        except ExportInventoryRejected:
+            self.status_line.set(
+                "ZIP envelope not inspected: unsupported, oversized or "
+                "unsafe metadata. No messages extracted or uploaded."
+            )
+            return
+        self._metadata_inventory = report
+        self.status_line.set(
+            "Local metadata ONLY: " + str(report["zip_entry_count"]) +
+            " ZIP entries; " + str(report["archive_bytes"]) +
+            " archive bytes; ChatGPT filename hints " +
+            str(report["chatgpt_named_conversation_json_hints"]) +
+            ". Contents NOT read, source/Google import NOT verified."
+        )
 
     def _open_export_guide(self):
         if not self._allowed():
@@ -280,6 +366,7 @@ class NativeHistoryImportGuide(tk.Toplevel):
         if not self._allowed():
             return
         self._session.reset()
+        self._metadata_inventory = None
         for var in (self.ack_account, self.ack_region,
                     self.ack_zip, self.ack_privacy):
             var.set(False)
@@ -288,6 +375,7 @@ class NativeHistoryImportGuide(tk.Toplevel):
 
     def _dismiss(self):
         self._session.reset()
+        self._metadata_inventory = None
         if getattr(self._workbench, "_native_history_window", None) is self:
             self._workbench._native_history_window = None
         self.destroy()
