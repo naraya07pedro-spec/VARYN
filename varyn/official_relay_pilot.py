@@ -74,9 +74,13 @@ def build_manual_pilot_report(answers):
     }
 
 
-def collect_manual_pilot(read_input=input, *, write=print):
+def collect_manual_pilot(read_input=input, *, write=print,
+                         desktop_already_launched=False):
     write("17S-23: owner-run non-sensitive manual continuity pilot.")
-    write("Launch from another normal-user Windows terminal: py -3 -m varyn.desktop")
+    if desktop_already_launched:
+        write("The launcher requested a desktop window. Verify it actually opened.")
+    else:
+        write("Launch from another normal-user Windows terminal: py -3 -m varyn.desktop")
     write("Do NOT use personal conversations, API keys or customer data.")
     write("Use two existing official AI apps; login is performed in the browser,")
     write("never by VARYN. Answer only yes/no/skip (skip is not a pass).")
