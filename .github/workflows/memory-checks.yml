@@ -137,6 +137,10 @@ jobs:
       - name: 17S-38 native hosted Windows Tk owner selection, denial, fresh packet and discard
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_archive_continuation_tk.py" -v
+      - name: 17S-39 Universal Model Gateway reviewed-price registry and pinned API offline consent regressions
+        run: |
+          python -m unittest discover -s tests -p "test_universal_gateway.py" -v
+          python -m varyn.model_registry
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
       - name: Synthetic-only desktop boundary and disposable sample cleanup
