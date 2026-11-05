@@ -19,6 +19,10 @@ from varyn.native_history_import_gui import NativeHistoryImportGuide
 from varyn.owner_pilot_checklist_gui import OwnerPilotChecklist
 from varyn.guided_trio_flow import GuidedThreeAppFlow, GuidedTrioRejected
 from varyn.guided_reply_ledger import GuidedLedgerRejected
+from varyn.archive_continuation import (
+    ArchiveContinuationRejected, ArchivedExcerptSelection,
+    select_excerpt, selection_review, CONTINUATION_TASK,
+)
 from varyn.three_app_archive import (
     ArchiveRejected, snapshot as archive_snapshot,
     save_new as save_archive, load_readonly as load_archive,
@@ -47,6 +51,12 @@ class OfficialRelayWorkbench(tk.Toplevel):
         self._guided_flow = GuidedThreeAppFlow()
         self._guided_ledger_window = None
         self._saved_archive_window = None
+        self._archived_selection = None
+        self.archive_stage = tk.StringVar(master=self, value="3: Gemini")
+        self.include_archived_context = tk.BooleanVar(master=self, value=False)
+        self.archived_context_label = tk.StringVar(
+            master=self, value="No reviewed archived excerpt. Include: OFF."
+        )
         self.guided_label = tk.StringVar(
             master=self, value="Guided ChatGPT -> Claude -> Gemini: OFF"
         )
@@ -156,6 +166,32 @@ class OfficialRelayWorkbench(tk.Toplevel):
             line, text="1. Open official site (consent)",
             command=self._open_browser,
         ).pack(side="left")
+
+        ttk.Label(
+            body, text="17S-38 | Resume as NEW manual task using old archive",
+        ).pack(anchor="w", pady=(4, 3))
+        archive_row = ttk.Frame(body)
+        archive_row.pack(fill="x", pady=(0, 4))
+        ttk.Label(archive_row, text="Original reply:").pack(side="left")
+        archive_combo = ttk.Combobox(
+            archive_row, state="readonly", width=16,
+            values=("1: ChatGPT", "2: Claude", "3: Gemini"),
+            textvariable=self.archive_stage,
+        )
+        archive_combo.pack(side="left", padx=(7, 5))
+        archive_combo.bind("<<ComboboxSelected>>", self._clear_archive_resume_selection)
+        ttk.Button(
+            body, text="17S-38 | Select encrypted archive excerpt (review)",
+            command=self._select_archive_resume,
+        ).pack(anchor="w", pady=(0, 3))
+        ttk.Checkbutton(
+            body,
+            text="Include reviewed old excerpt in NEXT fresh manual packet",
+            variable=self.include_archived_context,
+        ).pack(anchor="w", pady=(0, 3))
+        ttk.Label(
+            body, textvariable=self.archived_context_label, wraplength=600,
+        ).pack(anchor="w", pady=(0, 8))
 
         ttk.Label(
             body, text="2. Your synthetic task (never loaded from disk)",
@@ -269,6 +305,7 @@ class OfficialRelayWorkbench(tk.Toplevel):
                 "harmless SYNTHETIC: task (max 650 characters)."
             )
             return
+        self._clear_archive_resume_selection()
         self.target.set(selection["provider"])
         self._sync_guided_label()
         self.detail_label.set(
@@ -307,6 +344,7 @@ class OfficialRelayWorkbench(tk.Toplevel):
         self._owner._discard_official_app_relay()
         self._clear_guided_ledger_view()
         self._guided_flow.reset()
+        self._clear_archive_resume_selection()
         self.reply.delete("1.0", "end")
         self._sync_guided_label()
         self.detail_label.set(
@@ -475,6 +513,88 @@ class OfficialRelayWorkbench(tk.Toplevel):
                 OSError, ValueError):
             self.detail_label.set("BLOCKED: invalid encrypted archive.")
 
+    def _clear_archive_resume_selection(self, _event=None):
+        self._archived_selection = None
+        self.include_archived_context.set(False)
+        self.archived_context_label.set(
+            "No reviewed archived excerpt. Include: OFF."
+        )
+
+    def _select_archive_resume(self):
+        if not self._allowed():
+            return
+        relay = self._owner._official_relay.status()
+        before_task = self.task.get("1.0", "end-1c")
+        chosen_stage = self.archive_stage.get()
+        stages = {"1: ChatGPT": 1, "2: Claude": 2, "3: Gemini": 3}
+        if (self._guided_flow.active or
+                chosen_stage not in stages or
+                relay["hops_used"] != 0 or
+                relay["awaiting_user_pasteback"] or
+                relay["reply_in_ram"] or relay["return_review_pending"] or
+                relay["return_receipt_available"] or
+                self.reply.get("1.0", "end-1c").strip()):
+            self.detail_label.set(
+                "BLOCKED: start from an empty fresh relay with no pasted reply; "
+                "discard current guided flow and relay RAM first."
+            )
+            return
+        try:
+            path = filedialog.askopenfilename(
+                parent=self,
+                title="Owner selects old encrypted three-AI synthetic archive",
+                filetypes=[("VARYN encrypted archive", "*.varyn-archive")],
+            )
+            if not path or not self._allowed():
+                return
+            archive = load_archive(path)
+            selected = select_excerpt(archive, stage=stages[chosen_stage])
+            approved = self._owner._review_scrollable_manual_text(
+                title="VARYN | Review exact old archive excerpt",
+                heading="PREPARE A NEW TASK, do not restore any old permission",
+                digest=selected.archive_digest,
+                content=selection_review(selected),
+                warning="Only a bounded user-pasted SYNTHETIC excerpt. "
+                        "Old AI source is UNVERIFIED. This does NOT copy, "
+                        "open browser, or activate old relay/history. "
+                        "Opt-in checkbox starts OFF.",
+                approve_label="Stage reviewed excerpt for a FRESH manual task",
+            )
+            if not approved or not self._allowed():
+                self.detail_label.set(
+                    "Old archive excerpt rejected or review declined."
+                )
+                return
+            if (self._owner._official_relay.status() != relay or
+                    self._guided_flow.active or
+                    self.archive_stage.get() != chosen_stage or
+                    self.task.get("1.0", "end-1c") != before_task or
+                    self.reply.get("1.0", "end-1c").strip()):
+                self.detail_label.set(
+                    "BLOCKED: workbench state changed during archive review."
+                )
+                return
+            self._archived_selection = selected
+            self.include_archived_context.set(False)
+            self.task.delete("1.0", "end")
+            self.task.insert("1.0", CONTINUATION_TASK)
+            self.archived_context_label.set(
+                "Reviewed " + selected.claimed_provider + " stage " +
+                str(selected.stage) + "/3; " +
+                str(len(selected.excerpt)) + "/" +
+                str(selected.full_characters) + " characters. "
+                "Include checkbox OFF until explicitly selected."
+            )
+            self.detail_label.set(
+                "New fictional task prepared. To send old excerpt, check "
+                "opt-in, then review and approve a NEW exact clipboard packet."
+            )
+        except (ArchiveRejected, ArchiveContinuationRejected,
+                SealedDataError, UnsupportedPlatformError, OSError, ValueError):
+            self.detail_label.set(
+                "BLOCKED: encrypted archive cannot supply safe synthetic context."
+            )
+
     def _draft_from_fields(self):
         return make_draft(
             target=self.target.get(),
@@ -578,6 +698,7 @@ class OfficialRelayWorkbench(tk.Toplevel):
                 widget.delete("1.0", "end")
                 widget.insert("1.0", content)
             self.include_context.set(False)
+            self._clear_archive_resume_selection()
             self.refresh()
             self.detail_label.set(
                 "Restored five synthetic draft fields only. Relay approvals, "
@@ -654,13 +775,35 @@ class OfficialRelayWorkbench(tk.Toplevel):
         except (GuidedTrioRejected, GuidedLedgerRejected):
             self.detail_label.set("BLOCKED: incomplete prior local guided history.")
             return
+        excerpt = None
+        if self.include_archived_context.get() is True:
+            excerpt = self._archived_selection
+            selected_stages = {
+                "1: ChatGPT": 1, "2: Claude": 2, "3: Gemini": 3
+            }
+            if (type(excerpt) is not ArchivedExcerptSelection or
+                    self.archive_stage.get() not in selected_stages or
+                    excerpt.stage != selected_stages[self.archive_stage.get()] or
+                    self._guided_flow.active or history is not None or
+                    before["hops_used"] != 0 or
+                    before["awaiting_user_pasteback"] or
+                    before["return_review_pending"]):
+                self.detail_label.set(
+                    "BLOCKED: select/review archive excerpt for a fresh relay; "
+                    "never replay old consent."
+                )
+                return
         self._owner._copy_official_app_relay(
             task=task, target=provider,
             project=self.project.get(),
             include_context=self.include_context.get() is True,
-            guided_history=history,
+            guided_history=history, archived_excerpt=excerpt,
         )
         after = relay.status()
+        if (excerpt is not None and
+                after["hops_used"] == before["hops_used"] + 1 and
+                after["awaiting_user_pasteback"]):
+            self._clear_archive_resume_selection()
         if self._guided_flow.active:
             if (after["hops_used"] == before["hops_used"] + 1 and
                     after["awaiting_user_pasteback"]):
@@ -730,6 +873,8 @@ class OfficialRelayWorkbench(tk.Toplevel):
         if not self._allowed():
             return
         self._owner._discard_official_app_relay()
+        self._clear_guided_ledger_view()
+        self._clear_archive_resume_selection()
         self._guided_flow.reset()
         self.reply.delete("1.0", "end")
         self.refresh()
@@ -771,6 +916,7 @@ class OfficialRelayWorkbench(tk.Toplevel):
         )
 
     def _dismiss(self):
+        self._clear_archive_resume_selection()
         self._clear_saved_archive_view()
         self._clear_guided_ledger_view()
         self._guided_flow.reset()
