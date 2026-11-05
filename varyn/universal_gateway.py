@@ -8,7 +8,7 @@ import os
 import urllib.error
 from datetime import date
 
-from varyn.gateway_chat import KEY_ENVS, prepare, parse, post
+from varyn.gateway_chat import KEY_ENVS, prepare, parse, post, reported_model
 from varyn.model_registry import Registry, RegistryRejected
 from varyn.providers import ModelReply, ProviderError
 from varyn.safety import assert_no_obvious_secrets
@@ -54,6 +54,7 @@ class UniversalGateway:
             if type(key) is not str or not key.strip():
                 raise ProviderError("Model API credential missing")
         self.budget.reserve(max_output_tokens)
+        observed_model = None
         try:
             if selected.provider == "fake":
                 reply = ModelReply("FAKE: no API or paid model called",
@@ -64,6 +65,8 @@ class UniversalGateway:
                         if self.transport is not None else
                         post(selected.provider, payload, key, timeout_seconds))
                 reply = parse(selected.provider, selected.model, body)
+                # Do not silently call selected model the ACTUAL upstream model.
+                observed_model = reported_model(body)
         except (urllib.error.URLError, TimeoutError, OSError):
             self.budget.report_failure()
             raise ProviderError("Model API request failed") from None
@@ -75,4 +78,9 @@ class UniversalGateway:
             "reply": reply, "estimated_micro_usd": amount,
             "estimate_only": True, "actual_billing_cap_enforced": False,
             "native_consumer_history_sync": False, "varyn_fallback": False,
+            "provider_reported_model": observed_model,
+            "provider_reported_model_matches_selected": (
+                None if observed_model is None else
+                observed_model == selected.model),
+            "upstream_model_identity_verified": False,
         }

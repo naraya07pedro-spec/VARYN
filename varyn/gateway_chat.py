@@ -1,6 +1,7 @@
 """17S-39: fixed OpenAI-compatible Chat Completions endpoints. NO redirects."""
 import json
 import urllib.request
+import re
 
 from varyn.providers import ProviderError, ModelReply
 
@@ -15,6 +16,20 @@ KEY_ENVS = {
     "9router": "VARYN_9ROUTER_API_KEY",
 }
 MAX_BYTES = 131072
+_MODEL_LABEL = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._:/+-]{0,119}\Z")
+
+
+def reported_model(raw):
+    """Only a provider-CLAIMED model label, never authenticated upstream identity."""
+    try:
+        model = json.loads(raw).get("model")
+        if (type(model) is str and _MODEL_LABEL.fullmatch(model) and
+                ".." not in model and "//" not in model):
+            return model
+    except (ValueError, AttributeError, TypeError, UnicodeError):
+        pass
+    return None
+
 
 
 def prepare(model, question, *, max_tokens):
@@ -39,7 +54,12 @@ def post(provider, payload, key, timeout):
     class NoRedirect(urllib.request.HTTPRedirectHandler):
         def redirect_request(self, req, fp, code, msg, headers, newurl):
             return None
-    with urllib.request.build_opener(NoRedirect).open(
+    # Loopback should NEVER honor HTTPS_PROXY/HTTP_PROXY environment values.
+    # On remote HTTPS API requests normal OS proxy configuration still applies.
+    handlers = [NoRedirect]
+    if provider == "9router":
+        handlers.append(urllib.request.ProxyHandler({}))
+    with urllib.request.build_opener(*handlers).open(
         request, timeout=timeout,
     ) as response:
         body = response.read(MAX_BYTES + 1)
