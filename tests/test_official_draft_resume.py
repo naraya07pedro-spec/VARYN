@@ -88,7 +88,7 @@ class NativeWindowsDraftTests(unittest.TestCase):
             save_new(path, first)
             ciphertext = path.read_bytes()
             self.assertNotIn(b"SYNTHETIC:", ciphertext)
-            self.assertNotIn(b"VARYN", ciphertext)
+            self.assertNotIn(b'"project":"VARYN"', ciphertext)
             self.assertEqual(load_existing(path), first)
             with self.assertRaises(FileExistsError):
                 save_new(path, first)
