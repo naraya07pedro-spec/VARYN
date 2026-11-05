@@ -529,18 +529,23 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False,
                 payload = strict_json(inherited_pipes.receive_after_child_exit())
             except Exception:
                 raise PublicToolRejected("Inherited pipe response rejected") from None
-            allowed_keys = {"version", "request_id", "nonce", "status", "total"}
+            allowed_keys = {"version", "request_id", "nonce", "status",
+                            "total", "decoy_status"}
             if (set(payload) != allowed_keys or
                     payload["version"] != "varyn.anon-pipes.v1" or
                     payload["request_id"] != broker_request["request_id"] or
                     payload["nonce"] != broker_request["nonce"] or
                     payload["status"] != "ok" or
+                    payload["decoy_status"] not in (
+                        "verified_absent", "unavailable_errno22") or
                     type(payload["total"]) is not int or
                     payload["total"] != 21):
                 raise PublicToolRejected("Inherited pipe response correlation refused")
             inherited_response_verified = True
-            inherited_decoy_excluded = True  # the child returns 73 only if
-            # its unrelated parent's inheritable EVENT could not be opened.
+            inherited_decoy_excluded = (
+                payload["decoy_status"] == "verified_absent")
+            # Unlike successful transport, a decoy OSError(EINVAL) is NOT
+            # accepted as actual native handle-leak denial evidence.
             if not journal_claimed or journal is None:
                 raise PublicToolRejected("Inherited pipe parent claim unavailable")
             journal_finalized = (
