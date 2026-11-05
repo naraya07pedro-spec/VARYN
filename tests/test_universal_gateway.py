@@ -150,7 +150,7 @@ class ChatWireTests(unittest.TestCase):
         self.assertEqual(calls[0][0].full_url, URLS["openrouter"])
         self.assertNotIn(KEY, calls[0][0].full_url)
         self.assertEqual(calls[0][0].get_header("Authorization"), "Bearer " + KEY)
-        self.assertIsNone(mk.call_args.args[0].redirect_request(
+        self.assertIsNone(mk.call_args.args[0]().redirect_request(
             None, None, 302, "Redirect", {}, "https://evil.example/"
         ))
 
