@@ -4,6 +4,18 @@
 
 > **Experimental, non-production prototype.** Beyond the local SQLite memory experiment, this branch includes bounded context retrieval, opt-in provider API adapters, a Tkinter desktop, synthetic agent approvals and recovery, provider-native tool-intent adapters, and temporary read-only synthetic folder grants. These pieces are **not** an integrated personal AI product. There is no official ChatGPT/Claude/Gemini *app-history* bidirectional synchronization, no authenticated full agent permission boundary, no production-safe confidential storage, and no verified real-world autonomous execution. The default remains offline; paid API calls require explicit opt-in.
 
+## Try the new 17S-28 official-app workbench (Windows)
+
+The VARYN desktop now has a clearly visible top button, **`17S-28 | Open official-app relay workbench`**. This opens a single scrollable window for the actual owner-driven workflow:
+
+1. Choose ChatGPT, Claude, or Gemini. **Open official site** asks for separate browser approval and passes only the public pinned homepage URL. Sign in or use the site yourself, outside VARYN.
+2. Use the default harmless `SYNTHETIC:` example (or type another synthetic task). **Review EXACT packet and copy** opens the existing scrollable approval and time-limited clipboard gate; manually paste into the official app.
+3. Manually copy any harmless reply into the workbench **reply** field. **Review EXACT pasted reply and stage in RAM** binds it to the preceding local outbound packet. The provider identity remains **UNVERIFIED**.
+4. Optionally type a short `SYNTHETIC:` project note, select its project and topic, and review any conflict. Select **Include only reviewed notes** if you want it included in the next separately reviewed packet. It is OFF by default, never uploads itself, and never persists automatically.
+5. Choose another official app, edit the task, and review another packet; or use the separate **Discard relay RAM** and **Discard project RAM notes** buttons. The original main desktop Message field is unchanged by workbench actions.
+
+The workbench still uses existing 17S-22 to 17S-27 explicit consent and local status machinery: **no browser automation, official consumer app account sync, private files, verified remote message delivery, or automatic provider-history read/write.** The one-click `Try-VARYN-Official-Apps.cmd` owner pilot remains usable. See [17S-28 workbench details](docs/official-app-workbench-17s-28.md).
+
 ## New: 17S-27 local event audit (optional)
 
 Once the Windows owner pilot opens the VARYN desktop, click **`17S-27 | Start local event audit`** *before* testing any official app handoff. VARYN will then record only seven allowlisted types of **successful in-process callback**, such as a packet copied after review or a pasted reply staged in RAM. It does **not** capture task text, reply text, browser cookies, tokens, conversation history, or clipboard contents.
