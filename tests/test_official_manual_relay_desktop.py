@@ -152,6 +152,61 @@ class OfficialManualDesktopTests(unittest.TestCase):
         self.assertFalse(ui._pilot_audit.snapshot()["active"])
         self.assertEqual(ui._pilot_audit.snapshot()["events_observed"], 0)
 
+    def test_workbench_explicit_task_and_app_do_not_modify_main_editor(self):
+        ui = FakeRelayDesktop(task="SYNTHETIC: main editor unchanged",
+                              provider="chatgpt")
+        original = ui.prompt.get("1.0", "end-1c")
+        VarynDesktop._copy_official_app_relay(
+            ui, task="SYNTHETIC: scoped workbench task", target="claude",
+            include_context=False,
+        )
+        self.assertIn("SYNTHETIC: scoped workbench task", ui._clipboard)
+        self.assertNotIn(original, ui._clipboard)
+        self.assertEqual(ui.prompt.get("1.0", "end-1c"), original)
+        self.assertEqual(ui._official_relay.status()["hops_used"], 1)
+        self.assertEqual(ui._official_relay._awaiting_provider, "claude")
+        VarynDesktop._review_official_app_reply(
+            ui, reply="SYNTHETIC: workbench pasted reply",
+        )
+        self.assertTrue(ui._official_relay.status()["reply_in_ram"])
+        self.assertIn("SYNTHETIC: main editor unchanged", original)
+        self.assertEqual(ui.prompt.get("1.0", "end-1c"), original)
+
+    def test_workbench_notes_are_scoped_and_not_auto_uploaded(self):
+        ui = FakeRelayDesktop(task="SYNTHETIC: main text", provider="chatgpt")
+        VarynDesktop._review_project_working_note(
+            ui, project="PROJECT_B", topic="action",
+            note="SYNTHETIC: workbench note B",
+        )
+        self.assertEqual(ui._working_context.selection(
+            "PROJECT_B").notes[0].topic, "action")
+        self.assertEqual(ui._working_context.status()["network_requests"], 0)
+        VarynDesktop._copy_official_app_relay(
+            ui, task="SYNTHETIC: scoped project request",
+            target="gemini", project="PROJECT_B", include_context=True,
+        )
+        self.assertIn("SYNTHETIC: workbench note B", ui._clipboard)
+        self.assertEqual(ui._official_relay.status()["provider_requests"], 0)
+
+    def test_workbench_wrong_project_and_invalid_optin_do_not_copy(self):
+        ui = FakeRelayDesktop(task="SYNTHETIC: existing editor")
+        VarynDesktop._review_project_working_note(
+            ui, project="A", topic="task",
+            note="SYNTHETIC: project A note",
+        )
+        for project, optin in (
+            ("B", True), ("A", "true"), ("A", 1),
+        ):
+            with self.subTest(project=project, optin=optin):
+                original = ui._clipboard
+                VarynDesktop._copy_official_app_relay(
+                    ui, task="SYNTHETIC: other project",
+                    target="claude", project=project, include_context=optin,
+                )
+                self.assertEqual(ui._clipboard, original)
+                self.assertEqual(ui.copies, 0)
+                self.assertEqual(ui._official_relay.status()["hops_used"], 0)
+
     def test_open_official_site_requires_separate_owner_consent(self):
         ui = FakeRelayDesktop(task="SYNTHETIC: never passed in URL",
                               provider="claude")
