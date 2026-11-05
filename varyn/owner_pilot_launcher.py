@@ -154,6 +154,10 @@ def run_owner_pilot(*, windows=None, elevated=None,
         return 2
     write("Keep that desktop window open. This terminal asks ONLY yes/no/skip. "
           "No transcript or account data is collected.")
+    write("17S-28: in the VARYN window, click Open official-app relay "
+          "workbench near the top. Use its separate task/reply/note fields "
+          "for the first and second official-app manual transfer; every "
+          "copy and return still requires review.")
     write("17S-27 optional stronger local evidence: click Start local event "
           "audit in VARYN BEFORE performing the pilot. At the end, click "
           "Review / copy audit, inspect the fixed JSON and separately "
