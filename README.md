@@ -4,6 +4,17 @@
 
 > **Experimental, non-production prototype.** Beyond the local SQLite memory experiment, this branch includes bounded context retrieval, opt-in provider API adapters, a Tkinter desktop, synthetic agent approvals and recovery, provider-native tool-intent adapters, and temporary read-only synthetic folder grants. These pieces are **not** an integrated personal AI product. There is no official ChatGPT/Claude/Gemini *app-history* bidirectional synchronization, no authenticated full agent permission boundary, no production-safe confidential storage, and no verified real-world autonomous execution. The default remains offline; paid API calls require explicit opt-in.
 
+## Try the official-app continuity pilot on Windows (17S-26)
+
+**No installation of a second AI client is required.** This is still a manual, owner-driven workflow, not official consumer-app history or memory synchronization.
+
+1. Open the latest successful **Windows CI run** on the [feature PR](https://github.com/naraya07pedro-spec/VARYN/pull/1), download the `varyn-windows-source-launcher` artifact ZIP and extract it. The source archive contains no Python executable, model, credentials, browser profiles or data exports. Python 3.12+ with Tkinter must already be installed.
+2. In the extracted `VARYN` folder, double-click **`Try-VARYN-Official-Apps.cmd`** as a **normal (non-administrator)** Windows user. It starts the desktop and guides the full ten-observation pilot (7 official-app transfer steps + 3 temporary per-project context checks). You need access to two official apps in your own browser to complete the manual handoff.
+3. Use only harmless `SYNTHETIC:` examples. Keep the model provider set to `fake` and VARYN network/API consents **OFF**. Accept or reject browser opens and clipboard transfers yourself. Answer only `yes`, `no` or `skip` for each observation.
+4. The final report is printed **only in your local terminal**; nothing is saved or uploaded by the launcher. A self-reported pass is **not** machine verification of your physical clicks, account access, reply provenance or automatic sync. If the UI fails to start or any observation fails, the pilot is incomplete and private-file access remains disabled.
+
+Alternative in a normal PowerShell window from the extracted folder: `py -3 -m varyn.owner_pilot_launcher --manual-only --interactive`. See [pilot acceptance instructions](docs/owner-pilot-one-click-17s-26.md) in the feature branch for limitations, troubleshooting and precise scope.
+
 ## First development checkpoint: local memory
 
 The prototype uses Python's standard library and an on-device SQLite file to add, search, and delete memories, labeled by project and a local owner string.
