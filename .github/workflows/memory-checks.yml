@@ -141,6 +141,11 @@ jobs:
         run: |
           python -m unittest discover -s tests -p "test_universal_gateway.py" -v
           python -m varyn.model_registry
+      - name: 17S-40 owner price conversion, exact model request review and dated quote safety
+        run: python -m unittest discover -s tests -p "test_model_control_center.py" -v
+      - name: 17S-40 native Windows Tk fake/denied/approved mock live request with key never in UI
+        if: runner.os == 'Windows'
+        run: python -m unittest discover -s tests -p "test_model_control_center_tk.py" -v
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
       - name: Synthetic-only desktop boundary and disposable sample cleanup
