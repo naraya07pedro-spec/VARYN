@@ -11,6 +11,18 @@ from varyn.desktop_controller import DesktopController
 
 @unittest.skipUnless(sys.platform == "win32", "Hosted native Windows Tk required")
 class OfficialManualTkTests(unittest.TestCase):
+    def test_close_releases_tk_variable_owners_on_gui_thread(self):
+        ui = VarynDesktop(controller=DesktopController())
+        names = (
+            "provider", "model", "consent_network",
+            "consent_public_tools", "consent_context", "status_line",
+            "memory_project", "official_relay_target",
+        )
+        self.assertTrue(all(getattr(ui, name) is not None for name in names))
+        ui._close()
+        self.assertTrue(all(getattr(ui, name) is None for name in names))
+        self.assertFalse(ui._official_relay.status()["reply_in_ram"])
+
     def test_real_buttons_copy_and_pasteback_do_not_call_api(self):
         ui = VarynDesktop(controller=DesktopController())
         try:
