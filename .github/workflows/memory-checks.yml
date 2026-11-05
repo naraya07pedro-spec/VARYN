@@ -127,6 +127,11 @@ jobs:
       - name: 17S-36 hosted Windows Tk full staged record display and discard
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_guided_trio_flow_tk.py" -v
+      - name: 17S-37 three-AI encrypted complete archive strict schema and native Windows DPAPI
+        run: python -m unittest discover -s tests -p "test_three_app_archive.py" -v
+      - name: 17S-37 hosted Windows Tk owner-approved save and read-only reopen
+        if: runner.os == 'Windows'
+        run: python -m unittest discover -s tests -p "test_three_app_archive_tk.py" -v
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
       - name: Synthetic-only desktop boundary and disposable sample cleanup

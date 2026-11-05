@@ -100,3 +100,13 @@ OWNER ACCEPTANCE IN THE APP (17S-32)
 - All copies still require fresh EXACT packet review and owner approval.
 - No native provider account sync, auto-export, disk save or background read.
 - Discard/close clears full RAM ledger, but cannot retract OS clipboard data.
+
+17S-37 | SAVE COMPLETED THREE-AI SYNTHETIC SESSION ENCRYPTED, OPEN READ-ONLY
+- Finish all three guided ChatGPT -> Claude -> Gemini synthetic handoffs.
+- Choose "17S-37 | Save completed 3-AI encrypted archive"; inspect ALL text,
+  approve, and select a NEW .varyn-archive file. No existing file overwritten.
+- On a later session in the SAME Windows profile, select
+  "17S-37 | Open saved 3-AI archive read-only". Review full contents first.
+- Loaded archives are READ-ONLY, not active relays. Previous consent, hops,
+  clipboard permissions and model/consumer-app history are NOT restored.
+- Only test with fictional SYNTHETIC data; DPAPI is not cross-device backup.
