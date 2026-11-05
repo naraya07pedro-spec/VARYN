@@ -51,11 +51,11 @@ class OfficialManualTkTests(unittest.TestCase):
     def test_actual_scrollable_preview_reject_button(self):
         ui = VarynDesktop(controller=DesktopController())
         try:
-            ui.withdraw()
             draft = ui._official_relay.prepare("claude", "SYNTHETIC: preview")
             observed = {"read_only": False, "scrollbar": False,
                         "rejected_button": False}
             def close_preview():
+                reject = None
                 for top in ui.winfo_children():
                     if not isinstance(top, tk.Toplevel):
                         continue
@@ -72,8 +72,10 @@ class OfficialManualTkTests(unittest.TestCase):
                             if (isinstance(child, ttk.Button) and
                                     child.cget("text") == "Reject"):
                                 observed["rejected_button"] = True
-                                child.invoke()
+                                reject = child
                             stack.append(child)
+                if reject is not None:
+                    reject.invoke()
             ui.after(100, close_preview)
             self.assertFalse(ui._review_manual_relay_packet(draft))
             self.assertTrue(all(observed.values()))
