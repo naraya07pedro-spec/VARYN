@@ -50,6 +50,11 @@ class AppContainerFailClosedPolicyTests(unittest.TestCase):
         with self.assertRaises(PublicToolRejected):
             run_ci_only_zero_capability_trial(inherited_trial=True,
                                             broker_trial=True)
+        with self.assertRaises(PublicToolRejected):
+            run_ci_only_zero_capability_trial(cancel_trial="true")
+        with self.assertRaises(PublicToolRejected):
+            run_ci_only_zero_capability_trial(cancel_trial=True,
+                                            inherited_trial=True)
         with patch.dict(os.environ, {"GITHUB_ACTIONS": "false",
                                      "VARYN_CI_APPCONTAINER_TRIAL": "1"}):
             with self.assertRaises(PublicToolRejected):
@@ -214,6 +219,25 @@ class NativeWindowsAppContainerTrial(unittest.TestCase):
         self.assertTrue(proof["native_pre_resume_fixture_handle_attested"])
         self.assertTrue(proof["unlisted_decoy_handle_denied"])
         self.assertFalse(proof["full_child_handle_table_audited"])
+
+    def test_real_job_kill_on_close_terminates_live_appcontainer(self):
+        # Not just checking configured flags: an actual launched AppContainer
+        # writes a synthetic ready marker and remains alive until the parent
+        # closes its last Job handle. The native kernel must then stop it.
+        with patch.dict(os.environ, {"VARYN_CI_APPCONTAINER_TRIAL": "1"}):
+            report = run_ci_only_zero_capability_trial(cancel_trial=True)
+        self.assertTrue(report["native_primary_appcontainer_attested"])
+        self.assertTrue(report["zero_capability_sids_attested"])
+        self.assertTrue(report["native_job_attested_before_resume"])
+        self.assertTrue(report["cancellation_trial"])
+        self.assertTrue(report["cancellation_child_executed"])
+        self.assertTrue(report["job_close_killed_running_child"])
+        self.assertTrue(report["process_terminated"])
+        self.assertTrue(report["disposable_profile_deleted"])
+        self.assertFalse(report["production_tool_integrated"])
+        self.assertNotEqual(report["python_exit_status"], 259)
+        print("17S-17 native AppContainer Job close terminated an actual "
+              "running fixed synthetic child after ready marker", flush=True)
 
     def test_job_membership_and_limits_attested_before_child_runs(self):
         proof = self._inherited_one_run()
