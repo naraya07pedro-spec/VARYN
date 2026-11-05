@@ -155,19 +155,24 @@ class ParentSyntheticReadBroker:
             actual = (identity.st_dev, identity.st_ino, identity.st_size,
                       identity.st_mtime_ns, identity.st_ctime_ns,
                       identity.st_nlink)
-            if actual != self._identity or not stat.S_ISREG(identity.st_mode):
-                fields = ("dev", "ino", "size", "mtime", "ctime", "nlink")
-                differences = [key for key, a, b in
-                               zip(fields, actual, self._identity) if a != b]
-                raise BrokerRejected(
-                    "Fixture identity changed during open: " +
-                    ",".join(differences or ["type"]))
+            # Win32 Python 3.12 can expose different ctime_ns for path
+            # lstat and descriptor fstat on an otherwise unchanged file.
+            # Keep the original path-lstat ctime comparison, but require
+            # handle-level ctime stability against another handle fstat,
+            # not a cross-API equality Windows cannot consistently promise.
+            stable_open = (actual[:4] == self._identity[:4] and
+                           actual[5] == self._identity[5] and
+                           (os.name == "nt" or
+                            actual[4] == self._identity[4]))
+            if not stable_open or not stat.S_ISREG(identity.st_mode):
+                raise BrokerRejected("Fixture identity changed during open")
             data = os.read(fd, _MAX_SOURCE + 1)
             after = os.fstat(fd)
             after_identity = (after.st_dev, after.st_ino, after.st_size,
                               after.st_mtime_ns, after.st_ctime_ns,
                               after.st_nlink)
-            if (after_identity != self._identity or
+            if (after_identity != actual or
+                    self._metadata() != self._identity or
                     not stat.S_ISREG(after.st_mode)):
                 raise BrokerRejected("Fixture changed while reading")
         except OSError:
