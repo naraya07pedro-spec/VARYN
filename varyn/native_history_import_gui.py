@@ -177,6 +177,11 @@ class NativeHistoryImportGuide(tk.Toplevel):
         )
         if not approved or not self._allowed():
             return
+        if self.source.get() != details["source"]:
+            self.status_line.set(
+                "Source changed during review. Guide launch refused."
+            )
+            return
         try:
             opened = webbrowser.open_new_tab(details["export_guide_url"])
         except (OSError, ValueError):
