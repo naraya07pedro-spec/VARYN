@@ -19,6 +19,7 @@ class FakeRelayDesktop:
         self.official_relay_target = SimpleNamespace(get=lambda: provider)
         self.prompt = SimpleNamespace(get=lambda *args: task)
         self._review_manual_relay_packet = lambda preview: approved
+        self._review_manual_reply_text = lambda candidate: approved
         self._clipboard = "USER_EXISTING_CLIPBOARD"
         self.messages = []
         self.copies = 0
@@ -85,23 +86,19 @@ class OfficialManualDesktopTests(unittest.TestCase):
         ui = FakeRelayDesktop(task="SYNTHETIC: copy")
         VarynDesktop._copy_official_app_relay(ui)
         ui.prompt = SimpleNamespace(get=lambda *args: "SYNTHETIC: copied reply")
-        with patch("varyn.desktop.messagebox.askyesno",
-                   return_value=False) as ask:
-            VarynDesktop._review_official_app_reply(ui)
-        self.assertEqual(ask.call_count, 1)
+        ui._review_manual_reply_text = lambda _: False
+        VarynDesktop._review_official_app_reply(ui)
         self.assertFalse(ui._official_relay.status()["reply_in_ram"])
-        with patch("varyn.desktop.messagebox.askyesno",
-                   return_value=True) as ask:
-            VarynDesktop._review_official_app_reply(ui)
-        self.assertEqual(ask.call_count, 1)
+        ui._review_manual_reply_text = lambda _: True
+        VarynDesktop._review_official_app_reply(ui)
         self.assertTrue(ui._official_relay.status()["reply_in_ram"])
         self.assertIn("origin NOT verified", ui.messages[-1][1])
 
     def test_no_pending_reply_never_prompts_for_consent(self):
         ui = FakeRelayDesktop()
-        with patch("varyn.desktop.messagebox.askyesno") as ask:
-            VarynDesktop._review_official_app_reply(ui)
-        ask.assert_not_called()
+        ui._review_manual_reply_text = lambda _: self.fail(
+            "Review dialog must not open without previous handoff")
+        VarynDesktop._review_official_app_reply(ui)
         self.assertIn("No valid pending", ui.messages[-1][1])
 
     def test_reset_does_not_clear_unrelated_clipboard(self):
