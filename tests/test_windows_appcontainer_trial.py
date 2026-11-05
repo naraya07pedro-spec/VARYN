@@ -38,6 +38,14 @@ class AppContainerFailClosedPolicyTests(unittest.TestCase):
             Path(__file__).resolve().parent.parent /
             "varyn/windows_appcontainer_trial.py", archive_entries())
 
+    def test_broker_trial_refuses_non_ci_and_invalid_trial_flag(self):
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "false",
+                                     "VARYN_CI_APPCONTAINER_TRIAL": "1"}):
+            with self.assertRaises(PublicToolRejected):
+                run_ci_only_zero_capability_trial(broker_trial=True)
+        with self.assertRaises(PublicToolRejected):
+            run_ci_only_zero_capability_trial(broker_trial="true")
+
     def test_linux_cannot_attest_windows_appcontainer(self):
         if os.name == "nt":
             self.skipTest("Native Windows code exercised separately")
@@ -85,6 +93,32 @@ class NativeWindowsAppContainerTrial(unittest.TestCase):
               str(result["synthetic_private_read_denied"]) +
               "; exit_status=0x" + format(result["python_exit_status"], "x"),
               flush=True)
+
+    def test_real_appcontainer_broker_one_request_one_response(self):
+        # A NEW real AppContainer profile and actual child process. This is
+        # deliberately separate from the baseline 17S-13 proof and does not
+        # authorize any production tool, file or network capability.
+        if (os.environ.get("GITHUB_ACTIONS") != "true" or
+                os.environ.get("RUNNER_OS") != "Windows"):
+            self.skipTest("No AppContainer profile change on owner PC")
+        with patch.dict(os.environ, {"VARYN_CI_APPCONTAINER_TRIAL": "1"}):
+            report = run_ci_only_zero_capability_trial(broker_trial=True)
+        self.assertTrue(report["native_primary_appcontainer_attested"])
+        self.assertTrue(report["zero_capability_sids_attested"])
+        self.assertTrue(report["disposable_profile_deleted"])
+        self.assertTrue(report["one_shot_broker_trial"])
+        self.assertTrue(report["synthetic_owner_positive_control"])
+        self.assertTrue(report["synthetic_granted_read_ok"])
+        self.assertTrue(report["synthetic_private_read_denied"])
+        self.assertTrue(report["authenticated_response_verified"])
+        self.assertTrue(report["replayed_response_refused"])
+        self.assertEqual(report["synthetic_broker_total"], 21)
+        self.assertEqual(report["python_exit_status"], 73)
+        self.assertFalse(report["network_used"])
+        self.assertFalse(report["production_tool_integrated"])
+        print("17S-14 actual AppContainer broker: signed request verified, "
+              "one response correlated, replay rejected, "
+              "owner-only synthetic denied; total=21", flush=True)
 
     def test_native_python_denies_present_owner_only_file_after_granted_read(self):
         # Hard FAIL, not SKIP: security proof is the entire 17S-13 gate.
