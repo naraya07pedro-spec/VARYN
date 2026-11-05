@@ -275,3 +275,82 @@ class WindowsChildJob:
 def attach_windows_child_guard(proc):
     """Production factory: never return a fake guard or insecure fallback."""
     return WindowsChildJob(proc)
+
+
+class WindowsSuspendedAppContainerJob:
+    """17S-17 CI-only strict Job for a *suspended* native AppContainer.
+
+    Does not change the security token's MIC or SID. The caller must separately
+    attest the child's actual AppContainer primary token and keep it suspended
+    until this Job's membership and limits are independently read back.
+    Fails closed rather than retrying unguarded.
+    """
+    def __init__(self, process_handle, *, memory_cap=MAX_CHILD_COMMIT_BYTES):
+        if os.name != "nt":
+            raise PublicToolRejected("Windows AppContainer job unavailable")
+        if type(memory_cap) is not int or not (
+                64 * 1024 * 1024 <= memory_cap <= 256 * 1024 * 1024):
+            raise PublicToolRejected("AppContainer Job memory cap rejected")
+        if not process_handle:
+            raise PublicToolRejected("Suspended process handle unavailable")
+        self._kernel, _ = _native_apis()
+        self._job = None
+        self._memory_cap = memory_cap
+        try:
+            job = self._kernel.CreateJobObjectW(None, None)
+            if not job:
+                raise PublicToolRejected("AppContainer Job creation refused")
+            self._job = job
+            info = _ExtendedLimit()
+            required = (
+                _JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE |
+                _JOB_OBJECT_LIMIT_ACTIVE_PROCESS |
+                _JOB_OBJECT_LIMIT_PROCESS_MEMORY)
+            info.BasicLimitInformation.LimitFlags = required
+            info.BasicLimitInformation.ActiveProcessLimit = 1
+            info.ProcessMemoryLimit = memory_cap
+            if not self._kernel.SetInformationJobObject(
+                    _HANDLE(job), _EXTENDED_LIMIT_INFORMATION,
+                    ctypes.byref(info), ctypes.sizeof(info)):
+                raise PublicToolRejected("AppContainer Job limits refused")
+            output = _ExtendedLimit()
+            length = _DWORD()
+            if not self._kernel.QueryInformationJobObject(
+                    _HANDLE(job), _EXTENDED_LIMIT_INFORMATION,
+                    ctypes.byref(output), ctypes.sizeof(output),
+                    ctypes.byref(length)):
+                raise PublicToolRejected("AppContainer Job readback denied")
+            if (output.BasicLimitInformation.LimitFlags & required != required
+                    or output.BasicLimitInformation.ActiveProcessLimit != 1
+                    or output.ProcessMemoryLimit != memory_cap):
+                raise PublicToolRejected("AppContainer Job readback mismatch")
+            if not self._kernel.AssignProcessToJobObject(
+                    _HANDLE(job), _HANDLE(int(process_handle))):
+                raise PublicToolRejected("AppContainer Job assignment refused")
+            yes = ctypes.c_int()
+            if not self._kernel.IsProcessInJob(
+                    _HANDLE(int(process_handle)), _HANDLE(job),
+                    ctypes.byref(yes)) or yes.value != 1:
+                raise PublicToolRejected("AppContainer Job membership unverified")
+        except Exception:
+            self.close()
+            raise PublicToolRejected(
+                "Native suspended AppContainer Job containment not established"
+            ) from None
+
+    @property
+    def attached(self):
+        return self._job is not None
+
+    @property
+    def active_process_limit(self):
+        return 1 if self.attached else 0
+
+    @property
+    def memory_cap_bytes(self):
+        return self._memory_cap if self.attached else 0
+
+    def close(self):
+        handle, self._job = self._job, None
+        if handle:
+            self._kernel.CloseHandle(_HANDLE(handle))
