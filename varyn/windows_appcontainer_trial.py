@@ -222,8 +222,10 @@ def _copy_runtime_into_owned_profile(exe, sid, kernel, advapi, userenv):
             kernel.LocalFree(ctypes.cast(as_text, wintypes.HANDLE))
 
 
-def run_ci_only_zero_capability_trial():
+def run_ci_only_zero_capability_trial(*, broker_trial=False):
     """One fixed, no-network test action. NEVER call from production UI."""
+    if type(broker_trial) is not bool:
+        raise PublicToolRejected("Broker trial flag must be boolean")
     if (os.name != "nt" or os.environ.get("GITHUB_ACTIONS") != "true"
             or os.environ.get("RUNNER_OS") != "Windows"
             or os.environ.get("VARYN_CI_APPCONTAINER_TRIAL") != "1"):
@@ -246,6 +248,11 @@ def run_ci_only_zero_capability_trial():
     runtime_parent = None
     private_fixture = None
     owner_read_verified = False
+    broker_request = None
+    broker_secret = None
+    broker_response = None
+    broker_total = None
+    broker_replay_refused = False
     try:
         hr = userenv.CreateAppContainerProfile(
             name, name, "Disposable offline VARYN CI restricted process test",
@@ -300,26 +307,49 @@ def run_ci_only_zero_capability_trial():
         if not owner_read_verified:
             raise PublicToolRejected("AppContainer synthetic positive control missing")
         # CHILD cannot receive provider credentials, model input or real files.
-        # Exit 73: allowed copy read succeeded and owner-only read DENIED.
-        # Exit 83: private read was allowed (security regression).
-        # Exit 84: private file not found (NOT acceptable proof).
-        source = (
-            "import sys\\n"
-            "try:\\n"
-            " with open(sys.argv[1],'rb') as f: ok=f.read()\\n"
-            " if ok!=b'varyn-17s13-granted': sys.exit(81)\\n"
-            "except Exception: sys.exit(82)\\n"
-            "try:\\n"
-            " with open(sys.argv[2],'rb') as f: f.read()\\n"
-            " sys.exit(83)\\n"
-            "except PermissionError: sys.exit(73)\\n"
-            "except FileNotFoundError: sys.exit(84)\\n"
-            "except Exception: sys.exit(85)\\n"
-        ).replace("\\n", "\n")
-        command = ctypes.create_unicode_buffer(
-            subprocess.list2cmdline([str(trusted_copy), "-I", "-S",
-                                     "-c", source,
-                                     str(allowed), str(owner_file)]))
+        # Exit 73 only after read-granted, owner-private denied and (when
+        # requested) a single authenticated synthetic IPC round-trip.
+        if broker_trial:
+            from varyn.bounded_broker_protocol import (
+                new_request, canonical,
+            )
+            root = trusted_copy.parent
+            # Copy only the reviewed, fixed child/protocol code into the
+            # disposable AppContainer-owned directory. No site packages.
+            source_dir = Path(__file__).resolve().parent
+            for module in ("bounded_broker_child.py",
+                           "bounded_broker_protocol.py"):
+                shutil.copy2(source_dir / module, root / module)
+            broker_secret = secrets.token_bytes(32)
+            key_file = root / "trial-key.bin"
+            request_file = root / "trial-request.json"
+            broker_response = root / "trial-response.json"
+            with open(key_file, "xb") as output:
+                output.write(broker_secret)
+            broker_request = new_request(broker_secret, [4, 6, 11])
+            with open(request_file, "xb") as output:
+                output.write(canonical(broker_request))
+            args = [str(trusted_copy), "-I", "-S",
+                    str(root / "bounded_broker_child.py"),
+                    str(allowed), str(owner_file),
+                    str(request_file), str(broker_response), str(key_file)]
+        else:
+            source = (
+                "import sys\\n"
+                "try:\\n"
+                " with open(sys.argv[1],'rb') as f: ok=f.read()\\n"
+                " if ok!=b'varyn-17s13-granted': sys.exit(81)\\n"
+                "except Exception: sys.exit(82)\\n"
+                "try:\\n"
+                " with open(sys.argv[2],'rb') as f: f.read()\\n"
+                " sys.exit(83)\\n"
+                "except PermissionError: sys.exit(73)\\n"
+                "except FileNotFoundError: sys.exit(84)\\n"
+                "except Exception: sys.exit(85)\\n"
+            ).replace("\\n", "\n")
+            args = [str(trusted_copy), "-I", "-S", "-c", source,
+                    str(allowed), str(owner_file)]
+        command = ctypes.create_unicode_buffer(subprocess.list2cmdline(args))
         systemroot = os.environ.get("SystemRoot")
         localappdata = os.environ.get("LOCALAPPDATA")
         if not systemroot or not localappdata:
@@ -355,6 +385,27 @@ def run_ci_only_zero_capability_trial():
         if not kernel.GetExitCodeProcess(proc.hProcess, ctypes.byref(raw)):
             raise PublicToolRejected("Cannot read AppContainer child exit status")
         exit_code = raw.value
+        if broker_trial and exit_code == 73:
+            from varyn.bounded_broker_protocol import (
+                BrokerRejected, OneShotReplyVerifier, MAX_BYTES,
+            )
+            if broker_request is None or broker_response is None:
+                raise PublicToolRejected("Missing CI broker challenge")
+            if not broker_response.is_file():
+                raise PublicToolRejected("AppContainer broker response missing")
+            with open(broker_response, "rb") as response_file:
+                raw_response = response_file.read(MAX_BYTES + 1)
+            verifier = OneShotReplyVerifier(broker_request, broker_secret)
+            try:
+                broker_total = verifier.consume(raw_response)
+            except BrokerRejected:
+                raise PublicToolRejected("AppContainer broker reply rejected") from None
+            try:
+                verifier.consume(raw_response)
+            except BrokerRejected:
+                broker_replay_refused = True
+            if broker_total != 21 or not broker_replay_refused:
+                raise PublicToolRejected("Synthetic broker verification failed")
         completed = True
     finally:
         # Terminate unresponsive/test-crashed child before profile deletion.
@@ -397,4 +448,8 @@ def run_ci_only_zero_capability_trial():
         "synthetic_private_read_denied": exit_code == 73,
         "private_file_test_executed": exit_code in (73, 83, 84, 85),
         "production_tool_integrated": False,
+        "one_shot_broker_trial": broker_trial,
+        "authenticated_response_verified": broker_total == 21,
+        "replayed_response_refused": broker_replay_refused,
+        "synthetic_broker_total": broker_total,
     }
