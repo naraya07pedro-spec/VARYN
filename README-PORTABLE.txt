@@ -128,3 +128,26 @@ OWNER ACCEPTANCE IN THE APP (17S-32)
   history. Excerpts are capped at 480 characters and may be truncated.
 - No automatic model request, native app read/write, history sync, or
   restoration of earlier session consent, browser state or credentials.
+
+17S-39 | UNIVERSAL MODEL REGISTRY + PINNED CHEAP/FREE MODEL GATEWAY
+- New code: varyn/model_registry.py (dated, owner-reviewed price offers);
+  varyn/gateway_chat.py (pinned OpenRouter, DeepSeek, local 9Router);
+  varyn/universal_gateway.py (explicit opt-in and in-process budget).
+- TEST WITHOUT AN API KEY: python -m varyn.model_registry
+  Prints only a fictional model-choice summary; no network request.
+- All live model API calls are DISABLED by default. Programmatic use needs
+  allow_network=True, a fresh approve_request=True per call, and the
+  correct environment key: OPENROUTER_API_KEY, DEEPSEEK_API_KEY,
+  or VARYN_9ROUTER_API_KEY. Never put keys in chat, repo or log.
+- 9Router's local gateway is PINNED to 127.0.0.1:20128, not public.
+  It also needs authorized_upstream=True. Its OWN fallback may change
+  which provider/model bills, even if VARYN does not auto-fallback.
+- Only fictional SYNTHETIC: tasks are supported by the pilot API.
+  A 'free' or 'cheap' claim requires fresh explicit owner-reviewed
+  input AND output prices; unknown/stale prices refuse auto-selection.
+  Inferred token and cost estimates do not enforce real billing caps.
+- This stage exposes a Python gateway, NOT a finished model-chooser GUI
+  or verified live provider connection. Portable EXE startup and previous
+  DPAPI regressions do NOT independently prove live model routing.
+- ChatGPT/Claude/Gemini official consumer-app account history and memory
+  are NOT synchronized by this gateway. Option C remains BLOCKED.
