@@ -16,6 +16,7 @@ import os
 from pathlib import Path
 import secrets
 import shutil
+from tempfile import TemporaryDirectory
 import subprocess
 import sys
 
@@ -243,6 +244,8 @@ def run_ci_only_zero_capability_trial():
     exit_code = None
     cleaned = False
     runtime_parent = None
+    private_fixture = None
+    owner_read_verified = False
     try:
         hr = userenv.CreateAppContainerProfile(
             name, name, "Disposable offline VARYN CI restricted process test",
@@ -282,11 +285,41 @@ def run_ci_only_zero_capability_trial():
         si = _StartupInfoEx()
         si.StartupInfo.cb = ctypes.sizeof(si)
         si.lpAttributeList = ctypes.addressof(attr_buf)
-        # No user-controlled command, no network intent, no inherited handles.
-        # Python reaching the fixed returncode 73 proves runtime bootstrap.
-        source = "import sys; sys.exit(73)"
+        # Both files are newly-created disposable OFFLINE fixtures.
+        # The granted file is INSIDE the disposable container storage; the
+        # owner-private file is OUTSIDE it and is readable by the host.
+        allowed = trusted_copy.parent / "synthetic-granted.txt"
+        allowed.write_bytes(b"varyn-17s13-granted")
+        private_fixture = TemporaryDirectory(prefix="varyn-ci-appowner-")
+        owner_file = Path(private_fixture.name) / "synthetic-owner-only.txt"
+        owner_file.write_bytes(b"varyn-17s13-owner-only")
+        owner_read_verified = (
+            owner_file.is_file() and
+            owner_file.read_bytes() == b"varyn-17s13-owner-only"
+        )
+        if not owner_read_verified:
+            raise PublicToolRejected("AppContainer synthetic positive control missing")
+        # CHILD cannot receive provider credentials, model input or real files.
+        # Exit 73: allowed copy read succeeded and owner-only read DENIED.
+        # Exit 83: private read was allowed (security regression).
+        # Exit 84: private file not found (NOT acceptable proof).
+        source = (
+            "import sys\\n"
+            "try:\\n"
+            " with open(sys.argv[1],'rb') as f: ok=f.read()\\n"
+            " if ok!=b'varyn-17s13-granted': sys.exit(81)\\n"
+            "except Exception: sys.exit(82)\\n"
+            "try:\\n"
+            " with open(sys.argv[2],'rb') as f: f.read()\\n"
+            " sys.exit(83)\\n"
+            "except PermissionError: sys.exit(73)\\n"
+            "except FileNotFoundError: sys.exit(84)\\n"
+            "except Exception: sys.exit(85)\\n"
+        ).replace("\\n", "\n")
         command = ctypes.create_unicode_buffer(
-            subprocess.list2cmdline([str(trusted_copy), "-I", "-S", "-c", source]))
+            subprocess.list2cmdline([str(trusted_copy), "-I", "-S",
+                                     "-c", source,
+                                     str(allowed), str(owner_file)]))
         systemroot = os.environ.get("SystemRoot")
         localappdata = os.environ.get("LOCALAPPDATA")
         if not systemroot or not localappdata:
@@ -336,6 +369,8 @@ def run_ci_only_zero_capability_trial():
         if runtime_parent is not None:
             # Deleting only the known child of our newly created profile.
             shutil.rmtree(runtime_parent)
+        if private_fixture is not None:
+            private_fixture.cleanup()
         if sid:
             advapi.FreeSid(sid)
         if created:
@@ -354,9 +389,12 @@ def run_ci_only_zero_capability_trial():
         "inherited_handles": False,
         "process_terminated": True,
         "disposable_profile_deleted": cleaned,
-        "python_runtime_executed": exit_code == 73,
+        "python_runtime_executed": exit_code in (73, 81, 82, 83, 84, 85),
         "python_exit_status": exit_code,
         "network_used": False,
-        "private_file_test_executed": False,
+        "synthetic_owner_positive_control": owner_read_verified,
+        "synthetic_granted_read_ok": exit_code in (73, 83, 84, 85),
+        "synthetic_private_read_denied": exit_code == 73,
+        "private_file_test_executed": exit_code in (73, 83, 84, 85),
         "production_tool_integrated": False,
     }
