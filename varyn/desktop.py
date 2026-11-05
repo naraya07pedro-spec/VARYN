@@ -1001,7 +1001,7 @@ class VarynDesktop(tk.Tk):
 
     def _copy_official_app_relay(self, *, task=None, target=None,
                                  project=None, include_context=None,
-                                 guided_history=None):
+                                 guided_history=None, archived_excerpt=None):
         """Review exact user-typed text before writing it to OS clipboard."""
         if self._busy or self._closing:
             return
@@ -1028,6 +1028,7 @@ class VarynDesktop(tk.Tk):
             preview = relay.prepare(
                 target, task, reviewed_context=reviewed_context,
                 guided_history=guided_history,
+                archived_excerpt=archived_excerpt,
             )
         except (ManualRelayRejected, WorkingContextRejected, ValueError):
             self._append(

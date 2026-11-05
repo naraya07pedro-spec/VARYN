@@ -64,7 +64,8 @@ class ArchivedExcerptSelection:
                 self.automatic_bidirectional_sync is not False):
             raise ArchiveContinuationRejected("Invalid archive excerpt selection")
         try:
-            if _bounded_text(self.excerpt, _EXCERPT) != self.excerpt:
+            checked = _bounded_text(self.excerpt, _EXCERPT)
+            if not self.truncated and checked != self.excerpt:
                 raise ArchiveContinuationRejected("Noncanonical synthetic excerpt")
             assert_no_obvious_secrets(self.excerpt)
         except (ValueError, TypeError) as error:

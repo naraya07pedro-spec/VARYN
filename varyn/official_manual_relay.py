@@ -96,7 +96,8 @@ class OfficialManualRelay:
             raise ManualRelayRejected("Invalid trusted time")
         return value
 
-    def prepare(self, provider, task, *, reviewed_context=None, guided_history=None):
+    def prepare(self, provider, task, *, reviewed_context=None,
+                guided_history=None, archived_excerpt=None):
         official_destination(provider)
         if self._pending is not None or self._awaiting_provider is not None:
             raise ManualRelayRejected("Complete or discard the previous relay first")
@@ -118,6 +119,15 @@ class OfficialManualRelay:
             history_block = guided_history.render()
         else:
             history_block = None
+        if archived_excerpt is not None:
+            from varyn.archive_continuation import ArchivedExcerptSelection
+            if type(archived_excerpt) is not ArchivedExcerptSelection:
+                raise ManualRelayRejected("Archive excerpt needs separate owner selection")
+            if guided_history is not None or self._hops != 0 or self._previous_reply is not None:
+                raise ManualRelayRejected("Archived continuation only starts a fresh relay")
+            archive_block = archived_excerpt.render()
+        else:
+            archive_block = None
         sections = [
             "VARYN | HUMAN-MEDIATED OFFICIAL APP HANDOFF v1",
             "Destination: " + provider,
@@ -129,6 +139,8 @@ class OfficialManualRelay:
             sections.append(context_block)
         if history_block is not None:
             sections.append(history_block)
+        if archive_block is not None:
+            sections.append(archive_block)
         if self._previous_reply is not None and history_block is None:
             # repr keeps the unverified reply quoted and clearly distinguishable.
             sections.append(
