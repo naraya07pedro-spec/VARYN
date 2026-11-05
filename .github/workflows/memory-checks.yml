@@ -65,6 +65,13 @@ jobs:
       - name: 17S-24 native Windows Tk outbound-bound reply consent presentation
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_official_manual_relay_tk.py" -v
+      - name: 17S-25 owner-reviewed project RAM notes, conflicts and explicit opt-in
+        run: |
+          python -m unittest discover -s tests -p "test_relay_working_context.py" -v
+          python -m unittest discover -s tests -p "test_official_manual_relay_desktop.py" -v
+      - name: 17S-25 native Windows Tk working context owner review, copy and discard
+        if: runner.os == 'Windows'
+        run: python -m unittest discover -s tests -p "test_relay_working_context_tk.py" -v
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
       - name: Synthetic-only desktop boundary and disposable sample cleanup
