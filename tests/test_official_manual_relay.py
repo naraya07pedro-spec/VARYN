@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from varyn.official_manual_relay import (
-    OFFICIAL_APP_LINKS, ManualRelayRejected, OfficialManualRelay,
+    OFFICIAL_APP_LINKS, ManualRelayRejected, OfficialManualRelay, official_destination,
 )
 
 
@@ -12,6 +12,36 @@ class ManualConsumerRelayTests(unittest.TestCase):
     def setUp(self):
         self.now = [1000]
         self.relay = OfficialManualRelay(clock=lambda: self.now[0])
+
+    def test_official_destinations_are_pinned_not_user_urls(self):
+        self.assertEqual(official_destination("chatgpt"), "https://chatgpt.com/")
+        self.assertEqual(official_destination("claude"), "https://claude.ai/")
+        self.assertEqual(official_destination("gemini"), "https://gemini.google.com/")
+        for bad in ("", "ChatGPT", "https://chatgpt.com/?prompt=leak",
+                    "claude.ai", "../gemini", None, False, 7):
+            with self.subTest(bad=bad), self.assertRaises(ManualRelayRejected):
+                official_destination(bad)
+
+    def test_preflight_copy_is_nonmutating_and_rejects_stale_preview(self):
+        first = self.relay.prepare("chatgpt", "SYNTHETIC: only")
+        self.assertEqual(self.relay.preflight_copy(first), first.packet)
+        self.assertFalse(self.relay.status()["awaiting_user_pasteback"])
+        self.assertEqual(self.relay.status()["hops_used"], 0)
+        with self.assertRaises(ManualRelayRejected):
+            self.relay.preflight_copy(replace(first, packet="forged"))
+        self.assertEqual(self.relay.decide(first, approved=False)["status"], "denied")
+        with self.assertRaises(ManualRelayRejected):
+            self.relay.preflight_copy(first)
+
+    def test_expiry_preflight_burns_pending_before_clipboard(self):
+        first = self.relay.prepare("claude", "SYNTHETIC: expires")
+        self.now[0] = first.expires_at + 1
+        with self.assertRaises(ManualRelayRejected):
+            self.relay.preflight_copy(first)
+        with self.assertRaises(ManualRelayRejected):
+            self.relay.decide(first, approved=True, copied=True)
+        self.assertEqual(self.relay.status()["hops_used"], 0)
+        self.assertEqual(self.relay.status()["provider_requests"], 0)
 
     def test_reviewed_packet_has_real_destination_but_no_sync_authority(self):
         for provider in OFFICIAL_APP_LINKS:
