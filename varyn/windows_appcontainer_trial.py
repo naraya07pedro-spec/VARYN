@@ -271,6 +271,9 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False):
     broker_replay_refused = False
     pipe_guard = None
     pipe_attested = False
+    journal = None
+    journal_claimed = False
+    journal_finalized = False
     try:
         hr = userenv.CreateAppContainerProfile(
             name, name, "Disposable offline VARYN CI restricted process test",
@@ -370,6 +373,14 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False):
             broker_request = new_request(broker_secret, [4, 6, 11])
             with open(request_file, "xb") as output:
                 output.write(canonical(broker_request))
+            # Parent-private SQLite journal, outside the child AppContainer.
+            # COMMIT the synthetic dispatch claim BEFORE process creation.
+            # This CI fixture is removed after the test. Production needs
+            # a persistent owner-selected journal and consent workflow.
+            from varyn.durable_broker_journal import DurableOneShotJournal
+            journal = DurableOneShotJournal(
+                str(Path(private_fixture.name) / "broker-dispatch.sqlite"))
+            journal_claimed = journal.claim(broker_request["request_id"])
             args = [str(trusted_copy), "-I", "-S",
                     str(root / "bounded_broker_child.py"),
                     str(allowed), str(owner_file),
@@ -457,6 +468,13 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False):
                 broker_replay_refused = True
             if broker_total != 21 or not broker_replay_refused:
                 raise PublicToolRejected("Synthetic broker verification failed")
+            if journal is None or not journal_claimed:
+                raise PublicToolRejected("Broker dispatch journal missing")
+            journal_finalized = (
+                journal.finalize(
+                    broker_request["request_id"], succeeded=True) == "completed")
+            if not journal_finalized:
+                raise PublicToolRejected("Broker dispatch finalization missing")
         completed = True
     finally:
         # Do not leave an IPC endpoint live while tearing down a profile.
@@ -474,6 +492,8 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False):
         if runtime_parent is not None:
             # Deleting only the known child of our newly created profile.
             shutil.rmtree(runtime_parent)
+        if journal is not None:
+            journal.close()
         if private_fixture is not None:
             private_fixture.cleanup()
         if sid:
@@ -508,4 +528,6 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False):
         "authenticated_response_verified": broker_total == 21,
         "replayed_response_refused": broker_replay_refused,
         "synthetic_broker_total": broker_total,
+        "parent_journal_claimed_before_launch": journal_claimed,
+        "parent_journal_completed_after_verification": journal_finalized,
     }
