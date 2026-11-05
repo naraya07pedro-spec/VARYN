@@ -133,7 +133,16 @@ def _own_user_sid(kernel, advapi):
 class OneShotWindowsPipe:
     """Owned, one-client OS PID attestation. Never inherits its server handle."""
 
-    def __init__(self):
+    def __init__(self, *, appcontainer_sid=None):
+        if appcontainer_sid is not None:
+            if (type(appcontainer_sid) is not str or
+                    not appcontainer_sid.startswith("S-1-15-2-") or
+                    len(appcontainer_sid) > 220 or
+                    not all(x.isdigit() for x in
+                            appcontainer_sid.split("-")[4:]) or
+                    len(appcontainer_sid.split("-")) < 8):
+                raise PublicToolRejected("Untrusted AppContainer package SID")
+        self._package_sid_scoped = appcontainer_sid is not None
         kernel, advapi = _api()
         self._k = kernel
         self._pipe = None
@@ -145,10 +154,12 @@ class OneShotWindowsPipe:
         descriptor = ctypes.c_void_p()
         try:
             sid = _own_user_sid(kernel, advapi)
-            # Explicitly omit Everyone/Anonymous/Authenticated Users.
-            # A future AppContainer trial must grant its *specific* package
-            # SID separately, not silently widen this owner-only ACL.
+            # Omit Everyone/Anonymous/Authenticated Users. AppContainer
+            # path grants only its exact OS-issued profile SID if supplied.
+            # Client PID must STILL match the attested child process.
             sddl = "D:P(A;;GA;;;SY)(A;;GA;;;" + sid + ")"
+            if appcontainer_sid is not None:
+                sddl += "(A;;GRGW;;;" + appcontainer_sid + ")"
             if not advapi.ConvertStringSecurityDescriptorToSecurityDescriptorW(
                     sddl, 1, ctypes.byref(descriptor), None):
                 raise PublicToolRejected("Pipe DACL creation refused")
@@ -224,7 +235,9 @@ class OneShotWindowsPipe:
             raise PublicToolRejected("Unexpected pipe payload")
         return {"os_client_pid_verified": True,
                 "one_shot": True, "local_only": True,
-                "owner_only_dacl": True, "inherited_handles": False,
+                "owner_only_dacl": not self._package_sid_scoped,
+                "package_sid_scoped_dacl": self._package_sid_scoped,
+                "inherited_handles": False,
                 "appcontainer_sid_verified": False}
 
     def close(self):
