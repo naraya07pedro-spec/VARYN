@@ -115,8 +115,30 @@ class ModelControlCenter(tk.Toplevel):
         self.protocol("WM_DELETE_WINDOW", self._dismiss)
 
     def _build(self):
-        shell = ttk.Frame(self, padding=10)
-        shell.pack(fill="both", expand=True)
+        root = ttk.Frame(self)
+        root.pack(fill="both", expand=True)
+        scroll = ttk.Scrollbar(root, orient="vertical")
+        scroll.pack(side="right", fill="y")
+        canvas = tk.Canvas(root, highlightthickness=0, borderwidth=0)
+        canvas.pack(side="left", fill="both", expand=True)
+        canvas.configure(yscrollcommand=scroll.set)
+        scroll.configure(command=canvas.yview)
+        shell = ttk.Frame(canvas, padding=10)
+        window = canvas.create_window((0, 0), window=shell, anchor="nw")
+        shell.bind(
+            "<Configure>",
+            lambda _event: canvas.configure(scrollregion=canvas.bbox("all")),
+        )
+        canvas.bind(
+            "<Configure>",
+            lambda event: canvas.itemconfigure(window, width=event.width),
+        )
+        canvas.bind(
+            "<MouseWheel>",
+            lambda event: canvas.yview_scroll(
+                -1 if event.delta > 0 else 1, "units",
+            ),
+        )
         ttk.Label(shell, text="17S-40 | Owner-reviewed model registry (RAM only)").pack(anchor="w")
         ttk.Label(
             shell, wraplength=695,
@@ -343,8 +365,9 @@ class ModelControlCenter(tk.Toplevel):
                 transport=self._transport,
             )
             thread = threading.Thread(
-                target=self._worker,
-                args=(gateway, selection, chosen.provider == "9router"),
+                target=ModelControlCenter._worker,
+                args=(gateway, selection, chosen.provider == "9router",
+                      self._results),
                 daemon=True,
             )
             thread.start()
@@ -355,7 +378,8 @@ class ModelControlCenter(tk.Toplevel):
                 "No dispatch."
             )
 
-    def _worker(self, gateway, selection, upstream_approved):
+    @staticmethod
+    def _worker(gateway, selection, upstream_approved, output_queue):
         chosen, estimated, task, input_estimate, out, ceiling = selection
         try:
             result = gateway.generate(
@@ -363,12 +387,12 @@ class ModelControlCenter(tk.Toplevel):
                 ceiling_micro_usd=ceiling, provider=chosen.provider,
                 approve_request=True, authorized_upstream=upstream_approved,
             )
-            self._results.put(("ok", result))
+            output_queue.put(("ok", result))
         except (ProviderError, RegistryRejected, BudgetExceeded,
                 PermissionError, ValueError, OSError):
-            self._results.put(("error", None))
+            output_queue.put(("error", None))
         except BaseException:
-            self._results.put(("error", None))
+            output_queue.put(("error", None))
 
     def _poll(self):
         self._poll_id = None
