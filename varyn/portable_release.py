@@ -43,8 +43,10 @@ def _inventory(directory):
             continue
         if (name.startswith("../") or name.startswith("/") or
                 "\\" in name or name.lower().endswith(
-                    (".sqlite3", ".db", ".env", ".log", ".spec", ".zip", ".7z")
-                ) or name in (".env", "credentials.json", "cookies.sqlite")):
+                    (".sqlite3", ".db", ".env", ".log", ".spec", ".7z")
+                ) or (name.lower().endswith(".zip") and
+                      name != "_internal/base_library.zip") or
+                name in (".env", "credentials.json", "cookies.sqlite")):
             raise PortableBundleRejected("Disallowed runtime/user data in bundle")
         total += path.stat().st_size
         if len(entries) >= _MAX_FILES or total > _MAX_TOTAL_BYTES:
