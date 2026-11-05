@@ -27,6 +27,16 @@ class ManualRelayRejected(ValueError):
     """Unreviewed, oversized, stale or invalid manual relay state."""
 
 
+def official_destination(provider):
+    """Return a PINNED official-app landing URL, never a user-supplied URL.
+
+    The caller must provide separate, explicit browser-launch consent.
+    """
+    if type(provider) is not str or provider not in OFFICIAL_APP_LINKS:
+        raise ManualRelayRejected("Unknown official consumer application")
+    return OFFICIAL_APP_LINKS[provider]
+
+
 def _bounded_text(value, limit):
     if type(value) is not str or not 1 <= len(value.strip()) <= limit:
         raise ManualRelayRejected("Only bounded explicitly typed text is allowed")
@@ -71,8 +81,7 @@ class OfficialManualRelay:
         return value
 
     def prepare(self, provider, task):
-        if type(provider) is not str or provider not in OFFICIAL_APP_LINKS:
-            raise ManualRelayRejected("Unknown official consumer application")
+        official_destination(provider)
         if self._pending is not None or self._awaiting_provider is not None:
             raise ManualRelayRejected("Complete or discard the previous relay first")
         if self._hops >= _MAX_HOPS:
@@ -106,10 +115,25 @@ class OfficialManualRelay:
         ).hexdigest()
         preview = ManualRelayPreview(
             provider, request_id, digest, packet,
-            self._now() + _TTL_SECONDS, OFFICIAL_APP_LINKS[provider],
+            self._now() + _TTL_SECONDS, official_destination(provider),
         )
         self._pending = preview
         return preview
+
+    def preflight_copy(self, preview):
+        """Verify the *live* exact preview before touching OS clipboard.
+
+        Called after a real owner-approved modal, before writing to clipboard.
+        No network or provider action. A later decide() checks again; clipboard
+        and the approval journal are not OS-transactionally atomic.
+        """
+        if (type(preview) is not ManualRelayPreview or
+                self._pending is None or preview is not self._pending):
+            raise ManualRelayRejected("Stale or forged manual handoff preview")
+        if self._now() > preview.expires_at:
+            self._pending = None
+            raise ManualRelayRejected("Manual handoff preview expired")
+        return preview.packet
 
     def decide(self, preview, *, approved, copied=False):
         """Host-only post-review transition, NOT a provider-account signal."""
