@@ -19,6 +19,11 @@ from varyn.native_history_import_gui import NativeHistoryImportGuide
 from varyn.owner_pilot_checklist_gui import OwnerPilotChecklist
 from varyn.guided_trio_flow import GuidedThreeAppFlow, GuidedTrioRejected
 from varyn.guided_reply_ledger import GuidedLedgerRejected
+from varyn.three_app_archive import (
+    ArchiveRejected, snapshot as archive_snapshot,
+    save_new as save_archive, load_readonly as load_archive,
+    digest as archive_digest, review as archive_review, display as archive_display,
+)
 
 
 class OfficialRelayWorkbench(tk.Toplevel):
@@ -41,6 +46,7 @@ class OfficialRelayWorkbench(tk.Toplevel):
         self.include_context = tk.BooleanVar(master=self, value=False)
         self._guided_flow = GuidedThreeAppFlow()
         self._guided_ledger_window = None
+        self._saved_archive_window = None
         self.guided_label = tk.StringVar(
             master=self, value="Guided ChatGPT -> Claude -> Gemini: OFF"
         )
@@ -107,6 +113,14 @@ class OfficialRelayWorkbench(tk.Toplevel):
         ttk.Button(
             guided, text="17S-36 | View complete locally reviewed replies (RAM)",
             command=self._view_guided_ledger,
+        ).pack(anchor="w", pady=(0, 3))
+        ttk.Button(
+            guided, text="17S-37 | Save completed 3-AI encrypted archive",
+            command=self._save_three_app_archive,
+        ).pack(anchor="w", pady=(0, 3))
+        ttk.Button(
+            guided, text="17S-37 | Open saved 3-AI archive read-only",
+            command=self._open_three_app_archive,
         ).pack(anchor="w", pady=(0, 3))
         ttk.Button(
             guided, text="17S-35 | Discard guided flow and relay RAM",
@@ -344,6 +358,122 @@ class OfficialRelayWorkbench(tk.Toplevel):
                    command=self._clear_guided_ledger_view).pack(
                        anchor="e", pady=(8, 0))
         viewer.protocol("WM_DELETE_WINDOW", self._clear_guided_ledger_view)
+
+    def _archive_snapshot(self):
+        return archive_snapshot(
+            self._guided_flow.ledger, phase=self._guided_flow.phase
+        )
+
+    def _save_three_app_archive(self):
+        if not self._allowed():
+            return
+        try:
+            data = self._archive_snapshot()
+            approved = self._owner._review_scrollable_manual_text(
+                title="VARYN | Review encrypted three-AI snapshot",
+                heading="SAVE complete reviewed synthetic history READ-ONLY",
+                digest=archive_digest(data), content=archive_review(data),
+                warning="All three complete user-pasted SYNTHETIC replies "
+                        "will be encrypted for THIS Windows profile. "
+                        "Origins are NOT authenticated and NO relay "
+                        "permissions, login or native sync are saved.",
+                approve_label="Approve saving NEW encrypted archive",
+            )
+            if not approved or not self._allowed():
+                self.detail_label.set("Archive save declined.")
+                return
+            if self._archive_snapshot() != data:
+                self.detail_label.set("BLOCKED: archive changed after review.")
+                return
+            selected = filedialog.asksaveasfilename(
+                parent=self,
+                title="Choose NEW encrypted .varyn-archive file (never overwrite)",
+                defaultextension=".varyn-archive",
+                filetypes=[("Encrypted three-AI archive", "*.varyn-archive")],
+            )
+            if not selected or not self._allowed():
+                return
+            if self._archive_snapshot() != data:
+                self.detail_label.set("BLOCKED: archive changed in file picker.")
+                return
+            save_archive(selected, data)
+            self.detail_label.set(
+                "Archive encrypted. No previous permission or session restored."
+            )
+        except (ArchiveRejected, SealedDataError, UnsupportedPlatformError,
+                OSError, ValueError):
+            self.detail_label.set(
+                "BLOCKED: incomplete or unsafe synthetic archive; "
+                "no existing file overwritten."
+            )
+
+    def _clear_saved_archive_view(self):
+        viewer = getattr(self, "_saved_archive_window", None)
+        if viewer is not None:
+            try:
+                if viewer.winfo_exists():
+                    viewer.destroy()
+            except tk.TclError:
+                pass
+        self._saved_archive_window = None
+
+    def _open_three_app_archive(self):
+        if not self._allowed():
+            return
+        try:
+            selected = filedialog.askopenfilename(
+                parent=self, title="Open one encrypted archive READ-ONLY",
+                filetypes=[("Encrypted three-AI archive", "*.varyn-archive")],
+            )
+            if not selected or not self._allowed():
+                return
+            data = load_archive(selected)
+            approved = self._owner._review_scrollable_manual_text(
+                title="VARYN | Review archive before READ-ONLY display",
+                heading="No previously approved relay can be restored",
+                digest=archive_digest(data), content=archive_review(data),
+                warning="Locally decrypted historical SYNTHETIC text; "
+                        "claimed app origins UNVERIFIED. No clipboard, "
+                        "model, login, consent or sync restored.",
+                approve_label="Open read-only local archive",
+            )
+            if not approved or not self._allowed():
+                self.detail_label.set("Archive open declined.")
+                return
+            self._clear_saved_archive_view()
+            viewer = tk.Toplevel(self)
+            self._saved_archive_window = viewer
+            viewer.title("VARYN | READ-ONLY 3-AI archive, unverified")
+            viewer.geometry("700x520")
+            viewer.transient(self)
+            frame = ttk.Frame(viewer, padding=10)
+            frame.pack(fill="both", expand=True)
+            ttk.Label(
+                frame, text="Only locally reviewed user-pasted text; "
+                            "NO live relay, account access or native sync.",
+                wraplength=650,
+            ).pack(anchor="w", pady=(0, 7))
+            area = ttk.Frame(frame)
+            area.pack(fill="both", expand=True)
+            scrollbar = ttk.Scrollbar(area)
+            scrollbar.pack(side="right", fill="y")
+            reader = tk.Text(area, wrap="word")
+            reader.pack(side="left", fill="both", expand=True)
+            reader.configure(yscrollcommand=scrollbar.set)
+            scrollbar.configure(command=reader.yview)
+            reader.insert("1.0", archive_display(data))
+            reader.configure(state="disabled")
+            ttk.Button(
+                frame, text="Close local archive view",
+                command=self._clear_saved_archive_view,
+            ).pack(anchor="e", pady=(8, 0))
+            viewer.protocol("WM_DELETE_WINDOW", self._clear_saved_archive_view)
+            self.detail_label.set(
+                "Archive displayed READ-ONLY; no relay state restored."
+            )
+        except (ArchiveRejected, SealedDataError, UnsupportedPlatformError,
+                OSError, ValueError):
+            self.detail_label.set("BLOCKED: invalid encrypted archive.")
 
     def _draft_from_fields(self):
         return make_draft(
@@ -641,6 +771,7 @@ class OfficialRelayWorkbench(tk.Toplevel):
         )
 
     def _dismiss(self):
+        self._clear_saved_archive_view()
         self._clear_guided_ledger_view()
         self._guided_flow.reset()
         # A closed workbench removes only its own editable widgets.
