@@ -185,7 +185,12 @@ class NativeWindowsAppContainerTrial(unittest.TestCase):
         self.assertTrue(proof["explicit_inherited_pipe_trial"])
         self.assertTrue(proof["inherited_handles"])  # precisely two, not zero
         self.assertTrue(proof["exact_two_endpoint_allowlist_used"])
-        self.assertIs(type(proof["unlisted_decoy_handle_denied"]), bool)
+        self.assertTrue(proof["unlisted_decoy_handle_denied"])
+        self.assertTrue(proof["native_pre_resume_fixture_handle_attested"])
+        self.assertTrue(proof["native_job_attested_before_resume"])
+        self.assertEqual(proof["native_job_memory_cap_bytes"], 192 * 1024 * 1024)
+        self.assertEqual(proof["native_job_active_process_limit"], 1)
+        self.assertFalse(proof["full_child_handle_table_audited"])
         self.assertTrue(proof["inherited_pipe_response_verified"])
         self.assertTrue(proof["parent_journal_claimed_before_launch"])
         self.assertTrue(proof["parent_journal_completed_after_verification"])
@@ -196,18 +201,26 @@ class NativeWindowsAppContainerTrial(unittest.TestCase):
         self.assertEqual(proof["python_exit_status"], 73)
         self.assertFalse(proof["production_tool_integrated"])
         self.assertFalse(proof["network_used"])
-        print("17S-16 native AppContainer: explicit two-handle launch, "
-              "bounded reply correlated, parent journal finalized, "
-              "owner-only synthetic denied; decoy-negative-verified="
-              + str(proof["unlisted_decoy_handle_denied"]), flush=True)
+        print("17S-17 native AppContainer: kernel pre-resume two pipe "
+              "identities and excluded decoy proved; Job membership and "
+              "192MiB/process=1 limits attested; synthetic IPC and "
+              "owner-only read denial confirmed", flush=True)
 
     def test_real_appcontainer_excluded_decoy_handle_is_os_attested(self):
+        # 17S-17 moves attestation into the trusted PARENT using native
+        # DuplicateHandle + CompareObjectHandles before child ResumeThread.
+        # Child-side Python EINVAL remains non-authoritative.
         proof = self._inherited_one_run()
-        if not proof["unlisted_decoy_handle_denied"]:
-            self.skipTest(
-                "17S-16 DEC0Y HANDLE OS DENIAL UNVERIFIED: native invalid "
-                "handle probe raises EINVAL; cannot claim no unlisted handles")
+        self.assertTrue(proof["native_pre_resume_fixture_handle_attested"])
         self.assertTrue(proof["unlisted_decoy_handle_denied"])
+        self.assertFalse(proof["full_child_handle_table_audited"])
+
+    def test_job_membership_and_limits_attested_before_child_runs(self):
+        proof = self._inherited_one_run()
+        self.assertTrue(proof["native_job_attested_before_resume"])
+        self.assertEqual(proof["native_job_active_process_limit"], 1)
+        self.assertEqual(proof["native_job_memory_cap_bytes"],
+                         192 * 1024 * 1024)
 
     def test_native_python_denies_present_owner_only_file_after_granted_read(self):
         # Hard FAIL, not SKIP: security proof is the entire 17S-13 gate.
