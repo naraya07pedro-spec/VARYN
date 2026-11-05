@@ -457,7 +457,7 @@ class OfficialRelayWorkbench(tk.Toplevel):
         provider = self.target.get()
         if self._guided_flow.active:
             try:
-                self._guided_flow.require_copy(provider, before)
+                self._guided_flow.require_copy(provider, before, task)
             except GuidedTrioRejected:
                 self.detail_label.set(
                     "BLOCKED: guided provider or stage mismatch. "
@@ -474,7 +474,7 @@ class OfficialRelayWorkbench(tk.Toplevel):
             if (after["hops_used"] == before["hops_used"] + 1 and
                     after["awaiting_user_pasteback"]):
                 try:
-                    self._guided_flow.copied(before, after, provider)
+                    self._guided_flow.copied(before, after, provider, task)
                 except GuidedTrioRejected:
                     self._guided_flow.reset()
                     self.detail_label.set(

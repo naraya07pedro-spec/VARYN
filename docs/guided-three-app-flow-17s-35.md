@@ -20,3 +20,6 @@ The `GuidedThreeAppFlow` logic has `idle → ready → awaiting_reply → ready_
 - Actual owner device, human browser actions, full transcript fidelity, Gemini provider-side import availability, and true automatic bidirectional memory synchronization remain unverified.
 
 Stage is **implemented** only when committed to the existing feature branch and **CI-verified** only if both OSes and final exact-HEAD portable artifact succeed. PR #1 stays DRAFT; `main` untouched.
+
+## Exact guided task binding (red-team revision)
+After the stage is prepared, copying is refused if the workbench task text was edited. The original outbound owner-review path remains mandatory. Editing the task requires discarding guided mode and restarting. Pure-controller and hosted Windows real-Tk tests cover an edited synthetic task on the correct provider, preventing a misleading guided-stage success claim.

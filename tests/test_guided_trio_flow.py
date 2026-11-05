@@ -7,10 +7,11 @@ from varyn.official_manual_relay import OfficialManualRelay
 
 def copied_and_reviewed(relay, guided, provider, answer):
     before = relay.status()
-    guided.require_copy(provider, before)
-    preview = relay.prepare(provider, "SYNTHETIC: fictional review")
+    task = guided.current_task
+    guided.require_copy(provider, before, task)
+    preview = relay.prepare(provider, task)
     relay.decide(preview, approved=True, copied=True)
-    guided.copied(before, relay.status(), provider)
+    guided.copied(before, relay.status(), provider, task)
     before_reply = relay.status()
     guided.require_reply(before_reply)
     review = relay.begin_return_review(answer)
@@ -54,9 +55,10 @@ class GuidedTrioContractTests(unittest.TestCase):
             self.assertEqual(self.flow.provider, provider)
             self.assertEqual(self.flow.phase, "ready")
             before = self.relay.status()
-            preview = self.relay.prepare(provider, root)
+            task = self.flow.current_task
+            preview = self.relay.prepare(provider, task)
             self.relay.decide(preview, approved=True, copied=True)
-            self.flow.copied(before, self.relay.status(), provider)
+            self.flow.copied(before, self.relay.status(), provider, task)
             self.assertEqual(self.flow.phase, "awaiting_reply")
             with self.assertRaises(GuidedTrioRejected):
                 self.flow.prepare_next(self.relay.status())
@@ -81,7 +83,9 @@ class GuidedTrioContractTests(unittest.TestCase):
     def test_wrong_provider_or_bypassed_review_refused(self):
         self.flow.start("SYNTHETIC: sample", self.relay.status())
         with self.assertRaises(GuidedTrioRejected):
-            self.flow.require_copy("gemini", self.relay.status())
+            self.flow.require_copy("gemini", self.relay.status(), self.flow.current_task)
+        with self.assertRaises(GuidedTrioRejected):
+            self.flow.require_copy("chatgpt", self.relay.status(), "SYNTHETIC: edited-in-the-middle")
         first = self.relay.prepare("chatgpt", "SYNTHETIC: sample")
         self.relay.decide(first, approved=True, copied=True)
         with self.assertRaises(GuidedTrioRejected):

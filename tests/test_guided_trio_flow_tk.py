@@ -41,6 +41,13 @@ class GuidedTrioTkTests(unittest.TestCase):
                 copy.invoke()
             ask.assert_not_called()
             wb.target.set("chatgpt")
+            wb.task.delete("1.0", "end")
+            wb.task.insert("1.0", "SYNTHETIC: modified task after guided start")
+            with patch.object(ui, "_review_manual_relay_packet") as ask:
+                copy.invoke()
+            ask.assert_not_called()
+            wb.task.delete("1.0", "end")
+            wb.task.insert("1.0", wb._guided_flow.current_task)
             with patch.object(ui, "_review_manual_relay_packet", return_value=False):
                 copy.invoke()
             self.assertEqual(ui._official_relay.status()["hops_used"], 0)

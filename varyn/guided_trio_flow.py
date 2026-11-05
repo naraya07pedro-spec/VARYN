@@ -36,6 +36,7 @@ class GuidedThreeAppFlow:
         self._index = 0
         self._state = "idle"
         self._root_task = None
+        self._current_task = None
 
     @property
     def active(self):
@@ -44,6 +45,10 @@ class GuidedThreeAppFlow:
     @property
     def provider(self):
         return None if not self.active else _STAGES[self._index]
+
+    @property
+    def current_task(self):
+        return self._current_task
 
     @property
     def phase(self):
@@ -81,14 +86,16 @@ class GuidedThreeAppFlow:
         except (TypeError, ValueError) as error:
             raise GuidedTrioRejected("Invalid or unsafe synthetic task") from error
         self._root_task = task
+        self._current_task = task
         self._index = 0
         self._state = "ready"
         return {"provider": self.provider, "task": task}
 
-    def require_copy(self, provider, relay):
+    def require_copy(self, provider, relay, task):
         status = _safe_status(relay)
         if (self._state != "ready" or
                 provider != self.provider or
+                type(task) is not str or task != self._current_task or
                 status["hops_used"] != self._index or
                 status["awaiting_user_pasteback"] or
                 status["return_review_pending"]):
@@ -96,8 +103,8 @@ class GuidedThreeAppFlow:
         if self._index > 0 and not status["reply_in_ram"]:
             raise GuidedTrioRejected("Previous reply was not reviewed locally")
 
-    def copied(self, before, after, provider):
-        self.require_copy(provider, before)
+    def copied(self, before, after, provider, task):
+        self.require_copy(provider, before, task)
         later = _safe_status(after)
         if (later["hops_used"] != self._index + 1 or
                 not later["awaiting_user_pasteback"] or
@@ -153,5 +160,6 @@ class GuidedThreeAppFlow:
         if len(next_task) > 1000:
             raise GuidedTrioRejected("Guided task exceeds relay limit")
         self._index = next_index
+        self._current_task = next_task
         self._state = "ready"
         return {"provider": self.provider, "task": next_task}
