@@ -46,13 +46,22 @@ def main(argv):
     k.CloseHandle.restype = wintypes.BOOL
     invalid = ctypes.c_void_p(-1).value
     pipe = None
+    observed_error = 0
     for _ in range(20):
         pipe = k.CreateFileW(pipe_name, 0x40000000, 0, None, 3, 0, None)
         if pipe is not None and int(pipe) != invalid:
             break
+        observed_error = ctypes.get_last_error()
         time.sleep(.1)
     else:
-        return 92
+        # Only generic OS error categories are encoded in exit status.
+        # 2/3 = namespace path missing; 5 = ACL/integrity denied.
+        # Does not disclose the named pipe path or any profile metadata.
+        if observed_error in (2, 3):
+            return 92
+        if observed_error == 5:
+            return 95
+        return 96
     try:
         data = ctypes.create_string_buffer(b"varyn-os-pid-v15")
         written = wintypes.DWORD()
