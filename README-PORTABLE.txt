@@ -65,3 +65,13 @@ OWNER ACCEPTANCE IN THE APP (17S-32)
 - DPAPI is tied to Windows user/profile; this is NOT cross-device portable,
   ransomware-proof, a complete backup or a production secret vault.
 - Save is never automatic. No API calls or native provider sync are made.
+
+17S-34 | FROZEN PROCESS RESTART VERIFICATION (HOSTED WINDOWS CI)
+- The matching GitHub Actions run now starts the actual unsigned portable EXE
+  four separate times against one temporary SYNTHETIC DPAPI fixture:
+  encrypt NEW -> restore in NEW process -> refuse overwrite -> refuse tamper.
+- This is an automated test on a GitHub-hosted Windows runner, NOT on your PC.
+- It is not browser account verification, approved consumer-app history import,
+  or native two-way ChatGPT/Claude/Gemini memory synchronization.
+- The owner should still test Save -> fully exit -> reopen -> Restore on their
+  own device, under their normal Windows user account. Do not disable AV.

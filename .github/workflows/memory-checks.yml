@@ -115,6 +115,8 @@ jobs:
       - name: 17S-33 hosted Windows Tk encrypted save/restore, denial and no relay restore
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_official_draft_resume_tk.py" -v
+      - name: 17S-34 restart probe confinement, no dynamic user data or unreviewed authority
+        run: python -m unittest discover -s tests -p "test_frozen_draft_probe.py" -v
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
       - name: Synthetic-only desktop boundary and disposable sample cleanup
@@ -318,6 +320,8 @@ jobs:
           if ($p.ExitCode -ne 0) {
             throw "Frozen Tk GUI smoke failed with exit code $($p.ExitCode)"
           }
+      - name: 17S-34 ACTUAL frozen EXE DPAPI save then NEW PROCESS restore, no overwrite and tamper refusal
+        run: python -m varyn.frozen_draft_probe --executable dist/VARYN-Portable/VARYN-Portable.exe
       - name: Verify frozen output unchanged after smoke
         run: python -m varyn.portable_release --directory dist/VARYN-Portable --verify
       - name: Publish unsigned portable Windows bundle (not signed/installer)

@@ -15,6 +15,8 @@ from tkinter import messagebox
 
 from varyn.desktop import VarynDesktop
 from varyn.desktop_controller import DesktopController
+from varyn.frozen_draft_probe import run_probe_phase, FrozenProbeRejected
+from varyn.dpapi_vault import SealedDataError, UnsupportedPlatformError
 
 
 def windows_non_admin():
@@ -57,7 +59,20 @@ def main(argv=None):
     parser = argparse.ArgumentParser(
         description="Windows portable VARYN, experimental manual official-app GUI")
     parser.add_argument("--smoke-only", action="store_true")
+    parser.add_argument("--synthetic-draft-smoke", choices=("write", "read"))
+    parser.add_argument("--smoke-directory")
     args = parser.parse_args(argv)
+    if args.synthetic_draft_smoke is not None:
+        # Restricted test-only subprocess. No Tk, browser, clipboard or provider.
+        if args.smoke_only or not args.smoke_directory:
+            return 2
+        try:
+            return run_probe_phase(args.synthetic_draft_smoke, args.smoke_directory)
+        except (FrozenProbeRejected, SealedDataError,
+                UnsupportedPlatformError, FileExistsError, OSError, ValueError):
+            return 4
+    if args.smoke_directory is not None:
+        return 2
     if not args.smoke_only and not windows_non_admin():
         try:
             messagebox.showerror(
