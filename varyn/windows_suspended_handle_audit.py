@@ -34,9 +34,12 @@ def attest_suspended_child_fixture_handles(process_handle, fixture):
     k.DuplicateHandle.restype = wintypes.BOOL
     k.CloseHandle.argtypes = [wintypes.HANDLE]
     k.CloseHandle.restype = wintypes.BOOL
-    compare = getattr(k, "CompareObjectHandles", None)
+    # Microsoft exports CompareObjectHandles from KernelBase.dll, NOT
+    # kernel32.dll. The trusted parent loads the platform DLL explicitly.
+    base = ctypes.WinDLL("KernelBase.dll", use_last_error=True)
+    compare = getattr(base, "CompareObjectHandles", None)
     if compare is None:
-        raise PublicToolRejected("Native Windows handle identity API unavailable")
+        raise PublicToolRejected("KernelBase handle identity API unavailable")
     compare.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
     compare.restype = wintypes.BOOL
     current = k.GetCurrentProcess()
