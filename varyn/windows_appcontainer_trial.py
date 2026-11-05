@@ -28,6 +28,8 @@ _TOKEN_IS_APPCONTAINER = 29
 _TOKEN_CAPABILITIES = 30
 _TOKEN_APPCONTAINER_SID = 31
 _ATTR_SECURITY_CAPABILITIES = 0x00020009
+_ATTR_HANDLE_LIST = 0x00020002
+_STARTF_USESTDHANDLES = 0x00000100
 _EXTENDED_STARTUPINFO_PRESENT = 0x00080000
 _CREATE_SUSPENDED = 0x00000004
 _CREATE_NO_WINDOW = 0x08000000
@@ -236,11 +238,13 @@ def _copy_runtime_into_owned_profile(exe, sid, kernel, advapi, userenv, *, broke
             kernel.LocalFree(ctypes.cast(as_text, wintypes.HANDLE))
 
 
-def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False):
+def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False,
+                                      inherited_trial=False):
     """One fixed, no-network test action. NEVER call from production UI."""
-    if type(broker_trial) is not bool or type(pipe_trial) is not bool:
+    if any(type(x) is not bool for x in
+           (broker_trial, pipe_trial, inherited_trial)):
         raise PublicToolRejected("CI AppContainer trial flag must be boolean")
-    if broker_trial and pipe_trial:
+    if sum((broker_trial, pipe_trial, inherited_trial)) > 1:
         raise PublicToolRejected("CI trial modes cannot share one child")
     if (os.name != "nt" or os.environ.get("GITHUB_ACTIONS") != "true"
             or os.environ.get("RUNNER_OS") != "Windows"
@@ -274,6 +278,10 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False):
     journal = None
     journal_claimed = False
     journal_finalized = False
+    inherited_pipes = None
+    pipe_handle_array = None
+    inherited_response_verified = False
+    inherited_decoy_excluded = False
     try:
         hr = userenv.CreateAppContainerProfile(
             name, name, "Disposable offline VARYN CI restricted process test",
@@ -287,11 +295,12 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False):
             raise PublicToolRejected("Created CI AppContainer SID invalid")
         trusted_copy = _copy_runtime_into_owned_profile(
             exe, sid, kernel, advapi, userenv,
-            broker_trial=(broker_trial or pipe_trial))
+            broker_trial=(broker_trial or pipe_trial or inherited_trial))
         runtime_parent = trusted_copy.parent
         length = ctypes.c_size_t()
+        attributes = 2 if inherited_trial else 1
         measured = kernel.InitializeProcThreadAttributeList(
-            None, 1, 0, ctypes.byref(length))
+            None, attributes, 0, ctypes.byref(length))
         last_error = ctypes.get_last_error()
         # Microsoft's documented size query returns FALSE with
         # ERROR_INSUFFICIENT_BUFFER (122), even on success of size discovery.
@@ -299,7 +308,7 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False):
             raise PublicToolRejected("Unexpected AppContainer attribute size")
         attr_buf = ctypes.create_string_buffer(length.value)
         if not kernel.InitializeProcThreadAttributeList(
-                attr_buf, 1, 0, ctypes.byref(length)):
+                attr_buf, attributes, 0, ctypes.byref(length)):
             raise PublicToolRejected("AppContainer attribute initialization failed")
         initialized = True
         security = _SecurityCapabilities(
@@ -310,10 +319,29 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False):
                 ctypes.byref(security), ctypes.sizeof(security),
                 None, None):
             raise PublicToolRejected("No-capability process attribute refused")
+        if inherited_trial:
+            from varyn.windows_inherited_pipe_trial import TwoInheritedAnonymousPipes
+            inherited_pipes = TwoInheritedAnonymousPipes()
+            # Both passed handles MUST be inheritable. This array stays
+            # allocated until CreateProcessW returns.
+            pipe_handle_array = inherited_pipes.child_allowlist
+            if not kernel.UpdateProcThreadAttribute(
+                    attr_buf, 0, _ATTR_HANDLE_LIST,
+                    ctypes.cast(pipe_handle_array, ctypes.c_void_p),
+                    ctypes.sizeof(pipe_handle_array), None, None):
+                raise PublicToolRejected(
+                    "Explicit two-handle inheritance allowlist refused")
 
         si = _StartupInfoEx()
         si.StartupInfo.cb = ctypes.sizeof(si)
         si.lpAttributeList = ctypes.addressof(attr_buf)
+        if inherited_trial:
+            si.StartupInfo.dwFlags |= _STARTF_USESTDHANDLES
+            si.StartupInfo.hStdInput = inherited_pipes.child_stdin
+            si.StartupInfo.hStdOutput = inherited_pipes.child_stdout
+            # stderr shares the already-allowlisted stdout handle: no 3rd
+            # inherited endpoint. Unexpected tracebacks break strict reply.
+            si.StartupInfo.hStdError = inherited_pipes.child_stdout
         # Both files are newly-created disposable OFFLINE fixtures.
         # The granted file is INSIDE the disposable container storage; the
         # owner-private file is OUTSIDE it and is readable by the host.
@@ -331,7 +359,31 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False):
         # CHILD cannot receive provider credentials, model input or real files.
         # Exit 73 only after read-granted, owner-private denied and (when
         # requested) a single authenticated synthetic IPC round-trip.
-        if pipe_trial:
+        if inherited_trial:
+            from varyn.durable_broker_journal import DurableOneShotJournal
+            root = trusted_copy.parent
+            shutil.copy2(
+                Path(__file__).resolve().parent /
+                "appcontainer_inherited_pipe_child.py",
+                root / "appcontainer_inherited_pipe_child.py")
+            broker_request = {
+                "version": "varyn.anon-pipes.v1",
+                "action": "sum_synthetic_counts",
+                "request_id": secrets.token_hex(16),
+                "nonce": secrets.token_hex(16),
+                "counts": [4, 6, 11],
+            }
+            # Parent-private journal claim must COMMIT BEFORE CreateProcessW.
+            journal = DurableOneShotJournal(
+                str(Path(private_fixture.name) / "anon-dispatch.sqlite"))
+            journal_claimed = journal.claim(broker_request["request_id"])
+            args = [
+                str(trusted_copy), "-I", "-S",
+                str(root / "appcontainer_inherited_pipe_child.py"),
+                str(allowed), str(owner_file),
+                str(inherited_pipes.excluded_decoy_value),
+            ]
+        elif pipe_trial:
             from varyn.windows_pipe_identity import OneShotWindowsPipe
             sid_text = wintypes.LPWSTR()
             try:
@@ -414,7 +466,8 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False):
         flags = (_EXTENDED_STARTUPINFO_PRESENT | _CREATE_SUSPENDED |
                  _CREATE_NO_WINDOW | _CREATE_UNICODE_ENV)
         if not kernel.CreateProcessW(
-                str(trusted_copy), command, None, None, False, flags,
+                str(trusted_copy), command, None, None,
+                bool(inherited_trial), flags,
                 ctypes.cast(environment, ctypes.c_void_p),
                 str(trusted_copy.parent),
                 ctypes.byref(si), ctypes.byref(proc)):
@@ -426,6 +479,13 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False):
                 + str(code) + ")")
         process_created = True
         _attest_child(proc.hProcess, sid, advapi, kernel)
+        if inherited_trial:
+            # Native child token proven BEFORE any synthetic request enters.
+            # Parent closes its two child-side handles immediately after
+            # CreateProcessW, so only the child can use those descriptors.
+            from varyn.bounded_broker_protocol import canonical
+            inherited_pipes.mark_child_created()
+            inherited_pipes.send_once(canonical(broker_request))
         # Keep process suspended until its actual primary token is attested.
         resumed = kernel.ResumeThread(proc.hThread)
         if resumed == 0xffffffff or resumed != 1:
@@ -459,6 +519,35 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False):
         if not kernel.GetExitCodeProcess(proc.hProcess, ctypes.byref(raw)):
             raise PublicToolRejected("Cannot read AppContainer child exit status")
         exit_code = raw.value
+        if inherited_trial:
+            if exit_code != 73:
+                raise PublicToolRejected(
+                    "AppContainer inherited pipe child did not complete, exit=0x"
+                    + format(exit_code, "x"))
+            from varyn.bounded_broker_protocol import strict_json
+            try:
+                payload = strict_json(inherited_pipes.receive_after_child_exit())
+            except Exception:
+                raise PublicToolRejected("Inherited pipe response rejected") from None
+            allowed_keys = {"version", "request_id", "nonce", "status", "total"}
+            if (set(payload) != allowed_keys or
+                    payload["version"] != "varyn.anon-pipes.v1" or
+                    payload["request_id"] != broker_request["request_id"] or
+                    payload["nonce"] != broker_request["nonce"] or
+                    payload["status"] != "ok" or
+                    type(payload["total"]) is not int or
+                    payload["total"] != 21):
+                raise PublicToolRejected("Inherited pipe response correlation refused")
+            inherited_response_verified = True
+            inherited_decoy_excluded = True  # the child returns 73 only if
+            # its unrelated parent's inheritable EVENT could not be opened.
+            if not journal_claimed or journal is None:
+                raise PublicToolRejected("Inherited pipe parent claim unavailable")
+            journal_finalized = (
+                journal.finalize(
+                    broker_request["request_id"], succeeded=True) == "completed")
+            if not journal_finalized:
+                raise PublicToolRejected("Inherited pipe journal finalize refused")
         if broker_trial and exit_code == 73:
             from varyn.bounded_broker_protocol import (
                 BrokerRejected, OneShotReplyVerifier, MAX_BYTES,
@@ -492,6 +581,8 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False):
         # Do not leave an IPC endpoint live while tearing down a profile.
         if pipe_guard is not None:
             pipe_guard.close()
+        if inherited_pipes is not None:
+            inherited_pipes.close()
         # Terminate unresponsive/test-crashed child before profile deletion.
         if process_created:
             if not completed:
@@ -523,7 +614,11 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False):
         "format": _SCHEMA,
         "native_primary_appcontainer_attested": True,
         "zero_capability_sids_attested": True,
-        "inherited_handles": False,
+        "inherited_handles": inherited_trial,
+        "explicit_inherited_pipe_trial": inherited_trial,
+        "exact_two_endpoint_allowlist_used": inherited_response_verified,
+        "unlisted_decoy_handle_denied": inherited_decoy_excluded,
+        "inherited_pipe_response_verified": inherited_response_verified,
         "process_terminated": True,
         "disposable_profile_deleted": cleaned,
         "python_runtime_executed": exit_code in (73, 81, 82, 83, 84, 85),
