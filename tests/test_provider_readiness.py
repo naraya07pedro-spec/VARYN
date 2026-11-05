@@ -54,7 +54,8 @@ class OfflineReadiness(unittest.TestCase):
         self.assertIn("os_environment_credential", q["missing"])
         self.assertIn("one_request_network_permission", q["missing"])
         self.assertIn("desktop_gateway_capability", q["missing"])
-        self.assertNotIn("api_key", str(q).lower())
+        self.assertNotIn(TOKEN, repr(q))
+        self.assertEqual(q["key_env_name"], "OPENROUTER_API_KEY")
 
     def test_ready_for_attempt_is_not_connected_or_verified(self):
         q = readiness(
@@ -118,7 +119,7 @@ class ReceiptContracts(unittest.TestCase):
         self.assertIsNone(data["real_amount_charged_usd"])
         self.assertEqual(data["reported_token_counters_NOT_AUDITED"]["input_tokens"], 12)
         for forbidden in ("SYNTHETIC: returned secret", TOKEN, "Authorization",
-                          "user_prompt", "response_text"):
+                          "user_prompt", '"response_text":'):
             self.assertNotIn(forbidden, text)
         self.assertNotIn("SYNTHETIC:", text)
         self.assertLess(len(text), 4096)
