@@ -143,6 +143,8 @@ jobs:
         run: python -m unittest discover -s tests -p "test_windows_startup_acl_probe.py" -v
       - name: 17S-13 native zero-capability AppContainer child and profile cleanup (CI-only)
         run: python -m unittest discover -s tests -p "test_windows_appcontainer_trial.py" -v
+      - name: 17S-14 signed one-shot synthetic broker protocol and replay regressions
+        run: python -m unittest discover -s tests -p "test_bounded_broker_protocol.py" -v
       - name: Option C consumer-history proof gates stay blocked
         run: |
           python -m unittest discover -s tests -p "test_option_c_gate.py" -v
