@@ -36,6 +36,8 @@ jobs:
         run: python -m unittest discover -s tests -p "test_windows_appcontainer_job.py" -v
       - name: 17S-18 trusted parent simulated approval, fixture tamper, revocation and replay
         run: python -m unittest discover -s tests -p "test_parent_synthetic_read_broker.py" -v
+      - name: 17S-20 owner synthetic desktop consent and broker regression
+        run: python -m unittest discover -s tests -p "test_desktop_parent_counts*.py" -v
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
       - name: Synthetic-only desktop boundary and disposable sample cleanup
