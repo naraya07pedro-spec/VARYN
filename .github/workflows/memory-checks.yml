@@ -117,6 +117,11 @@ jobs:
         run: python -m unittest discover -s tests -p "test_official_draft_resume_tk.py" -v
       - name: 17S-34 restart probe confinement, no dynamic user data or unreviewed authority
         run: python -m unittest discover -s tests -p "test_frozen_draft_probe.py" -v
+      - name: 17S-35 guided three-app manual relay state machine and fail-closed stage order
+        run: python -m unittest discover -s tests -p "test_guided_trio_flow.py" -v
+      - name: 17S-35 hosted Windows Tk three real widget hops with individual owner-review gates
+        if: runner.os == 'Windows'
+        run: python -m unittest discover -s tests -p "test_guided_trio_flow_tk.py" -v
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
       - name: Synthetic-only desktop boundary and disposable sample cleanup

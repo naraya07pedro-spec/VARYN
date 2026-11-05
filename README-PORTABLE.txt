@@ -75,3 +75,17 @@ OWNER ACCEPTANCE IN THE APP (17S-32)
   or native two-way ChatGPT/Claude/Gemini memory synchronization.
 - The owner should still test Save -> fully exit -> reopen -> Restore on their
   own device, under their normal Windows user account. Do not disable AV.
+
+17S-35 | GUIDED MANUAL 3-APP WORKFLOW (NO CONSUMER SYNC)
+- In the focused workbench, type a harmless SYNTHETIC: fictional task.
+- Click "17S-35 | Start three-app guided review". Stage 1 is ChatGPT.
+- For each stage, separately approve opening the pinned official website,
+  review/copy the exact packet, paste it YOURSELF, and paste the reply back.
+- Review the EXACT pasted reply and accept it locally. Then click
+  "17S-35 | Prepare next app after reviewed reply". VARYN selects Claude,
+  then Gemini and writes a stage-appropriate synthetic draft task.
+- Neither site opening, clipboard copy, nor provider delivery is automatic.
+- Claude is asked to summarize the first draft so Gemini can use that summary.
+  Gemini receives the last reviewed reply, NOT all account histories.
+- All three stage flags are transient RAM only; no native app history sync.
+- "Discard guided flow and relay RAM" revokes this local temporary state.

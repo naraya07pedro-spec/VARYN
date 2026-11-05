@@ -17,6 +17,7 @@ from varyn.dpapi_vault import SealedDataError, UnsupportedPlatformError
 from varyn.official_manual_relay import OFFICIAL_APP_LINKS
 from varyn.native_history_import_gui import NativeHistoryImportGuide
 from varyn.owner_pilot_checklist_gui import OwnerPilotChecklist
+from varyn.guided_trio_flow import GuidedThreeAppFlow, GuidedTrioRejected
 
 
 class OfficialRelayWorkbench(tk.Toplevel):
@@ -37,6 +38,10 @@ class OfficialRelayWorkbench(tk.Toplevel):
         self.project = tk.StringVar(master=self, value="VARYN")
         self.topic = tk.StringVar(master=self, value="next_step")
         self.include_context = tk.BooleanVar(master=self, value=False)
+        self._guided_flow = GuidedThreeAppFlow()
+        self.guided_label = tk.StringVar(
+            master=self, value="Guided ChatGPT -> Claude -> Gemini: OFF"
+        )
         self.stage_label = tk.StringVar(
             master=self, value="Local manual workbench. No app connected."
         )
@@ -83,6 +88,24 @@ class OfficialRelayWorkbench(tk.Toplevel):
             top, text="17S-33 | Restore encrypted draft (manual)",
             command=self._restore_encrypted_draft,
         ).pack(anchor="w", pady=(0, 4))
+
+        guided = ttk.Frame(self, padding=(12, 6))
+        guided.pack(fill="x")
+        ttk.Label(
+            guided, textvariable=self.guided_label, wraplength=640,
+        ).pack(anchor="w", pady=(0, 4))
+        ttk.Button(
+            guided, text="17S-35 | Start three-app guided review",
+            command=self._start_guided,
+        ).pack(anchor="w", pady=(0, 3))
+        ttk.Button(
+            guided, text="17S-35 | Prepare next app after reviewed reply",
+            command=self._advance_guided,
+        ).pack(anchor="w", pady=(0, 3))
+        ttk.Button(
+            guided, text="17S-35 | Discard guided flow and relay RAM",
+            command=self._discard_guided,
+        ).pack(anchor="w", pady=(0, 5))
 
         area = ttk.Frame(self)
         area.pack(fill="both", expand=True)
@@ -201,6 +224,74 @@ class OfficialRelayWorkbench(tk.Toplevel):
             bottom, text="Close workbench (RAM relay stays until Discard)",
             command=self._dismiss,
         ).pack(anchor="w")
+
+    def _sync_guided_label(self):
+        state = self._guided_flow.status()
+        if state["phase"] == "idle":
+            label = "Guided ChatGPT -> Claude -> Gemini: OFF"
+        else:
+            label = ("Guided " + str(state["stage"]) + "/3: " +
+                     str(state["provider"]) + " | " + state["phase"] +
+                     " | manual transfer, provider origin UNVERIFIED")
+        self.guided_label.set(label)
+
+    def _start_guided(self):
+        if not self._allowed():
+            return
+        try:
+            selection = self._guided_flow.start(
+                self.task.get("1.0", "end-1c").strip(),
+                self._owner._official_relay.status(),
+            )
+        except GuidedTrioRejected:
+            self.detail_label.set(
+                "BLOCKED: discard current relay/guided flow and use a "
+                "harmless SYNTHETIC: task (max 650 characters)."
+            )
+            return
+        self.target.set(selection["provider"])
+        self._sync_guided_label()
+        self.detail_label.set(
+            "Stage 1 ready. Open ChatGPT with consent, then review the "
+            "EXACT clipboard packet; paste it yourself into the official app."
+        )
+
+    def _advance_guided(self):
+        if not self._allowed():
+            return
+        try:
+            selection = self._guided_flow.prepare_next(
+                self._owner._official_relay.status()
+            )
+        except GuidedTrioRejected:
+            self.detail_label.set(
+                "BLOCKED: copy to the current app and review its manual "
+                "reply first; next stage never skips user review."
+            )
+            return
+        self.target.set(selection["provider"])
+        self.task.delete("1.0", "end")
+        self.task.insert("1.0", selection["task"])
+        # The previous editable reply must not be accidentally appended to
+        # the next app's claimed reply. The reviewed relay still retains it.
+        self.reply.delete("1.0", "end")
+        self._sync_guided_label()
+        self.detail_label.set(
+            "Next stage prepared locally. No browser opened and nothing "
+            "copied or sent. Approve each official-app action separately."
+        )
+
+    def _discard_guided(self):
+        if not self._allowed():
+            return
+        self._owner._discard_official_app_relay()
+        self._guided_flow.reset()
+        self.reply.delete("1.0", "end")
+        self._sync_guided_label()
+        self.detail_label.set(
+            "Guided flow and relay RAM discarded. Existing OS clipboard "
+            "cannot be recalled. Project notes require separate discard."
+        )
 
     def _draft_from_fields(self):
         return make_draft(
@@ -361,11 +452,35 @@ class OfficialRelayWorkbench(tk.Toplevel):
         task = self._synthetic(self.task, 1000)
         if task is None:
             return
+        relay = self._owner._official_relay
+        before = relay.status()
+        provider = self.target.get()
+        if self._guided_flow.active:
+            try:
+                self._guided_flow.require_copy(provider, before)
+            except GuidedTrioRejected:
+                self.detail_label.set(
+                    "BLOCKED: guided provider or stage mismatch. "
+                    "Discard guided flow to use free-form manual relay."
+                )
+                return
         self._owner._copy_official_app_relay(
-            task=task, target=self.target.get(),
+            task=task, target=provider,
             project=self.project.get(),
             include_context=self.include_context.get() is True,
         )
+        after = relay.status()
+        if self._guided_flow.active:
+            if (after["hops_used"] == before["hops_used"] + 1 and
+                    after["awaiting_user_pasteback"]):
+                try:
+                    self._guided_flow.copied(before, after, provider)
+                except GuidedTrioRejected:
+                    self._guided_flow.reset()
+                    self.detail_label.set(
+                        "Guided flow local state mismatch; reset. "
+                        "Discard relay RAM before starting again."
+                    )
         self.refresh()
 
     def _accept_reply(self):
@@ -377,7 +492,30 @@ class OfficialRelayWorkbench(tk.Toplevel):
                 "BLOCKED: type a bounded harmless pasted reply (max 1600)."
             )
             return
+        relay = self._owner._official_relay
+        before = relay.status()
+        if self._guided_flow.active:
+            try:
+                self._guided_flow.require_reply(before)
+            except GuidedTrioRejected:
+                self.detail_label.set(
+                    "BLOCKED: current guided stage has no approved outgoing copy."
+                )
+                return
         self._owner._review_official_app_reply(reply=reply)
+        after = relay.status()
+        if self._guided_flow.active:
+            if (after["reply_in_ram"] and
+                    not after["awaiting_user_pasteback"] and
+                    after["return_receipt_available"]):
+                try:
+                    self._guided_flow.reviewed_reply(before, after)
+                except GuidedTrioRejected:
+                    self._guided_flow.reset()
+                    self.detail_label.set(
+                        "Guided flow local state mismatch; reset. "
+                        "Discard relay RAM before starting again."
+                    )
         self.refresh()
 
     def _review_note(self):
@@ -397,6 +535,8 @@ class OfficialRelayWorkbench(tk.Toplevel):
         if not self._allowed():
             return
         self._owner._discard_official_app_relay()
+        self._guided_flow.reset()
+        self.reply.delete("1.0", "end")
         self.refresh()
 
     def _discard_notes(self):
@@ -407,6 +547,7 @@ class OfficialRelayWorkbench(tk.Toplevel):
         self.refresh()
 
     def refresh(self):
+        self._sync_guided_label()
         if not self._allowed():
             return
         relay = self._owner._official_relay.status()
@@ -435,6 +576,7 @@ class OfficialRelayWorkbench(tk.Toplevel):
         )
 
     def _dismiss(self):
+        self._guided_flow.reset()
         # A closed workbench removes only its own editable widgets.
         # The owner can explicitly discard relay/board state in the main UI.
         child = getattr(self, "_native_history_window", None)
