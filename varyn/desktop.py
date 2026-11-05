@@ -25,6 +25,7 @@ from varyn.synthetic_fixture import SyntheticFixture
 from varyn.desktop_parent_counts import DesktopParentCountsAction
 from varyn.official_manual_relay import OfficialManualRelay, ManualRelayRejected, OFFICIAL_APP_LINKS, official_destination
 from varyn.relay_working_context import WorkingContextBoard, WorkingContextRejected
+from varyn.local_pilot_audit import PilotLocalAudit, PilotAuditRejected
 from varyn.bounded_broker_protocol import BrokerRejected
 from varyn.tool_gateway import SyntheticReadToolGateway, ToolGatewayRejected
 from varyn.public_github_tool import PublicGithubToolGateway, PublicToolRejected
@@ -68,6 +69,10 @@ class VarynDesktop(tk.Tk):
         self.official_relay_target = tk.StringVar(value="chatgpt")
         self._official_relay = OfficialManualRelay()
         self._working_context = WorkingContextBoard()
+        self._pilot_audit = PilotLocalAudit()
+        self.pilot_audit_line = tk.StringVar(
+            value="LOCAL EVENT AUDIT OFF: no content or remote proof recorded"
+        )
         self.working_topic = tk.StringVar(value="next_step")
         self.include_working_context = tk.BooleanVar(value=False)
         self._approval = DesktopApprovalController(journal=agent_journal)
@@ -158,6 +163,23 @@ class VarynDesktop(tk.Tk):
             outer, text="LOCAL-FIRST  |  OFFLINE BY DEFAULT  |  API LIVE IS OPT-IN",
             style="V.TLabel",
         ).pack(anchor="w", pady=(0, 14))
+        pilot = ttk.Frame(outer, style="V.TFrame")
+        pilot.pack(fill="x", pady=(0, 6))
+        ttk.Button(
+            pilot, text="17S-27 | Start local event audit",
+            command=self._start_pilot_audit,
+        ).pack(side="left", padx=(0, 5))
+        ttk.Button(
+            pilot, text="17S-27 | Review / copy audit",
+            command=self._show_pilot_audit,
+        ).pack(side="left", padx=(0, 5))
+        ttk.Button(
+            pilot, text="17S-27 | Reset audit",
+            command=self._reset_pilot_audit,
+        ).pack(side="left")
+        ttk.Label(
+            outer, textvariable=self.pilot_audit_line, style="V.TLabel",
+        ).pack(anchor="w", pady=(0, 9))
         settings = ttk.Frame(outer, style="V.TFrame")
         settings.pack(fill="x", pady=(0, 8))
         ttk.Label(settings, text="Provider", style="V.TLabel").grid(
@@ -333,6 +355,110 @@ class VarynDesktop(tk.Tk):
             "SYSTEM", "Only fake mode is free and offline. Live mode requires an "
             "API key set outside this app, network consent, and confirmation "
             "of each individual request. Do not input private data."
+        )
+
+    def _note_pilot_event(self, code, *, provider=None):
+        """Only successful VARYN callback outcomes, no user content or URLs."""
+        recorder = getattr(self, "_pilot_audit", None)
+        if recorder is None or self._closing:
+            return
+        try:
+            if recorder.record(code, provider=provider):
+                line = getattr(self, "pilot_audit_line", None)
+                if line is not None:
+                    line.set(
+                        "LOCAL EVENT AUDIT ON: " +
+                        str(recorder.snapshot()["events_observed"]) +
+                        " app callbacks (not external app proof)"
+                    )
+        except PilotAuditRejected:
+            # Already completed operations must not be undone by a full audit.
+            self._append(
+                "PILOT AUDIT",
+                "Audit capacity or invalid event: later callbacks NOT recorded. "
+                "Review and reset audit to start a fresh session.",
+            )
+
+    def _start_pilot_audit(self):
+        if self._busy or self._closing:
+            return
+        try:
+            self._pilot_audit.start()
+        except PilotAuditRejected:
+            self._append(
+                "PILOT AUDIT",
+                "Already recording. Review/reset the current RAM audit first.",
+            )
+            return
+        self.pilot_audit_line.set(
+            "LOCAL EVENT AUDIT ON: 0 app callbacks (not external app proof)"
+        )
+        self._append(
+            "PILOT AUDIT",
+            "Started bounded RAM-only callback audit. Only successful "
+            "VARYN actions after this point count. No prompts, replies, "
+            "clipboard bytes, credentials or app sessions are recorded. "
+            "This is NOT independent human-click or remote-paste proof.",
+        )
+
+    def _show_pilot_audit(self):
+        if self._busy or self._closing:
+            return
+        payload = self._pilot_audit.export_fixed_json()
+        approved = self._review_scrollable_manual_text(
+            title="VARYN | Review local callback audit (NOT remote proof)",
+            heading="Only local callback outcomes. Any simulated click could "
+                    "produce these events; remote app state is UNKNOWN.",
+            digest="fixed allowlisted event names only, no transcript",
+            content=payload,
+            warning="If approved, copies ONLY this fixed JSON to OS clipboard. "
+                    "Clipboard contents may persist after VARYN exits. "
+                    "No report is automatically uploaded or saved.",
+            approve_label="Approve copy fixed audit JSON",
+        )
+        if self._busy or self._closing or not approved:
+            return
+        # A nested event/modal might have reset or changed the event log.
+        # Never write a report different from the exact owner-reviewed text.
+        if payload != self._pilot_audit.export_fixed_json():
+            self._append(
+                "PILOT AUDIT",
+                "Audit changed during review: copy refused. Review again.",
+            )
+            return
+        try:
+            self.clipboard_clear()
+            self.clipboard_append(payload)
+        except (tk.TclError, ValueError):
+            self._append(
+                "PILOT AUDIT", "Clipboard copy failed; no report uploaded.",
+            )
+            return
+        self._append(
+            "PILOT AUDIT",
+            "Reviewed fixed local callback JSON copied to OS clipboard. "
+            "It does NOT prove real app delivery, human clicks or sync.",
+        )
+
+    def _reset_pilot_audit(self):
+        if self._busy or self._closing:
+            return
+        approved = messagebox.askyesno(
+            "VARYN | Discard local callback audit",
+            "Erase this in-RAM event audit? This does not revoke previously "
+            "copied clipboard packets or delete messages on external apps.",
+            parent=self,
+        )
+        if not approved or self._closing or self._busy:
+            return
+        self._pilot_audit.reset()
+        self.pilot_audit_line.set(
+            "LOCAL EVENT AUDIT OFF: no content or remote proof recorded"
+        )
+        self._append(
+            "PILOT AUDIT",
+            "In-RAM callback audit cleared. No local files or remote "
+            "app content were modified.",
         )
 
     def _on_page_content_resize(self, _event=None):
@@ -782,6 +908,10 @@ class VarynDesktop(tk.Tk):
                 "; project " + preview.project + " / topic " + preview.topic +
                 "; no database save, no network, no verified provider source.",
             )
+            if result["status"] in ("added", "replaced"):
+                VarynDesktop._note_pilot_event(
+                    self, "working_note_reviewed"
+                )
         except (WorkingContextRejected, tk.TclError):
             board.discard_pending()
             self._append(
@@ -798,6 +928,9 @@ class VarynDesktop(tk.Tk):
             "WORKING CONTEXT",
             "All temporary project notes discarded from VARYN RAM. "
             "Previously copied OS clipboard bytes cannot be recalled.",
+        )
+        VarynDesktop._note_pilot_event(
+            self, "working_context_discarded"
         )
 
     def _open_selected_official_app(self):
@@ -843,6 +976,10 @@ class VarynDesktop(tk.Tk):
              if launched else
              "Browser could not be launched; no app access established."),
         )
+        if launched:
+            VarynDesktop._note_pilot_event(
+                self, "homepage_launch_requested", provider=provider,
+            )
 
     def _copy_official_app_relay(self):
         """Review exact user-typed text before writing it to OS clipboard."""
@@ -893,6 +1030,14 @@ class VarynDesktop(tk.Tk):
                 "the reply into VARYN's Message field for optional review. "
                 "No app account access or automatic sync occurred.",
             )
+            VarynDesktop._note_pilot_event(
+                self, "approved_packet_copied", provider=result["provider"],
+            )
+            if reviewed_context is not None:
+                VarynDesktop._note_pilot_event(
+                    self, "project_context_included_in_copy",
+                    provider=result["provider"],
+                )
         except (ManualRelayRejected, tk.TclError, ValueError):
             relay.discard_pending()
             self._append(
@@ -934,6 +1079,10 @@ class VarynDesktop(tk.Tk):
                 "official app, type a new non-sensitive task and review "
                 "a fresh clipboard preview.",
             )
+            VarynDesktop._note_pilot_event(
+                self, "reviewed_reply_staged",
+                provider=result["claimed_provider"],
+            )
         except (ManualRelayRejected, ValueError):
             self._append(
                 "OFFICIAL APP RELAY",
@@ -948,6 +1097,9 @@ class VarynDesktop(tk.Tk):
             "OFFICIAL APP RELAY",
             "All manual relay text discarded from VARYN RAM. "
             "OS clipboard is NOT automatically cleared.",
+        )
+        VarynDesktop._note_pilot_event(
+            self, "relay_state_discarded",
         )
 
     def _public_tool_permission_changed(self):
@@ -1840,6 +1992,9 @@ class VarynDesktop(tk.Tk):
         working = getattr(self, "_working_context", None)
         if working is not None:
             working.reset()
+        audit = getattr(self, "_pilot_audit", None)
+        if audit is not None:
+            audit.reset()
         VarynDesktop._abort_public_comparison(self, "Desktop closing")
         VarynDesktop._cancel_public_scheduled_callbacks(self)
         self._approval.reject_all_pending()
@@ -1878,6 +2033,7 @@ class VarynDesktop(tk.Tk):
                 "consent_public_tools", "consent_context", "status_line",
                 "memory_project", "official_relay_target",
                 "working_topic", "include_working_context",
+                "pilot_audit_line",
             ):
                 variable = getattr(self, name, None)
                 if isinstance(variable, tk.Variable):
