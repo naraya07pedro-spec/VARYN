@@ -19,6 +19,7 @@ import shutil
 from tempfile import TemporaryDirectory
 import subprocess
 import sys
+import time
 
 from varyn.public_github_tool import PublicToolRejected
 
@@ -239,12 +240,12 @@ def _copy_runtime_into_owned_profile(exe, sid, kernel, advapi, userenv, *, broke
 
 
 def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False,
-                                      inherited_trial=False):
+                                      inherited_trial=False, cancel_trial=False):
     """One fixed, no-network test action. NEVER call from production UI."""
     if any(type(x) is not bool for x in
-           (broker_trial, pipe_trial, inherited_trial)):
+           (broker_trial, pipe_trial, inherited_trial, cancel_trial)):
         raise PublicToolRejected("CI AppContainer trial flag must be boolean")
-    if sum((broker_trial, pipe_trial, inherited_trial)) > 1:
+    if sum((broker_trial, pipe_trial, inherited_trial, cancel_trial)) > 1:
         raise PublicToolRejected("CI trial modes cannot share one child")
     if (os.name != "nt" or os.environ.get("GITHUB_ACTIONS") != "true"
             or os.environ.get("RUNNER_OS") != "Windows"
@@ -285,6 +286,8 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False,
     suspended_fixture_attested = False
     job_guard = None
     job_attested = False
+    cancellation_marker_seen = False
+    job_close_killed_child = False
     try:
         hr = userenv.CreateAppContainerProfile(
             name, name, "Disposable offline VARYN CI restricted process test",
@@ -298,7 +301,8 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False,
             raise PublicToolRejected("Created CI AppContainer SID invalid")
         trusted_copy = _copy_runtime_into_owned_profile(
             exe, sid, kernel, advapi, userenv,
-            broker_trial=(broker_trial or pipe_trial or inherited_trial))
+            broker_trial=(broker_trial or pipe_trial or inherited_trial or
+                          cancel_trial))
         runtime_parent = trusted_copy.parent
         length = ctypes.c_size_t()
         attributes = 2 if inherited_trial else 1
@@ -362,7 +366,20 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False,
         # CHILD cannot receive provider credentials, model input or real files.
         # Exit 73 only after read-granted, owner-private denied and (when
         # requested) a single authenticated synthetic IPC round-trip.
-        if inherited_trial:
+        if cancel_trial:
+            cancel_marker = trusted_copy.parent / "synthetic-child-started.flag"
+            # A fixed script that never processes untrusted requests, reads
+            # no real owner files, creates exactly one owned marker and
+            # deliberately remains alive for kill-on-close acceptance.
+            source = (
+                "import sys,time; "
+                "f=open(sys.argv[1],'xb'); "
+                "f.write(b'varyn-appcontainer-17s17-ready'); "
+                "f.close(); time.sleep(25)"
+            )
+            args = [str(trusted_copy), "-I", "-S", "-c", source,
+                    str(cancel_marker)]
+        elif inherited_trial:
             from varyn.durable_broker_journal import DurableOneShotJournal
             root = trusted_copy.parent
             shutil.copy2(
@@ -482,29 +499,32 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False,
                 + str(code) + ")")
         process_created = True
         _attest_child(proc.hProcess, sid, advapi, kernel)
-        if inherited_trial:
-            from varyn.windows_suspended_handle_audit import (
-                attest_suspended_child_fixture_handles,
-            )
+        if inherited_trial or cancel_trial:
             from varyn.windows_child_job import WindowsSuspendedAppContainerJob
-            # Real native inspection while the child is still suspended.
-            attestation = attest_suspended_child_fixture_handles(
-                proc.hProcess, inherited_pipes)
-            suspended_fixture_attested = bool(
-                attestation["two_expected_pipe_objects_verified"] and
-                attestation["excluded_parent_event_verified_absent"] and
-                attestation["process_was_suspended"] and
-                not attestation["full_handle_table_audited"])
-            if not suspended_fixture_attested:
-                raise PublicToolRejected("Native pre-resume handle audit incomplete")
+            if inherited_trial:
+                from varyn.windows_suspended_handle_audit import (
+                    attest_suspended_child_fixture_handles,
+                )
+                # Native independent check while child remains suspended.
+                attestation = attest_suspended_child_fixture_handles(
+                    proc.hProcess, inherited_pipes)
+                suspended_fixture_attested = bool(
+                    attestation["two_expected_pipe_objects_verified"] and
+                    attestation["excluded_parent_event_verified_absent"] and
+                    attestation["process_was_suspended"] and
+                    not attestation["full_handle_table_audited"])
+                if not suspended_fixture_attested:
+                    raise PublicToolRejected("Native pre-resume handle audit incomplete")
             # KILL_ON_JOB_CLOSE, process count=1, bounded memory; membership
-            # is verified before ResumeThread and any child execution.
+            # readback occurs before resuming even for cancellation trial.
             job_guard = WindowsSuspendedAppContainerJob(proc.hProcess)
             job_attested = bool(
                 job_guard.attached and job_guard.active_process_limit == 1
                 and job_guard.memory_cap_bytes == 192 * 1024 * 1024)
             if not job_attested:
                 raise PublicToolRejected("AppContainer job membership unverified")
+        if inherited_trial:
+            # Exact two-handle IPC only when separate OS audit passed.
             from varyn.bounded_broker_protocol import canonical
             inherited_pipes.mark_child_created()
             inherited_pipes.send_once(canonical(broker_request))
@@ -534,13 +554,45 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False,
                 proof["local_only"] and not proof["inherited_handles"])
             if not pipe_attested:
                 raise PublicToolRejected("AppContainer named pipe OS identity rejected")
-        wait = kernel.WaitForSingleObject(proc.hProcess, 8000)
-        if wait != _WAIT_OBJECT_0:
-            raise PublicToolRejected("AppContainer child timeout or wait failure")
+        if cancel_trial:
+            deadline = time.monotonic() + 5.0
+            while time.monotonic() < deadline:
+                if cancel_marker.is_file():
+                    if (cancel_marker.read_bytes() !=
+                            b"varyn-appcontainer-17s17-ready"):
+                        raise PublicToolRejected("Untrusted child ready marker")
+                    cancellation_marker_seen = True
+                    break
+                # Detect a child that dies without reaching real execution.
+                status = wintypes.DWORD()
+                if (not kernel.GetExitCodeProcess(
+                        proc.hProcess, ctypes.byref(status)) or
+                        status.value != _STILL_ACTIVE):
+                    raise PublicToolRejected(
+                        "AppContainer cancellation child exited too early")
+                time.sleep(0.05)
+            if not cancellation_marker_seen:
+                raise PublicToolRejected(
+                    "AppContainer cancellation child never started")
+            if not job_guard or not job_guard.attached:
+                raise PublicToolRejected("Cancellation Job missing")
+            job_guard.close()  # Native KILL_ON_JOB_CLOSE, not TerminateProcess
+            job_close_killed_child = (
+                kernel.WaitForSingleObject(proc.hProcess, 3000)
+                == _WAIT_OBJECT_0)
+            if not job_close_killed_child:
+                raise PublicToolRejected(
+                    "Job close did not terminate active AppContainer child")
+        else:
+            wait = kernel.WaitForSingleObject(proc.hProcess, 8000)
+            if wait != _WAIT_OBJECT_0:
+                raise PublicToolRejected("AppContainer child timeout or wait failure")
         raw = wintypes.DWORD()
         if not kernel.GetExitCodeProcess(proc.hProcess, ctypes.byref(raw)):
             raise PublicToolRejected("Cannot read AppContainer child exit status")
         exit_code = raw.value
+        if cancel_trial and exit_code == _STILL_ACTIVE:
+            raise PublicToolRejected("Cancelled child still active")
         if inherited_trial:
             if exit_code != 73:
                 raise PublicToolRejected(
@@ -657,6 +709,9 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False,
         "native_job_memory_cap_bytes": (192 * 1024 * 1024
                                         if job_attested else 0),
         "native_job_active_process_limit": (1 if job_attested else 0),
+        "cancellation_trial": cancel_trial,
+        "cancellation_child_executed": cancellation_marker_seen,
+        "job_close_killed_running_child": job_close_killed_child,
         "full_child_handle_table_audited": False,
         "process_terminated": True,
         "disposable_profile_deleted": cleaned,
