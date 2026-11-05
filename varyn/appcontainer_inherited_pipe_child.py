@@ -91,10 +91,22 @@ def main(argv):
         if error != 6:  # ERROR_INVALID_HANDLE
             return 125  # Unrecognized kernel denial is not proof.
     except OSError as exc:
-        # ctypes may surface an invalid handle as an OSError instead of
-        # returning FALSE. Accept only the exact native WinError 6.
-        if getattr(exc, "winerror", None) != 6:
-            return 126
+        # Only known Windows invalid-handle outcomes are acceptable. Native
+        # errors must be separated from arbitrary Python runtime exceptions.
+        if getattr(exc, "winerror", None) == 6:
+            pass
+        elif ctypes.get_last_error() == 6:
+            pass
+        elif getattr(exc, "errno", None) == 9:
+            return 128  # EBADF, not yet OS-attested Win32 denial.
+        elif getattr(exc, "errno", None) == 22:
+            return 129  # EINVAL, not yet OS-attested Win32 denial.
+        elif "access violation" in str(exc).lower():
+            return 130  # Invalid pointer or native fault; reject.
+        elif "invalid handle" in str(exc).lower():
+            return 131  # Text-only diagnostic; not yet proven.
+        else:
+            return 132  # Unknown OSError; reject.
     except Exception:
         return 127
 
