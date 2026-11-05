@@ -322,7 +322,7 @@ class ModelControlCenter(tk.Toplevel):
             chosen, estimated, task, input_estimate, out, ceiling = selection
             live = chosen.provider != "fake"
             if live and (not self.network.get() or
-                         not self._owner.controller.allow_live_providers):
+                         not self._owner._universal_model_live_capability):
                 raise PermissionError("Network disabled in this window or desktop")
             if chosen.provider == "9router" and not self.upstream.get():
                 raise PermissionError("Local 9Router upstream authorization missing")

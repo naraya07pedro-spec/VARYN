@@ -46,9 +46,16 @@ from varyn.reasoning_eval import parse_rubric, compare_collaboration_report, Eva
 
 
 class VarynDesktop(tk.Tk):
-    def __init__(self, controller=None, *, agent_journal=None, memory_db=None, task_journal=None, comparison_journal=None):
+    def __init__(self, controller=None, *, agent_journal=None, memory_db=None, task_journal=None, comparison_journal=None, allow_universal_model_network=False):
         super().__init__()
         self.controller = controller or DesktopController(allow_live_providers=True)
+        if type(allow_universal_model_network) is not bool:
+            raise ValueError("Model-gateway capability must be an explicit boolean")
+        # Separate from existing native/offline provider permissions.
+        self._universal_model_live_capability = (
+            bool(self.controller.allow_live_providers) or
+            allow_universal_model_network
+        )
         self.title("VARYN  |  Local AI Workspace (Opt-in Live MVP)")
         self.geometry("760x650")
         self.minsize(540, 480)

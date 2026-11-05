@@ -34,14 +34,25 @@ def create_portable_desktop(*, smoke_only=False):
     if type(smoke_only) is not bool:
         raise ValueError("Invalid smoke-only flag")
     controller = DesktopController(allow_live_providers=False)
-    window = VarynDesktop(controller=controller)
+    window = VarynDesktop(
+        controller=controller,
+        # Only the new gateway may opt in to live endpoints per request.
+        # The pre-existing portable provider controller REMAINS offline.
+        allow_universal_model_network=not smoke_only,
+    )
     window.title("VARYN | Portable manual official-app workbench (EXPERIMENTAL)")
     if smoke_only:
         # CI uses actual Tk creation, a workbench widget, and close on
         # Windows hosted runner; never calls browser, clipboard or AI APIs.
         window.withdraw()
         window._open_relay_workbench()
-        if (window._relay_workbench is None or
+        window._open_model_control_center()
+        center = window._model_center
+        if (center is None or not center.winfo_exists() or
+                center.network.get() is not False or
+                center._offers != [] or
+                window._universal_model_live_capability or
+                window._relay_workbench is None or
                 not window._relay_workbench.winfo_exists() or
                 controller.status()["mode"] != "offline_simulation"):
             window._close()
