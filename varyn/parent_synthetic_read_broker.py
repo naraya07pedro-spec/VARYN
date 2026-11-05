@@ -82,9 +82,11 @@ class ParentSyntheticReadBroker:
             info = os.lstat(self._path)
         except OSError:
             raise BrokerRejected("Synthetic fixture metadata unavailable") from None
-        if not stat.S_ISREG(info.st_mode) or not 1 <= info.st_size <= _MAX_SOURCE:
+        if (not stat.S_ISREG(info.st_mode) or info.st_nlink != 1 or
+                not 1 <= info.st_size <= _MAX_SOURCE):
             raise BrokerRejected("Synthetic fixture type or size rejected")
-        return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns)
+        return (info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns,
+                info.st_ctime_ns, info.st_nlink)
 
     def preview(self):
         if self._state != "fresh":
@@ -138,10 +140,18 @@ class ParentSyntheticReadBroker:
             fd = os.open(self._path, flags)
             identity = os.fstat(fd)
             actual = (identity.st_dev, identity.st_ino, identity.st_size,
-                      identity.st_mtime_ns)
+                      identity.st_mtime_ns, identity.st_ctime_ns,
+                      identity.st_nlink)
             if actual != self._identity or not stat.S_ISREG(identity.st_mode):
                 raise BrokerRejected("Fixture identity changed during open")
             data = os.read(fd, _MAX_SOURCE + 1)
+            after = os.fstat(fd)
+            after_identity = (after.st_dev, after.st_ino, after.st_size,
+                              after.st_mtime_ns, after.st_ctime_ns,
+                              after.st_nlink)
+            if (after_identity != self._identity or
+                    not stat.S_ISREG(after.st_mode)):
+                raise BrokerRejected("Fixture changed while reading")
         except OSError:
             raise BrokerRejected("Approved synthetic file read refused") from None
         finally:
