@@ -610,6 +610,60 @@ class VarynDesktop(tk.Tk):
             if action is not None:
                 action.close()
 
+    def _review_manual_relay_packet(self, preview):
+        """Bounded, scrollable read-only modal; never silently auto-approve."""
+        decision = {"approved": False}
+        dialog = tk.Toplevel(self)
+        dialog.title("VARYN | Read exact manual relay before copying")
+        dialog.geometry("650x440")
+        dialog.minsize(500, 310)
+        dialog.transient(self)
+        outer = ttk.Frame(dialog, padding=12)
+        outer.pack(fill="both", expand=True)
+        ttk.Label(
+            outer,
+            text="Official app: " + preview.provider +
+                 "  |  Manual clipboard only, NOT account sync",
+        ).pack(anchor="w")
+        ttk.Label(
+            outer, text="Review digest: " + preview.digest,
+        ).pack(anchor="w", pady=(4, 6))
+        content = ttk.Frame(outer)
+        content.pack(fill="both", expand=True)
+        scrollbar = ttk.Scrollbar(content)
+        scrollbar.pack(side="right", fill="y")
+        reader = tk.Text(content, wrap="word", height=10, width=52)
+        reader.pack(side="left", fill="both", expand=True)
+        reader.configure(yscrollcommand=scrollbar.set)
+        scrollbar.configure(command=reader.yview)
+        reader.insert("1.0", preview.packet)
+        reader.configure(state="disabled")
+        ttk.Label(
+            outer,
+            text="OS clipboard may retain this text. Do not use secrets or "
+                 "private documents. Copy requires explicit approval.",
+            wraplength=590,
+        ).pack(anchor="w", pady=(6, 6))
+        controls = ttk.Frame(outer)
+        controls.pack(fill="x")
+
+        def finish(approved):
+            if not self._closing:
+                decision["approved"] = approved
+            dialog.destroy()
+
+        ttk.Button(
+            controls, text="Reject", command=lambda: finish(False),
+        ).pack(side="left")
+        ttk.Button(
+            controls, text="Approve clipboard copy",
+            command=lambda: finish(True),
+        ).pack(side="right")
+        dialog.protocol("WM_DELETE_WINDOW", lambda: finish(False))
+        dialog.grab_set()
+        self.wait_window(dialog)
+        return decision["approved"]
+
     def _copy_official_app_relay(self):
         """Review exact user-typed text before writing it to OS clipboard."""
         if self._busy or self._closing:
@@ -627,19 +681,7 @@ class VarynDesktop(tk.Tk):
             )
             return
         try:
-            approved = messagebox.askyesno(
-                "VARYN | Review manual official-app handoff",
-                "Destination: " + preview.provider + " (" +
-                preview.destination_url + ")\\n" +
-                "Digest: " + preview.digest +
-                "\\n\\nExact text to copy to OS clipboard:\\n\\n" +
-                preview.packet +
-                "\\n\\nThis is MANUAL: VARYN cannot read/write your "
-                "official app's account history. Clipboard contents may "
-                "remain after exit; do not include secrets or private files. "
-                "Approve copying this text?",
-                parent=self,
-            )
+            approved = self._review_manual_relay_packet(preview)
             if self._closing or self._busy:
                 relay.discard_pending()
                 return
