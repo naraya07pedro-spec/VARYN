@@ -65,14 +65,14 @@ class OfficialManualDesktopTests(unittest.TestCase):
         VarynDesktop._start_pilot_audit(ui)
         self.assertTrue(ui._pilot_audit.snapshot()["active"])
         with patch("varyn.desktop.messagebox.askyesno",
-                   return_value=False), \\
+                   return_value=False), \
              patch("varyn.desktop.webbrowser.open_new_tab") as browser:
             VarynDesktop._open_selected_official_app(ui)
         browser.assert_not_called()
         self.assertEqual(ui._pilot_audit.snapshot()["events_observed"], 0)
 
         with patch("varyn.desktop.messagebox.askyesno",
-                   return_value=True), \\
+                   return_value=True), \
              patch("varyn.desktop.webbrowser.open_new_tab",
                    return_value=True) as browser:
             VarynDesktop._open_selected_official_app(ui)
