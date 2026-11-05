@@ -24,6 +24,7 @@ from varyn.file_grants import ScopedFileGrants
 from varyn.synthetic_fixture import SyntheticFixture
 from varyn.desktop_parent_counts import DesktopParentCountsAction
 from varyn.official_manual_relay import OfficialManualRelay, ManualRelayRejected, OFFICIAL_APP_LINKS, official_destination
+from varyn.relay_working_context import WorkingContextBoard, WorkingContextRejected
 from varyn.bounded_broker_protocol import BrokerRejected
 from varyn.tool_gateway import SyntheticReadToolGateway, ToolGatewayRejected
 from varyn.public_github_tool import PublicGithubToolGateway, PublicToolRejected
@@ -66,6 +67,9 @@ class VarynDesktop(tk.Tk):
         self.memory_project = tk.StringVar(value="VARYN")
         self.official_relay_target = tk.StringVar(value="chatgpt")
         self._official_relay = OfficialManualRelay()
+        self._working_context = WorkingContextBoard()
+        self.working_topic = tk.StringVar(value="next_step")
+        self.include_working_context = tk.BooleanVar(value=False)
         self._approval = DesktopApprovalController(journal=agent_journal)
         self._native_client = NativeToolRequestClient(allow_network=True)
         self._file_grants = ScopedFileGrants(auto_expire=True)
@@ -269,6 +273,28 @@ class VarynDesktop(tk.Tk):
             textvariable=self.official_relay_target, state="readonly",
             width=10,
         ).pack(side="left", padx=(0, 8))
+        working_row = ttk.Frame(outer, style="V.TFrame")
+        working_row.pack(fill="x", pady=(0, 6))
+        ttk.Label(
+            working_row, text="17S-25 temporary project note topic",
+            style="V.TLabel",
+        ).pack(side="left", padx=(0, 6))
+        ttk.Entry(
+            working_row, textvariable=self.working_topic, width=18,
+        ).pack(side="left", padx=(0, 8))
+        ttk.Checkbutton(
+            outer,
+            text="Include reviewed project RAM notes in NEXT official-app copy (opt-in)",
+            variable=self.include_working_context,
+        ).pack(anchor="w", pady=(0, 4))
+        ttk.Button(
+            outer, text="17S-25 | Review project working note (RAM-only)",
+            command=self._review_project_working_note,
+        ).pack(anchor="w", pady=(0, 4))
+        ttk.Button(
+            outer, text="17S-25 | Discard all temporary project notes",
+            command=self._discard_project_working_notes,
+        ).pack(anchor="w", pady=(0, 6))
         ttk.Button(
             outer, text="17S-23 | Open selected official app in browser",
             command=self._open_selected_official_app,
@@ -691,6 +717,89 @@ class VarynDesktop(tk.Tk):
             approve_label="Accept bound reply in RAM",
         )
 
+    def _review_project_working_note(self):
+        """Owner must review exact synthetic note and any conflicting revision."""
+        if self._busy or self._closing:
+            return
+        board = self._working_context
+        relay = self._official_relay
+        try:
+            project = self.memory_project.get()
+            topic = self.working_topic.get()
+            note = self.prompt.get("1.0", "end-1c")
+            receipt = relay.last_return_receipt()
+            preview = board.propose(
+                project, topic, note, source_receipt=receipt,
+            )
+        except (WorkingContextRejected, ValueError):
+            self._append(
+                "WORKING CONTEXT",
+                "Note refused: use SYNTHETIC: note, safe project/topic, "
+                "320-char limit and complete any prior review. No save.",
+            )
+            return
+        try:
+            old = preview.previous_note
+            message = (
+                "PROJECT: " + preview.project +
+                "\\nTOPIC: " + preview.topic +
+                "\\nTYPE: " + preview.kind +
+                "\\nSOURCE: " +
+                ("owner-reviewed note from unverified pasted response"
+                 if receipt is not None else
+                 "owner-reviewed typed note, not independently verified") +
+                "\\n\\nPROPOSED TEXT:\\n" + preview.text
+            )
+            if old is not None:
+                message += (
+                    "\\n\\nPREVIOUS LOCAL VERSION " + str(old.revision) +
+                    ":\\n" + old.text
+                )
+            approved = self._review_scrollable_manual_text(
+                title="VARYN | Review project working context",
+                heading=("CONFLICT: exact topic change requires explicit replace."
+                         if preview.conflict else
+                         "Temporary per-project note; source NOT verified."),
+                digest=preview.digest,
+                content=message,
+                warning="RAM ONLY. Does not save to memory DB, authenticate "
+                        "an AI provider, or share unless next outgoing packet "
+                        "is separately reviewed and approved.",
+                approve_label=("Replace existing project note"
+                               if preview.conflict else "Approve temporary note"),
+            )
+            if self._closing or self._busy:
+                board.discard_pending()
+                return
+            result = board.decide(
+                preview, approved=approved,
+                allow_replace=bool(approved and preview.conflict),
+                source_receipt=relay.last_return_receipt(),
+            )
+            self._append(
+                "WORKING CONTEXT",
+                "Review " + result["status"] +
+                "; project " + preview.project + " / topic " + preview.topic +
+                "; no database save, no network, no verified provider source.",
+            )
+        except (WorkingContextRejected, tk.TclError):
+            board.discard_pending()
+            self._append(
+                "WORKING CONTEXT",
+                "Stale/conflicting note or review failed closed; no change.",
+            )
+
+    def _discard_project_working_notes(self):
+        if self._busy or self._closing:
+            return
+        self._working_context.reset()
+        self.include_working_context.set(False)
+        self._append(
+            "WORKING CONTEXT",
+            "All temporary project notes discarded from VARYN RAM. "
+            "Previously copied OS clipboard bytes cannot be recalled.",
+        )
+
     def _open_selected_official_app(self):
         """Owner-initiated browser navigation to pinned official homepage only.
 
@@ -743,12 +852,21 @@ class VarynDesktop(tk.Tk):
         try:
             target = self.official_relay_target.get()
             task = self.prompt.get("1.0", "end-1c")
-            preview = relay.prepare(target, task)
-        except (ManualRelayRejected, ValueError):
+            reviewed_context = None
+            opt_in = getattr(self, "include_working_context", None)
+            if opt_in is not None and opt_in.get() is True:
+                reviewed_context = self._working_context.selection(
+                    self.memory_project.get()
+                )
+            preview = relay.prepare(
+                target, task, reviewed_context=reviewed_context,
+            )
+        except (ManualRelayRejected, WorkingContextRejected, ValueError):
             self._append(
                 "OFFICIAL APP RELAY",
                 "Cannot prepare: use a bounded typed task, or complete/discard "
-                "the previous handoff. No clipboard action.",
+                "the previous handoff; check project context selection. "
+                "No clipboard action.",
             )
             return
         try:
@@ -1719,6 +1837,9 @@ class VarynDesktop(tk.Tk):
         relay = getattr(self, "_official_relay", None)
         if relay is not None:
             relay.reset()
+        working = getattr(self, "_working_context", None)
+        if working is not None:
+            working.reset()
         VarynDesktop._abort_public_comparison(self, "Desktop closing")
         VarynDesktop._cancel_public_scheduled_callbacks(self)
         self._approval.reject_all_pending()
@@ -1756,6 +1877,7 @@ class VarynDesktop(tk.Tk):
                 "provider", "model", "consent_network",
                 "consent_public_tools", "consent_context", "status_line",
                 "memory_project", "official_relay_target",
+                "working_topic", "include_working_context",
             ):
                 variable = getattr(self, name, None)
                 if isinstance(variable, tk.Variable):
