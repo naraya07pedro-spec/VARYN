@@ -677,17 +677,18 @@ class VarynDesktop(tk.Tk):
             approve_label="Approve clipboard copy",
         )
 
-    def _review_manual_reply_text(self, candidate):
-        from hashlib import sha256
+    def _review_manual_reply_text(self, preview):
         return self._review_scrollable_manual_text(
-            title="VARYN | Review user-pasted external reply",
-            heading="Provider origin UNVERIFIED. This text is untrusted "
-                    "reference material stored only in VARYN RAM.",
-            digest=sha256(candidate.encode("utf-8")).hexdigest(),
-            content=candidate,
-            warning="A later relay may include this reference only after "
-                    "you approve a new exact clipboard preview.",
-            approve_label="Accept unverified reply in RAM",
+            title="VARYN | Review outbound-bound pasted reply",
+            heading="Claimed app: " + preview.provider +
+                    " | Outbound request: " + preview.outbound_request_id +
+                    " | Provider origin UNVERIFIED.",
+            digest=preview.reply_digest,
+            content=preview.reply_text,
+            warning="This exact text is bound to ONE local outgoing packet. "
+                    "It is untrusted reference, not authenticated provider "
+                    "history. No automatic sync or model call.",
+            approve_label="Accept bound reply in RAM",
         )
 
     def _open_selected_official_app(self):
@@ -793,23 +794,25 @@ class VarynDesktop(tk.Tk):
             # Validate before review to avoid oversized modal dialogs.
             from varyn.official_manual_relay import _bounded_text, _MAX_REPLY
             candidate = _bounded_text(reply, _MAX_REPLY)
-            if not relay.status()["awaiting_user_pasteback"]:
-                raise ManualRelayRejected("No outgoing manual handoff")
-            approved = self._review_manual_reply_text(candidate)
+            preview = relay.begin_return_review(candidate)
+            approved = self._review_manual_reply_text(preview)
             if self._closing or self._busy:
                 relay.discard_pending()
                 return
             if not approved:
+                relay.finish_return_review(preview, approved=False)
                 self._append(
                     "OFFICIAL APP RELAY", "Pasted reply declined; not stored."
                 )
                 return
-            result = relay.record_pasted_reply(candidate, reviewed=True)
+            result = relay.finish_return_review(preview, approved=True)
             self._append(
                 "OFFICIAL APP RELAY",
                 "User-pasted reply staged in RAM (claimed source: " +
                 result["claimed_provider"] +
-                "; origin NOT verified). To relay onward: choose another "
+                "; origin NOT verified; locally bound receipt " +
+                result["return_receipt"]["outbound_request_id"] +
+                "). To relay onward: choose another "
                 "official app, type a new non-sensitive task and review "
                 "a fresh clipboard preview.",
             )
