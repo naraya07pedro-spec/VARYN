@@ -4,6 +4,19 @@
 
 > **Experimental, non-production prototype.** Beyond the local SQLite memory experiment, this branch includes bounded context retrieval, opt-in provider API adapters, a Tkinter desktop, synthetic agent approvals and recovery, provider-native tool-intent adapters, and temporary read-only synthetic folder grants. These pieces are **not** an integrated personal AI product. There is no official ChatGPT/Claude/Gemini *app-history* bidirectional synchronization, no authenticated full agent permission boundary, no production-safe confidential storage, and no verified real-world autonomous execution. The default remains offline; paid API calls require explicit opt-in.
 
+## Official ONE-TIME ChatGPT/Claude history import into Gemini (17S-30)
+
+A **provider-supported history migration** is now exposed in the 17S-28 workbench as **`17S-30 | Official one-time ChatGPT/Claude ZIP import to Gemini`**. It is different from VARYN's synthetic clipboard relay: Google's native Gemini Apps import may accept exported ChatGPT/Claude chat-history ZIP files from eligible users.
+
+1. In VARYN's portable workbench, open the new native import guide and select **ChatGPT** or **Claude**. The guide opens the source provider's **official export instructions** only after a separate browser consent; download your export yourself, outside VARYN.
+2. Confirm you have an eligible personal Google account (18+, not in EEA/Switzerland/UK), obtained an export ZIP, and understand **Google's imported chat Activity/privacy and training implications**. VARYN does not verify age, location, eligibility, ZIP validity or account access.
+3. Review the full warning, then separately approve opening the pinned `https://gemini.google.com/` homepage. **You** must use Gemini's **Settings > Import memory to Gemini > Import chats > Add**, select the ZIP directly in Gemini, and handle its own import outcome. Google's help currently describes up to **5 GB per ZIP** and **5 ZIP files per day**. Do not supply the ZIP to VARYN.
+4. An optional, **unverified** result can be marked in VARYN RAM. A browser launch and a self-report are **not evidence of successful provider import or synchronized histories**. Close/reset discards the session.
+
+As of 2026-11-05, official sources: [OpenAI export](https://help.openai.com/en/articles/7260999-exporting-your-chatgpt-history-and-data), [Claude export](https://support.claude.com/en/articles/9450526-export-your-claude-data), [Google native Gemini import](https://support.google.com/gemini/answer/16868299?hl=en). See [17S-30 scope and limits](docs/official-native-history-import-17s-30.md).
+
+**Opsi C remains BLOCKED.** This is a one-time, owner-driven provider-side migration TO Gemini, not VARYN reading/writing native app histories, not an ongoing or bidirectional sync, and not a supported reverse Gemini-to-ChatGPT/Claude import.
+
 ## Windows portable app build, no Python installation (17S-29)
 
 A new **experimental, unsigned, one-folder Windows x64 build** is under verification. Once its exact-commit Windows Actions job succeeds, download the optional artifact named **`varyn-windows-portable`** from the [feature PR Actions checks](https://github.com/naraya07pedro-spec/VARYN/pull/1). Extract the whole package and double-click **`VARYN-Portable.exe`** in a normal Windows user session, not as Administrator. It bundles Python/Tkinter and opens the official-app manual workbench automatically. Keep the entire `_internal` folder alongside the executable. The original source-only ZIP remains available.
