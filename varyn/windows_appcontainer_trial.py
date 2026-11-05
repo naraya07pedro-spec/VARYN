@@ -433,7 +433,19 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False):
         if pipe_trial:
             if pipe_guard is None:
                 raise PublicToolRejected("Missing AppContainer pipe listener")
-            proof = pipe_guard.verify_one_client(proc.dwProcessId)
+            try:
+                proof = pipe_guard.verify_one_client(proc.dwProcessId)
+            except PublicToolRejected:
+                # Safe exit-code-only cause separation. NEVER turn a
+                # connection timeout into a successful identity check.
+                child_code = wintypes.DWORD()
+                if not kernel.GetExitCodeProcess(
+                        proc.hProcess, ctypes.byref(child_code)):
+                    raise PublicToolRejected(
+                        "AppContainer pipe handshake refused, exit unavailable") from None
+                raise PublicToolRejected(
+                    "AppContainer pipe handshake refused, child exit=0x"
+                    + format(child_code.value, "x")) from None
             pipe_attested = bool(
                 proof["os_client_pid_verified"] and
                 proof["package_sid_scoped_dacl"] and
