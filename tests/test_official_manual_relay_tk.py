@@ -38,8 +38,8 @@ class OfficialManualTkTests(unittest.TestCase):
             self.assertIn("HUMAN-MEDIATED", ui.clipboard_get())
             ui.prompt.delete("1.0", "end")
             ui.prompt.insert("1.0", "SYNTHETIC: pasted, unverified provider reply")
-            with patch("varyn.desktop.messagebox.askyesno",
-                       return_value=True):
+            with patch.object(ui, "_review_manual_reply_text",
+                              return_value=True):
                 paste.invoke()
             self.assertTrue(ui._official_relay.status()["reply_in_ram"])
             reset.invoke()
