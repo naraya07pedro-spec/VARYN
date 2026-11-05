@@ -48,7 +48,9 @@ def main(argv):
     pipe = None
     observed_error = 0
     for _ in range(20):
-        pipe = k.CreateFileW(pipe_name, 0x40000000, 0, None, 3, 0, None)
+        # FILE_WRITE_DATA ONLY; do not request GENERIC_WRITE, which can
+        # include FILE_CREATE_PIPE_INSTANCE on named pipes.
+        pipe = k.CreateFileW(pipe_name, 0x00000002, 0, None, 3, 0, None)
         if pipe is not None and int(pipe) != invalid:
             break
         observed_error = ctypes.get_last_error()
