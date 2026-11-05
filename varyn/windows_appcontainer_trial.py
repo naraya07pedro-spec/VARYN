@@ -221,9 +221,13 @@ def run_ci_only_zero_capability_trial():
         command = ctypes.create_unicode_buffer(
             subprocess.list2cmdline([str(exe), "-I", "-S", "-c", source]))
         systemroot = os.environ.get("SystemRoot")
-        if not systemroot:
-            raise PublicToolRejected("Windows system root unavailable")
+        localappdata = os.environ.get("LOCALAPPDATA")
+        if not systemroot or not localappdata:
+            raise PublicToolRejected("Windows CI AppContainer environment unavailable")
+        # CreateProcessW resolves AppContainer profile storage under
+        # LOCALAPPDATA. Never inherit the full host environment or secrets.
         environment = ctypes.create_unicode_buffer(
+            "LOCALAPPDATA=" + localappdata + "\0" +
             "SystemRoot=" + systemroot + "\0\0")
         flags = (_EXTENDED_STARTUPINFO_PRESENT | _CREATE_SUSPENDED |
                  _CREATE_NO_WINDOW | _CREATE_UNICODE_ENV)
