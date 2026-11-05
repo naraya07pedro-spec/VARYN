@@ -4,6 +4,14 @@
 
 > **Experimental, non-production prototype.** Beyond the local SQLite memory experiment, this branch includes bounded context retrieval, opt-in provider API adapters, a Tkinter desktop, synthetic agent approvals and recovery, provider-native tool-intent adapters, and temporary read-only synthetic folder grants. These pieces are **not** an integrated personal AI product. There is no official ChatGPT/Claude/Gemini *app-history* bidirectional synchronization, no authenticated full agent permission boundary, no production-safe confidential storage, and no verified real-world autonomous execution. The default remains offline; paid API calls require explicit opt-in.
 
+## Windows portable app build, no Python installation (17S-29)
+
+A new **experimental, unsigned, one-folder Windows x64 build** is under verification. Once its exact-commit Windows Actions job succeeds, download the optional artifact named **`varyn-windows-portable`** from the [feature PR Actions checks](https://github.com/naraya07pedro-spec/VARYN/pull/1). Extract the whole package and double-click **`VARYN-Portable.exe`** in a normal Windows user session, not as Administrator. It bundles Python/Tkinter and opens the official-app manual workbench automatically. Keep the entire `_internal` folder alongside the executable. The original source-only ZIP remains available.
+
+The portable build intentionally disables *model API providers* (the VARYN controller accepts only `fake`). Existing separately-approved public tool capabilities may still request network access if you deliberately use them; avoid that during the offline pilot. Official ChatGPT/Claude/Gemini sites still open only after user approval and must be used manually. This is **not official app-history synchronization**, a signed installer, an OS sandbox, or confidential private-data storage.
+
+**Important:** The build is unsigned. **Do not disable Windows Defender/SmartScreen** or other security controls if Windows warns or blocks the executable. Prefer the audited source-only ZIP instead. Each package has `BUNDLE-SHA256.json` containing a hash inventory, but a self-published checksum is **not** a digital signature; see [Windows portable build/verification](docs/windows-portable-17s-29.md) and the included `README-PORTABLE.txt`. A hosted Windows GUI smoke check is not physical owner acceptance.
+
 ## Try the new 17S-28 official-app workbench (Windows)
 
 The VARYN desktop now has a clearly visible top button, **`17S-28 | Open official-app relay workbench`**. This opens a single scrollable window for the actual owner-driven workflow:
