@@ -4,6 +4,12 @@
 
 > **Experimental, non-production prototype.** Beyond the local SQLite memory experiment, this branch includes bounded context retrieval, opt-in provider API adapters, a Tkinter desktop, synthetic agent approvals and recovery, provider-native tool-intent adapters, and temporary read-only synthetic folder grants. These pieces are **not** an integrated personal AI product. There is no official ChatGPT/Claude/Gemini *app-history* bidirectional synchronization, no authenticated full agent permission boundary, no production-safe confidential storage, and no verified real-world autonomous execution. The default remains offline; paid API calls require explicit opt-in.
 
+## New: 17S-27 local event audit (optional)
+
+Once the Windows owner pilot opens the VARYN desktop, click **`17S-27 | Start local event audit`** *before* testing any official app handoff. VARYN will then record only seven allowlisted types of **successful in-process callback**, such as a packet copied after review or a pasted reply staged in RAM. It does **not** capture task text, reply text, browser cookies, tokens, conversation history, or clipboard contents.
+
+At the end, click **`17S-27 | Review / copy audit`**, inspect the exact fixed-status JSON, and separately approve copying it to the clipboard if you want to share the observations. **`Reset audit`** clears the RAM report, and desktop exit clears it too. This is **not** human-click attestation or proof that content reached any official app. Even if two clipboard destinations are observed, automatic bidirectional ChatGPT/Claude/Gemini consumer history sync remains unverified and blocked. See [callback audit guidance](docs/local-owner-pilot-callback-audit-17s-27.md).
+
 ## Try the official-app continuity pilot on Windows (17S-26)
 
 **No installation of a second AI client is required.** This is still a manual, owner-driven workflow, not official consumer-app history or memory synchronization.
