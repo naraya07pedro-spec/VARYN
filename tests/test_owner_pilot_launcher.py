@@ -79,7 +79,7 @@ class OwnerPilotLauncherTests(unittest.TestCase):
 
     def test_admin_unknown_or_nonwindows_does_not_spawn(self):
         for windows, elevated in (
-            (False, False), (True, True), (True, None),
+            (False, False), (True, True),
             ("true", False), (True, "no")
         ):
             with self.subTest(windows=windows, elevated=elevated):
@@ -91,6 +91,18 @@ class OwnerPilotLauncherTests(unittest.TestCase):
                 )
                 self.assertEqual(result, 2)
                 self.assertFalse(calls)
+
+    def test_unknown_elevation_refuses_to_start(self):
+        with patch("varyn.owner_pilot_launcher.is_windows_elevated",
+                   return_value=None) as probe:
+            result = run_owner_pilot(
+                windows=True, elevated=None,
+                popen=lambda *args, **kwargs: self.fail(
+                    "Unknown elevation must not start desktop"),
+                write=lambda _: None,
+            )
+        self.assertEqual(result, 2)
+        probe.assert_called_once()
 
     def test_python_launch_failure_and_early_exit_fail_closed(self):
         with patch("varyn.owner_pilot_launcher.collect_manual_pilot") as ask:
