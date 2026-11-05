@@ -58,6 +58,13 @@ jobs:
       - name: 17S-23 hosted Windows actual Tk official homepage launch consent
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_official_relay_open_tk.py" -v
+      - name: 17S-24 exact bound return receipt and nested review adversarial checks
+        run: |
+          python -m unittest discover -s tests -p "test_official_return_receipt.py" -v
+          python -m unittest discover -s tests -p "test_official_manual_relay_desktop.py" -v
+      - name: 17S-24 native Windows Tk outbound-bound reply consent presentation
+        if: runner.os == 'Windows'
+        run: python -m unittest discover -s tests -p "test_official_manual_relay_tk.py" -v
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
       - name: Synthetic-only desktop boundary and disposable sample cleanup
