@@ -1,0 +1,70 @@
+"""17S-15 native AppContainer LOCAL pipe client, fixed offline marker only.
+
+The process runs only inside a disposable Windows CI AppContainer and does
+not use a shared HMAC secret, arbitrary code execution, network, providers,
+or real host files. Parent must verify the actual OS client PID and token.
+"""
+import ctypes
+from ctypes import wintypes
+import sys
+import time
+
+
+def main(argv):
+    if len(argv) != 3:
+        return 90
+    allowed, denied, pipe_name = argv
+    if not pipe_name.startswith(r"\\.\pipe\LOCAL\Varyn15_"):
+        return 91
+    try:
+        with open(allowed, "rb") as stream:
+            if stream.read(40) != b"varyn-17s13-granted":
+                return 81
+    except Exception:
+        return 82
+    try:
+        with open(denied, "rb") as stream:
+            stream.read(1)
+        return 83
+    except PermissionError:
+        pass
+    except FileNotFoundError:
+        return 84
+    except Exception:
+        return 85
+
+    k = ctypes.WinDLL("kernel32", use_last_error=True)
+    k.CreateFileW.argtypes = [
+        wintypes.LPCWSTR, wintypes.DWORD, wintypes.DWORD,
+        ctypes.c_void_p, wintypes.DWORD, wintypes.DWORD, wintypes.HANDLE]
+    k.CreateFileW.restype = wintypes.HANDLE
+    k.WriteFile.argtypes = [
+        wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD,
+        ctypes.POINTER(wintypes.DWORD), ctypes.c_void_p]
+    k.WriteFile.restype = wintypes.BOOL
+    k.CloseHandle.argtypes = [wintypes.HANDLE]
+    k.CloseHandle.restype = wintypes.BOOL
+    invalid = ctypes.c_void_p(-1).value
+    pipe = None
+    for _ in range(20):
+        pipe = k.CreateFileW(pipe_name, 0x40000000, 0, None, 3, 0, None)
+        if pipe is not None and int(pipe) != invalid:
+            break
+        time.sleep(.1)
+    else:
+        return 92
+    try:
+        data = ctypes.create_string_buffer(b"varyn-os-pid-v15")
+        written = wintypes.DWORD()
+        if not k.WriteFile(pipe, data, 16, ctypes.byref(written), None):
+            return 93
+        if written.value != 16:
+            return 94
+        time.sleep(.15)  # Keep pipe alive for parent OS PID query.
+        return 73
+    finally:
+        k.CloseHandle(pipe)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))
