@@ -156,7 +156,12 @@ class ParentSyntheticReadBroker:
                       identity.st_mtime_ns, identity.st_ctime_ns,
                       identity.st_nlink)
             if actual != self._identity or not stat.S_ISREG(identity.st_mode):
-                raise BrokerRejected("Fixture identity changed during open")
+                fields = ("dev", "ino", "size", "mtime", "ctime", "nlink")
+                differences = [key for key, a, b in
+                               zip(fields, actual, self._identity) if a != b]
+                raise BrokerRejected(
+                    "Fixture identity changed during open: " +
+                    ",".join(differences or ["type"]))
             data = os.read(fd, _MAX_SOURCE + 1)
             after = os.fstat(fd)
             after_identity = (after.st_dev, after.st_ino, after.st_size,
