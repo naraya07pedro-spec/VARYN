@@ -8,6 +8,18 @@ from unittest.mock import patch
 
 from varyn.desktop import VarynDesktop
 from varyn.official_manual_relay import OfficialManualRelay
+from varyn.relay_working_context import WorkingContextBoard
+
+
+class FakeFlag:
+    def __init__(self, value=False):
+        self.value = value
+
+    def get(self):
+        return self.value
+
+    def set(self, value):
+        self.value = value
 
 
 class FakeRelayDesktop:
@@ -16,6 +28,11 @@ class FakeRelayDesktop:
         self._busy = False
         self._closing = False
         self._official_relay = OfficialManualRelay(clock=lambda: 1000)
+        self._working_context = WorkingContextBoard(clock=lambda: 1000)
+        self.working_topic = SimpleNamespace(get=lambda: "next_step")
+        self.memory_project = SimpleNamespace(get=lambda: "VARYN")
+        self.include_working_context = FakeFlag(False)
+        self._review_scrollable_manual_text = lambda **kwargs: approved
         self.official_relay_target = SimpleNamespace(get=lambda: provider)
         self.prompt = SimpleNamespace(get=lambda *args: task)
         self._review_manual_relay_packet = lambda preview: approved
@@ -212,6 +229,81 @@ class OfficialManualDesktopTests(unittest.TestCase):
             "Review dialog must not open without previous handoff")
         VarynDesktop._review_official_app_reply(ui)
         self.assertIn("No valid pending", ui.messages[-1][1])
+
+    def test_owner_reviewed_project_note_requires_explicit_future_transfer(self):
+        ui = FakeRelayDesktop(task="SYNTHETIC: first task")
+        VarynDesktop._copy_official_app_relay(ui)
+        ui.prompt = SimpleNamespace(get=lambda *args: "SYNTHETIC: pasted reply")
+        VarynDesktop._review_official_app_reply(ui)
+        self.assertTrue(ui._official_relay.status()["return_receipt_available"])
+        ui.prompt = SimpleNamespace(
+            get=lambda *args: "SYNTHETIC: owner-reviewed next task")
+        VarynDesktop._review_project_working_note(ui)
+        self.assertEqual(ui._working_context.status()["saved_count"], 1)
+        self.assertIn("Review added", ui.messages[-1][1])
+
+        ui.official_relay_target = SimpleNamespace(get=lambda: "claude")
+        ui.prompt = SimpleNamespace(get=lambda *args: "SYNTHETIC: second task")
+        VarynDesktop._copy_official_app_relay(ui)
+        self.assertNotIn("TEMPORARY PROJECT NOTES", ui._clipboard)
+        self.assertEqual(ui._official_relay.status()["hops_used"], 2)
+
+    def test_owner_selected_project_note_enters_exact_clipboard_packet(self):
+        ui = FakeRelayDesktop(task="SYNTHETIC: workspace note")
+        VarynDesktop._review_project_working_note(ui)
+        self.assertEqual(ui._working_context.status()["saved_count"], 1)
+        ui.include_working_context.set(True)
+        with patch("varyn.multi_provider._post",
+                   side_effect=AssertionError("No API requests allowed")):
+            VarynDesktop._copy_official_app_relay(ui)
+        self.assertIn("HUMAN-REVIEWED TEMPORARY PROJECT NOTES", ui._clipboard)
+        self.assertIn("SYNTHETIC: workspace note", ui._clipboard)
+        self.assertEqual(ui._official_relay.status()["provider_requests"], 0)
+
+    def test_conflicting_topic_requires_reading_previous_and_replace(self):
+        ui = FakeRelayDesktop(task="SYNTHETIC: original")
+        VarynDesktop._review_project_working_note(ui)
+        ui.prompt = SimpleNamespace(get=lambda *args: "SYNTHETIC: changed")
+        seen = []
+        def inspect(**kwargs):
+            seen.append(kwargs)
+            return True
+        ui._review_scrollable_manual_text = inspect
+        VarynDesktop._review_project_working_note(ui)
+        self.assertIn("CONFLICT", seen[-1]["heading"])
+        self.assertIn("SYNTHETIC: original", seen[-1]["content"])
+        self.assertIn("SYNTHETIC: changed", seen[-1]["content"])
+        self.assertEqual(ui._working_context.selection("VARYN").notes[0].revision, 2)
+
+    def test_nested_discard_during_note_review_fails_closed(self):
+        ui = FakeRelayDesktop(task="SYNTHETIC: proposed")
+        def dismiss(**kwargs):
+            ui._working_context.reset()
+            return True
+        ui._review_scrollable_manual_text = dismiss
+        VarynDesktop._review_project_working_note(ui)
+        self.assertEqual(ui._working_context.status()["saved_count"], 0)
+        self.assertIn("failed closed", ui.messages[-1][1])
+
+    def test_explicit_discard_removes_board_and_turns_off_share(self):
+        ui = FakeRelayDesktop(task="SYNTHETIC: stage only")
+        VarynDesktop._review_project_working_note(ui)
+        ui.include_working_context.set(True)
+        VarynDesktop._discard_project_working_notes(ui)
+        self.assertEqual(ui._working_context.status()["saved_count"], 0)
+        self.assertFalse(ui.include_working_context.get())
+        self.assertIn("clipboard bytes cannot be recalled", ui.messages[-1][1])
+
+    def test_cross_project_board_not_silently_sent(self):
+        ui = FakeRelayDesktop(task="SYNTHETIC: private-to-project-A")
+        VarynDesktop._review_project_working_note(ui)
+        ui.memory_project = SimpleNamespace(get=lambda: "OTHER")
+        ui.include_working_context.set(True)
+        original_clipboard = ui._clipboard
+        VarynDesktop._copy_official_app_relay(ui)
+        self.assertEqual(ui._clipboard, original_clipboard)
+        self.assertEqual(ui.copies, 0)
+        self.assertIn("check project context selection", ui.messages[-1][1])
 
     def test_reset_does_not_clear_unrelated_clipboard(self):
         ui = FakeRelayDesktop()
