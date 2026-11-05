@@ -610,39 +610,35 @@ class VarynDesktop(tk.Tk):
             if action is not None:
                 action.close()
 
-    def _review_manual_relay_packet(self, preview):
-        """Bounded, scrollable read-only modal; never silently auto-approve."""
+    def _review_scrollable_manual_text(self, *, title, heading, digest,
+                                      content, warning, approve_label):
+        """Read-only scrollable modal for bounded external transfer decisions."""
         decision = {"approved": False}
         dialog = tk.Toplevel(self)
-        dialog.title("VARYN | Read exact manual relay before copying")
+        dialog.title(title)
         dialog.geometry("650x440")
         dialog.minsize(500, 310)
         dialog.transient(self)
         outer = ttk.Frame(dialog, padding=12)
         outer.pack(fill="both", expand=True)
         ttk.Label(
-            outer,
-            text="Official app: " + preview.provider +
-                 "  |  Manual clipboard only, NOT account sync",
+            outer, text=heading, wraplength=590,
         ).pack(anchor="w")
         ttk.Label(
-            outer, text="Review digest: " + preview.digest,
+            outer, text="Review digest: " + digest,
         ).pack(anchor="w", pady=(4, 6))
-        content = ttk.Frame(outer)
-        content.pack(fill="both", expand=True)
-        scrollbar = ttk.Scrollbar(content)
+        viewer = ttk.Frame(outer)
+        viewer.pack(fill="both", expand=True)
+        scrollbar = ttk.Scrollbar(viewer)
         scrollbar.pack(side="right", fill="y")
-        reader = tk.Text(content, wrap="word", height=10, width=52)
+        reader = tk.Text(viewer, wrap="word", height=10, width=52)
         reader.pack(side="left", fill="both", expand=True)
         reader.configure(yscrollcommand=scrollbar.set)
         scrollbar.configure(command=reader.yview)
-        reader.insert("1.0", preview.packet)
+        reader.insert("1.0", content)
         reader.configure(state="disabled")
         ttk.Label(
-            outer,
-            text="OS clipboard may retain this text. Do not use secrets or "
-                 "private documents. Copy requires explicit approval.",
-            wraplength=590,
+            outer, text=warning, wraplength=590,
         ).pack(anchor="w", pady=(6, 6))
         controls = ttk.Frame(outer)
         controls.pack(fill="x")
@@ -656,13 +652,38 @@ class VarynDesktop(tk.Tk):
             controls, text="Reject", command=lambda: finish(False),
         ).pack(side="left")
         ttk.Button(
-            controls, text="Approve clipboard copy",
+            controls, text=approve_label,
             command=lambda: finish(True),
         ).pack(side="right")
         dialog.protocol("WM_DELETE_WINDOW", lambda: finish(False))
         dialog.grab_set()
         self.wait_window(dialog)
         return decision["approved"]
+
+    def _review_manual_relay_packet(self, preview):
+        return self._review_scrollable_manual_text(
+            title="VARYN | Read exact relay before copying",
+            heading="Official app: " + preview.provider +
+                    " | Manual clipboard, NOT account sync",
+            digest=preview.digest,
+            content=preview.packet,
+            warning="OS clipboard may retain this text. Do not include "
+                    "secrets or private documents.",
+            approve_label="Approve clipboard copy",
+        )
+
+    def _review_manual_reply_text(self, candidate):
+        from hashlib import sha256
+        return self._review_scrollable_manual_text(
+            title="VARYN | Review user-pasted external reply",
+            heading="Provider origin UNVERIFIED. This text is untrusted "
+                    "reference material stored only in VARYN RAM.",
+            digest=sha256(candidate.encode("utf-8")).hexdigest(),
+            content=candidate,
+            warning="A later relay may include this reference only after "
+                    "you approve a new exact clipboard preview.",
+            approve_label="Accept unverified reply in RAM",
+        )
 
     def _copy_official_app_relay(self):
         """Review exact user-typed text before writing it to OS clipboard."""
@@ -723,16 +744,7 @@ class VarynDesktop(tk.Tk):
             candidate = _bounded_text(reply, _MAX_REPLY)
             if not relay.status()["awaiting_user_pasteback"]:
                 raise ManualRelayRejected("No outgoing manual handoff")
-            approved = messagebox.askyesno(
-                "VARYN | Review user-pasted external reply",
-                "The provider origin cannot be verified. This reply is "
-                "UNTRUSTED reference text, not memory or instructions. "
-                "It stays only in VARYN RAM and may be included if you "
-                "explicitly approve a later manual handoff.\\n\\n" +
-                "Exact pasted text:\\n\\n" + candidate +
-                "\\n\\nAccept this reference text?",
-                parent=self,
-            )
+            approved = self._review_manual_reply_text(candidate)
             if self._closing or self._busy:
                 relay.discard_pending()
                 return
