@@ -63,17 +63,24 @@ def main(argv):
         decoy = int(decoy_raw)
         if decoy < 4:
             return 91
-        # This handle was deliberately INHERITABLE in the parent but must be
-        # excluded by the OS-provided HANDLE_LIST. It is not given to child.
+    except Exception:
+        return 111  # Cannot parse fixed synthetic decoy identity.
+    try:
         k = ctypes.WinDLL("kernel32", use_last_error=True)
+    except Exception:
+        return 112  # Native library loader unavailable.
+    try:
         k.GetHandleInformation.argtypes = [
             wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
         k.GetHandleInformation.restype = wintypes.BOOL
+    except Exception:
+        return 113  # Kernel procedure could not be bound.
+    try:
         flags = wintypes.DWORD()
         if k.GetHandleInformation(decoy, ctypes.byref(flags)):
-            return 92  # Unrelated inherited kernel handle leaked.
+            return 92  # Unlisted decoy was unexpectedly inherited.
     except Exception:
-        return 93
+        return 114  # Decoy handle verification call itself failed.
 
     try:
         with open(allowed, "rb") as resource:
