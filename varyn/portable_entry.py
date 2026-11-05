@@ -17,6 +17,7 @@ from varyn.desktop import VarynDesktop
 from varyn.desktop_controller import DesktopController
 from varyn.frozen_draft_probe import run_probe_phase, FrozenProbeRejected
 from varyn.dpapi_vault import SealedDataError, UnsupportedPlatformError
+from varyn.frozen_model_center_smoke import synthetic_center_acceptance
 
 
 def windows_non_admin():
@@ -57,8 +58,13 @@ def create_portable_desktop(*, smoke_only=False):
                 controller.status()["mode"] != "offline_simulation"):
             window._close()
             raise RuntimeError("Offline workbench self-check failed")
-        window.update_idletasks()
-        window._close()
+        # 17S-42: real frozen EXE tests the actual Tk fake-request,
+        # review-denial, no-network API guard and memory cleanup, not just
+        # construction of widgets. Only fixed fictional data is permitted.
+        try:
+            synthetic_center_acceptance(window)
+        finally:
+            window._close()
         return None
     # Real user sees the focused workbench without needing to discover the
     # long legacy desktop control list. The main UI remains available.
