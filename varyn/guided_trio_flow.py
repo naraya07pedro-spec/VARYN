@@ -6,6 +6,7 @@ automatic history/memory sync, private data, disk writes or hidden dispatch.
 """
 from varyn.official_manual_relay import _bounded_text
 from varyn.safety import assert_no_obvious_secrets
+from varyn.guided_reply_ledger import GuidedReplyLedger
 
 _STAGES = ("chatgpt", "claude", "gemini")
 _MAX_ROOT = 650
@@ -37,6 +38,7 @@ class GuidedThreeAppFlow:
         self._state = "idle"
         self._root_task = None
         self._current_task = None
+        self._ledger = GuidedReplyLedger()
 
     @property
     def active(self):
@@ -51,6 +53,10 @@ class GuidedThreeAppFlow:
         return self._current_task
 
     @property
+    def ledger(self):
+        return self._ledger
+
+    @property
     def phase(self):
         return self._state
 
@@ -60,6 +66,7 @@ class GuidedThreeAppFlow:
             "phase": self._state,
             "stage": 0 if not self.active else self._index + 1,
             "stage_total": len(_STAGES),
+            "locally_reviewed_replies": self._ledger.count,
             "provider": self.provider,
             "manual_only": True,
             "local_review_required": True,
@@ -100,6 +107,8 @@ class GuidedThreeAppFlow:
                 status["awaiting_user_pasteback"] or
                 status["return_review_pending"]):
             raise GuidedTrioRejected("Wrong stage, provider, or unresolved relay")
+        if self._ledger.count != self._index:
+            raise GuidedTrioRejected("Missing reviewed local stage records")
         if self._index > 0 and not status["reply_in_ram"]:
             raise GuidedTrioRejected("Previous reply was not reviewed locally")
 
@@ -119,7 +128,7 @@ class GuidedThreeAppFlow:
                 not status["awaiting_user_pasteback"]):
             raise GuidedTrioRejected("Review the correct outgoing handoff first")
 
-    def reviewed_reply(self, before, after):
+    def reviewed_reply(self, before, after, *, reply_text, receipt):
         self.require_reply(before)
         later = _safe_status(after)
         if (later["hops_used"] != self._index + 1 or
@@ -128,9 +137,16 @@ class GuidedThreeAppFlow:
                 later["return_review_pending"] or
                 not later["return_receipt_available"]):
             raise GuidedTrioRejected("Pasted reply was not accepted by local review")
+        self._ledger.record(self._index + 1, self.provider, reply_text, receipt)
         self._state = (
             "completed" if self._index == len(_STAGES) - 1 else "ready_next"
         )
+
+    def history_selection(self):
+        if (self._state != "ready" or self._index not in (1, 2) or
+                self._ledger.count != self._index):
+            raise GuidedTrioRejected("No matching prior stage history")
+        return self._ledger.selection()
 
     def prepare_next(self, relay):
         status = _safe_status(relay)
@@ -140,7 +156,8 @@ class GuidedThreeAppFlow:
                 status["awaiting_user_pasteback"] or
                 not status["reply_in_ram"] or
                 status["return_review_pending"] or
-                not status["return_receipt_available"]):
+                not status["return_receipt_available"] or
+                self._ledger.count != self._index + 1):
             raise GuidedTrioRejected("Complete and review the current stage first")
         next_index = self._index + 1
         original = self._root_task[len("SYNTHETIC:"):].strip()

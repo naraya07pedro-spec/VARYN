@@ -18,6 +18,7 @@ from varyn.official_manual_relay import OFFICIAL_APP_LINKS
 from varyn.native_history_import_gui import NativeHistoryImportGuide
 from varyn.owner_pilot_checklist_gui import OwnerPilotChecklist
 from varyn.guided_trio_flow import GuidedThreeAppFlow, GuidedTrioRejected
+from varyn.guided_reply_ledger import GuidedLedgerRejected
 
 
 class OfficialRelayWorkbench(tk.Toplevel):
@@ -39,6 +40,7 @@ class OfficialRelayWorkbench(tk.Toplevel):
         self.topic = tk.StringVar(master=self, value="next_step")
         self.include_context = tk.BooleanVar(master=self, value=False)
         self._guided_flow = GuidedThreeAppFlow()
+        self._guided_ledger_window = None
         self.guided_label = tk.StringVar(
             master=self, value="Guided ChatGPT -> Claude -> Gemini: OFF"
         )
@@ -101,6 +103,10 @@ class OfficialRelayWorkbench(tk.Toplevel):
         ttk.Button(
             guided, text="17S-35 | Prepare next app after reviewed reply",
             command=self._advance_guided,
+        ).pack(anchor="w", pady=(0, 3))
+        ttk.Button(
+            guided, text="17S-36 | View complete locally reviewed replies (RAM)",
+            command=self._view_guided_ledger,
         ).pack(anchor="w", pady=(0, 3))
         ttk.Button(
             guided, text="17S-35 | Discard guided flow and relay RAM",
@@ -285,6 +291,7 @@ class OfficialRelayWorkbench(tk.Toplevel):
         if not self._allowed():
             return
         self._owner._discard_official_app_relay()
+        self._clear_guided_ledger_view()
         self._guided_flow.reset()
         self.reply.delete("1.0", "end")
         self._sync_guided_label()
@@ -292,6 +299,51 @@ class OfficialRelayWorkbench(tk.Toplevel):
             "Guided flow and relay RAM discarded. Existing OS clipboard "
             "cannot be recalled. Project notes require separate discard."
         )
+
+    def _clear_guided_ledger_view(self):
+        viewer = getattr(self, "_guided_ledger_window", None)
+        if viewer is not None:
+            try:
+                if viewer.winfo_exists():
+                    viewer.destroy()
+            except tk.TclError:
+                pass
+        self._guided_ledger_window = None
+
+    def _view_guided_ledger(self):
+        if not self._allowed():
+            return
+        try:
+            content = self._guided_flow.ledger.full_review_text()
+        except GuidedLedgerRejected:
+            self.detail_label.set("No locally reviewed replies available.")
+            return
+        self._clear_guided_ledger_view()
+        viewer = tk.Toplevel(self)
+        self._guided_ledger_window = viewer
+        viewer.title("VARYN | Full local staged replies (unverified)")
+        viewer.geometry("700x530")
+        viewer.minsize(500, 330)
+        viewer.transient(self)
+        root = ttk.Frame(viewer, padding=10)
+        root.pack(fill="both", expand=True)
+        ttk.Label(root, text="RAM ONLY; claimed provider origins unverified. "
+                  "No export, browser, provider API or native account sync.",
+                  wraplength=650).pack(anchor="w", pady=(0, 8))
+        area = ttk.Frame(root)
+        area.pack(fill="both", expand=True)
+        scroll = ttk.Scrollbar(area)
+        scroll.pack(side="right", fill="y")
+        reader = tk.Text(area, wrap="word")
+        reader.pack(side="left", fill="both", expand=True)
+        reader.configure(yscrollcommand=scroll.set)
+        scroll.configure(command=reader.yview)
+        reader.insert("1.0", content)
+        reader.configure(state="disabled")
+        ttk.Button(root, text="Close local record view",
+                   command=self._clear_guided_ledger_view).pack(
+                       anchor="e", pady=(8, 0))
+        viewer.protocol("WM_DELETE_WINDOW", self._clear_guided_ledger_view)
 
     def _draft_from_fields(self):
         return make_draft(
@@ -464,10 +516,19 @@ class OfficialRelayWorkbench(tk.Toplevel):
                     "Discard guided flow to use free-form manual relay."
                 )
                 return
+        try:
+            history = (self._guided_flow.history_selection()
+                       if self._guided_flow.active and
+                       self._guided_flow.status()["stage"] in (2, 3)
+                       else None)
+        except (GuidedTrioRejected, GuidedLedgerRejected):
+            self.detail_label.set("BLOCKED: incomplete prior local guided history.")
+            return
         self._owner._copy_official_app_relay(
             task=task, target=provider,
             project=self.project.get(),
             include_context=self.include_context.get() is True,
+            guided_history=history,
         )
         after = relay.status()
         if self._guided_flow.active:
@@ -509,11 +570,15 @@ class OfficialRelayWorkbench(tk.Toplevel):
                     not after["awaiting_user_pasteback"] and
                     after["return_receipt_available"]):
                 try:
-                    self._guided_flow.reviewed_reply(before, after)
-                except GuidedTrioRejected:
+                    self._guided_flow.reviewed_reply(
+                        before, after, reply_text=reply,
+                        receipt=relay.last_return_receipt(),
+                    )
+                except (GuidedTrioRejected, GuidedLedgerRejected):
+                    self._clear_guided_ledger_view()
                     self._guided_flow.reset()
                     self.detail_label.set(
-                        "Guided flow local state mismatch; reset. "
+                        "Guided reply mismatch; flow reset. "
                         "Discard relay RAM before starting again."
                     )
         self.refresh()
@@ -576,6 +641,7 @@ class OfficialRelayWorkbench(tk.Toplevel):
         )
 
     def _dismiss(self):
+        self._clear_guided_ledger_view()
         self._guided_flow.reset()
         # A closed workbench removes only its own editable widgets.
         # The owner can explicitly discard relay/board state in the main UI.

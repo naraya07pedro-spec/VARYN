@@ -96,7 +96,7 @@ class OfficialManualRelay:
             raise ManualRelayRejected("Invalid trusted time")
         return value
 
-    def prepare(self, provider, task, *, reviewed_context=None):
+    def prepare(self, provider, task, *, reviewed_context=None, guided_history=None):
         official_destination(provider)
         if self._pending is not None or self._awaiting_provider is not None:
             raise ManualRelayRejected("Complete or discard the previous relay first")
@@ -111,6 +111,13 @@ class OfficialManualRelay:
             context_block = reviewed_context.render()
         else:
             context_block = None
+        if guided_history is not None:
+            from varyn.guided_reply_ledger import GuidedHistorySelection
+            if type(guided_history) is not GuidedHistorySelection:
+                raise ManualRelayRejected("Unsupported guided history selection")
+            history_block = guided_history.render()
+        else:
+            history_block = None
         sections = [
             "VARYN | HUMAN-MEDIATED OFFICIAL APP HANDOFF v1",
             "Destination: " + provider,
@@ -120,7 +127,9 @@ class OfficialManualRelay:
         ]
         if context_block is not None:
             sections.append(context_block)
-        if self._previous_reply is not None:
+        if history_block is not None:
+            sections.append(history_block)
+        if self._previous_reply is not None and history_block is None:
             # repr keeps the unverified reply quoted and clearly distinguishable.
             sections.append(
                 "PRIOR USER-PASTED REPLY (claimed source: " +
