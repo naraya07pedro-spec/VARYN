@@ -10,7 +10,6 @@ The transport and operating-system containment are tested separately.
 """
 from dataclasses import dataclass
 import hashlib
-import json
 import os
 from pathlib import Path
 import secrets
@@ -80,7 +79,7 @@ class ParentSyntheticReadBroker:
         if self._path.is_symlink():
             raise BrokerRejected("Synthetic fixture symlink refused")
         try:
-            info = self._path.stat(follow_symlinks=False)
+            info = os.lstat(self._path)
         except OSError:
             raise BrokerRejected("Synthetic fixture metadata unavailable") from None
         if not stat.S_ISREG(info.st_mode) or not 1 <= info.st_size <= _MAX_SOURCE:
