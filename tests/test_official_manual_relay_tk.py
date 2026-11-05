@@ -48,6 +48,29 @@ class OfficialManualTkTests(unittest.TestCase):
         finally:
             ui._close()
 
+    def test_bound_return_modal_displays_outbound_receipt_and_unverified_source(self):
+        ui = VarynDesktop(controller=DesktopController())
+        try:
+            ui.withdraw()
+            outgoing = ui._official_relay.prepare(
+                "gemini", "SYNTHETIC: outgoing task")
+            ui._official_relay.decide(outgoing, approved=True, copied=True)
+            review = ui._official_relay.begin_return_review(
+                "SYNTHETIC: user-pasted claimed reply")
+            with patch.object(ui, "_review_scrollable_manual_text",
+                              return_value=False) as modal:
+                self.assertFalse(ui._review_manual_reply_text(review))
+            modal.assert_called_once()
+            kwargs = modal.call_args.kwargs
+            self.assertIn(outgoing.request_id, kwargs["heading"])
+            self.assertIn("UNVERIFIED", kwargs["heading"])
+            self.assertEqual(kwargs["digest"], review.reply_digest)
+            self.assertEqual(kwargs["content"], review.reply_text)
+            ui._official_relay.finish_return_review(review, approved=False)
+            self.assertFalse(ui._official_relay.status()["reply_in_ram"])
+        finally:
+            ui._close()
+
     def test_actual_scrollable_preview_reject_button(self):
         ui = VarynDesktop(controller=DesktopController())
         try:
