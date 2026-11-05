@@ -8,6 +8,7 @@ and is NEVER automatically sent to any model. Real provider APIs require keys.
 import argparse
 import queue
 import threading
+import webbrowser
 import tkinter as tk
 from tkinter import messagebox, simpledialog, ttk
 
@@ -22,7 +23,7 @@ from varyn.native_tool_requests import NativeToolRequestClient
 from varyn.file_grants import ScopedFileGrants
 from varyn.synthetic_fixture import SyntheticFixture
 from varyn.desktop_parent_counts import DesktopParentCountsAction
-from varyn.official_manual_relay import OfficialManualRelay, ManualRelayRejected, OFFICIAL_APP_LINKS
+from varyn.official_manual_relay import OfficialManualRelay, ManualRelayRejected, OFFICIAL_APP_LINKS, official_destination
 from varyn.bounded_broker_protocol import BrokerRejected
 from varyn.tool_gateway import SyntheticReadToolGateway, ToolGatewayRejected
 from varyn.public_github_tool import PublicGithubToolGateway, PublicToolRejected
@@ -268,6 +269,10 @@ class VarynDesktop(tk.Tk):
             textvariable=self.official_relay_target, state="readonly",
             width=10,
         ).pack(side="left", padx=(0, 8))
+        ttk.Button(
+            outer, text="17S-23 | Open selected official app in browser",
+            command=self._open_selected_official_app,
+        ).pack(anchor="w", pady=(0, 4))
         ttk.Button(
             outer, text="17S-22 | Review and copy task to official app",
             command=self._copy_official_app_relay,
@@ -685,6 +690,50 @@ class VarynDesktop(tk.Tk):
             approve_label="Accept unverified reply in RAM",
         )
 
+    def _open_selected_official_app(self):
+        """Owner-initiated browser navigation to pinned official homepage only.
+
+        Does not pass task text, model prompt, identity or credentials in URL.
+        The separately opened browser may make network requests; this action
+        does not grant VARYN API, clipboard or consumer-history permissions.
+        """
+        if self._busy or self._closing:
+            return
+        try:
+            provider = self.official_relay_target.get()
+            url = official_destination(provider)
+        except (ManualRelayRejected, ValueError):
+            self._append(
+                "OFFICIAL APP RELAY",
+                "Unknown official app. No browser opened.",
+            )
+            return
+        approved = messagebox.askyesno(
+            "VARYN | Open official consumer app externally",
+            "Open " + url + " in your default browser?\\n\\n"
+            "The browser may connect to the internet under your account. "
+            "VARYN will NOT send your task, clipboard, memory, provider "
+            "credentials or chat history. You must paste manually.",
+            parent=self,
+        )
+        if not approved or self._busy or self._closing:
+            self._append(
+                "OFFICIAL APP RELAY",
+                "External site launch declined or cancelled; no browser call.",
+            )
+            return
+        try:
+            launched = webbrowser.open_new_tab(url)
+        except (OSError, ValueError, RuntimeError):
+            launched = False
+        self._append(
+            "OFFICIAL APP RELAY",
+            ("Browser launch requested for " + provider +
+             " (no prompt/account data passed)."
+             if launched else
+             "Browser could not be launched; no app access established."),
+        )
+
     def _copy_official_app_relay(self):
         """Review exact user-typed text before writing it to OS clipboard."""
         if self._busy or self._closing:
@@ -712,9 +761,11 @@ class VarynDesktop(tk.Tk):
                     "OFFICIAL APP RELAY", "Declined; clipboard unchanged."
                 )
                 return
-            # No network or clipboard operation occurs before exact review.
+            # Prevent touching OS clipboard after a slow human review.
+            # The relay performs a second expiry check after clipboard write.
+            packet = relay.preflight_copy(preview)
             self.clipboard_clear()
-            self.clipboard_append(preview.packet)
+            self.clipboard_append(packet)
             result = relay.decide(preview, approved=True, copied=True)
             self._append(
                 "OFFICIAL APP RELAY",
