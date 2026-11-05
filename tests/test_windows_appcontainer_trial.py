@@ -45,6 +45,15 @@ class AppContainerFailClosedPolicyTests(unittest.TestCase):
                 run_ci_only_zero_capability_trial(broker_trial=True)
         with self.assertRaises(PublicToolRejected):
             run_ci_only_zero_capability_trial(broker_trial="true")
+        with self.assertRaises(PublicToolRejected):
+            run_ci_only_zero_capability_trial(inherited_trial="true")
+        with self.assertRaises(PublicToolRejected):
+            run_ci_only_zero_capability_trial(inherited_trial=True,
+                                            broker_trial=True)
+        with patch.dict(os.environ, {"GITHUB_ACTIONS": "false",
+                                     "VARYN_CI_APPCONTAINER_TRIAL": "1"}):
+            with self.assertRaises(PublicToolRejected):
+                run_ci_only_zero_capability_trial(inherited_trial=True)
 
     def test_linux_cannot_attest_windows_appcontainer(self):
         if os.name == "nt":
@@ -154,6 +163,35 @@ class NativeWindowsAppContainerTrial(unittest.TestCase):
         self.assertFalse(report["production_tool_integrated"])
         print("17S-15 native AppContainer LOCAL pipe: OS client PID "
               "matches child, exact profile SID ACL, synthetic read denied",
+              flush=True)
+
+    def test_real_appcontainer_two_anonymous_handles_only(self):
+        # A hard native Windows gate, NEVER mark loader crashes or missing
+        # response as a successful sandbox proof. No owner's personal files.
+        if (os.environ.get("GITHUB_ACTIONS") != "true" or
+                os.environ.get("RUNNER_OS") != "Windows"):
+            self.skipTest("No AppContainer profile changes on owner PC")
+        with patch.dict(os.environ, {"VARYN_CI_APPCONTAINER_TRIAL": "1"}):
+            proof = run_ci_only_zero_capability_trial(inherited_trial=True)
+        self.assertTrue(proof["native_primary_appcontainer_attested"])
+        self.assertTrue(proof["zero_capability_sids_attested"])
+        self.assertTrue(proof["explicit_inherited_pipe_trial"])
+        self.assertTrue(proof["inherited_handles"])  # precisely two, not zero
+        self.assertTrue(proof["exact_two_endpoint_allowlist_used"])
+        self.assertTrue(proof["unlisted_decoy_handle_denied"])
+        self.assertTrue(proof["inherited_pipe_response_verified"])
+        self.assertTrue(proof["parent_journal_claimed_before_launch"])
+        self.assertTrue(proof["parent_journal_completed_after_verification"])
+        self.assertTrue(proof["synthetic_owner_positive_control"])
+        self.assertTrue(proof["synthetic_granted_read_ok"])
+        self.assertTrue(proof["synthetic_private_read_denied"])
+        self.assertTrue(proof["disposable_profile_deleted"])
+        self.assertEqual(proof["python_exit_status"], 73)
+        self.assertFalse(proof["production_tool_integrated"])
+        self.assertFalse(proof["network_used"])
+        print("17S-16 native AppContainer: two explicit inherited handles, "
+              "unlisted decoy denied, bounded reply correlated, journal "
+              "completed only after proof, owner-file synthetic denied",
               flush=True)
 
     def test_native_python_denies_present_owner_only_file_after_granted_read(self):
