@@ -110,3 +110,21 @@ OWNER ACCEPTANCE IN THE APP (17S-32)
 - Loaded archives are READ-ONLY, not active relays. Previous consent, hops,
   clipboard permissions and model/consumer-app history are NOT restored.
 - Only test with fictional SYNTHETIC data; DPAPI is not cross-device backup.
+
+17S-38 | RESUME FROM ENCRYPTED THREE-AI ARCHIVE AS FRESH MANUAL TASK
+- In a NEW idle relay, pick an original archived stage 1 ChatGPT, stage 2
+  Claude or stage 3 Gemini. Click Select encrypted archive excerpt (review).
+- Choose a .varyn-archive created from a completed SYNTHETIC three-stage
+  session, review its EXACT bounded unverified excerpt, then approve staging.
+- A NEW harmless synthetic continuation task appears in the editable task
+  field. The archive is NEVER imported as an active or approved relay.
+- The Include reviewed old excerpt checkbox starts OFF. Check it yourself
+  to include the excerpt on the next NEW manual packet. Approve the final
+  exact clipboard packet separately, then paste into the official app.
+- Wrong stage, active prior relay, stale selection, denied review and
+  unsupported/corrupt archive are refused. Discard/close clears local
+  excerpt state, but OS clipboard content cannot be retracted.
+- The archived source label is only a USER claim, not authenticated app
+  history. Excerpts are capped at 480 characters and may be truncated.
+- No automatic model request, native app read/write, history sync, or
+  restoration of earlier session consent, browser state or credentials.
