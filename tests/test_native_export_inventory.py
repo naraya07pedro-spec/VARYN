@@ -129,7 +129,7 @@ class MetadataOnlyExportZipTests(unittest.TestCase):
         # ZIP actually contains on both operating systems.
         self._zip(members={"dir/outside.txt": b"payload"})
         raw = bytearray(self.path.read_bytes())
-        central = raw.find(b"PK\\x01\\x02")
+        central = raw.find(b"PK\x01\x02")
         self.assertGreaterEqual(central, 0)
         raw_name_at = central + 46
         self.assertEqual(raw[raw_name_at:raw_name_at + 15],
