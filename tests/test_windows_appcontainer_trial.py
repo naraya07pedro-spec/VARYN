@@ -120,6 +120,29 @@ class NativeWindowsAppContainerTrial(unittest.TestCase):
               "one response correlated, replay rejected, "
               "owner-only synthetic denied; total=21", flush=True)
 
+    def test_real_appcontainer_named_pipe_client_is_os_pid_attested(self):
+        # Child is the same CI-only real AppContainer verified before resume;
+        # pipe ACL grants ONLY owner, SYSTEM and exact OS package SID.
+        # PID arrives from Windows GetNamedPipeClientProcessId.
+        if (os.environ.get("GITHUB_ACTIONS") != "true" or
+                os.environ.get("RUNNER_OS") != "Windows"):
+            self.skipTest("No AppContainer profile changes on owner PC")
+        with patch.dict(os.environ, {"VARYN_CI_APPCONTAINER_TRIAL": "1"}):
+            report = run_ci_only_zero_capability_trial(pipe_trial=True)
+        self.assertTrue(report["native_primary_appcontainer_attested"])
+        self.assertTrue(report["zero_capability_sids_attested"])
+        self.assertTrue(report["disposable_profile_deleted"])
+        self.assertTrue(report["named_pipe_trial"])
+        self.assertTrue(report["os_named_pipe_client_pid_attested"])
+        self.assertTrue(report["synthetic_granted_read_ok"])
+        self.assertTrue(report["synthetic_private_read_denied"])
+        self.assertEqual(report["python_exit_status"], 73)
+        self.assertFalse(report["network_used"])
+        self.assertFalse(report["production_tool_integrated"])
+        print("17S-15 native AppContainer LOCAL pipe: OS client PID "
+              "matches child, exact profile SID ACL, synthetic read denied",
+              flush=True)
+
     def test_native_python_denies_present_owner_only_file_after_granted_read(self):
         # Hard FAIL, not SKIP: security proof is the entire 17S-13 gate.
         # Exit 73 requires the verified owner file to exist, normal-owner
