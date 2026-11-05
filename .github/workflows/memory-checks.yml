@@ -29,11 +29,13 @@ jobs:
       - name: Check Windows Tkinter import (no graphical session)
         if: runner.os == 'Windows'
         run: python -c "import tkinter; print('Tkinter module available')"
-      - name: 17S-17 early native suspended Job handle, decoy and kill-on-close (CI-only)
+      - name: 17S-17/18 early native AppContainer job, kernel handle audit and approved parent fixture bridge (CI-only)
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_windows_appcontainer_trial.py" -v
       - name: 17S-17 cross-platform AppContainer Job refusal and memory policy
         run: python -m unittest discover -s tests -p "test_windows_appcontainer_job.py" -v
+      - name: 17S-18 trusted parent simulated approval, fixture tamper, revocation and replay
+        run: python -m unittest discover -s tests -p "test_parent_synthetic_read_broker.py" -v
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
       - name: Synthetic-only desktop boundary and disposable sample cleanup
