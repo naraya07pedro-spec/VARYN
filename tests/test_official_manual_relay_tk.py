@@ -78,7 +78,7 @@ class OfficialManualTkTests(unittest.TestCase):
                     reject.invoke()
             ui.after(100, close_preview)
             self.assertFalse(ui._review_manual_relay_packet(draft))
-            self.assertTrue(all(observed.values()))
+            self.assertTrue(all(observed.values()), repr(observed))
             ui._official_relay.discard_pending()
         finally:
             ui._close()
