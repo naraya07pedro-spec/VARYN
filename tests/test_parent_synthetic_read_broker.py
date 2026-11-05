@@ -226,6 +226,34 @@ class SyntheticParentBrokerTests(unittest.TestCase):
         with self.assertRaises(BrokerRejected):
             self.broker.preview()
 
+    def test_hardlinked_synthetic_fixture_is_refused(self):
+        other = self.root / "second-name.json"
+        try:
+            os.link(self.file, other)
+        except (OSError, NotImplementedError):
+            self.skipTest("Fixture filesystem cannot create hardlinks")
+        with self.assertRaises(BrokerRejected):
+            self.broker.preview()
+        self.assertIsNone(self.journal.status(self.broker.request_id))
+
+    def test_mutation_during_open_read_is_refused_before_journal_claim(self):
+        p = self.grant()
+        original_read = os.read
+
+        def mutating_read(fd, length):
+            data = original_read(fd, length)
+            # Mutate the same open file *after* content was obtained, so the
+            # post-read fstat must detect the changed source identity.
+            self.file.write_bytes(b'{"counts":[4,6,12]}')
+            return data
+
+        with patch("varyn.parent_synthetic_read_broker.os.read",
+                   side_effect=mutating_read):
+            with self.assertRaises(BrokerRejected):
+                self.broker.claim_and_prepare()
+        self.assertEqual(self.broker.state, "consumed")
+        self.assertIsNone(self.journal.status(p.request_id))
+
     def test_non_ci_environment_cannot_construct_read_broker(self):
         with patch.dict(os.environ, {"GITHUB_ACTIONS": "false"}):
             with self.assertRaises(BrokerRejected):
