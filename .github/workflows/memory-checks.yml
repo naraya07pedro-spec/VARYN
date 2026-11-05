@@ -139,6 +139,8 @@ jobs:
         run: python -m unittest discover -s tests -p "test_windows_restricted_read_probe.py" -v
       - name: 17S-11 restricted-primary capability probe (SKIP means unavailable, NOT protected)
         run: python -m unittest discover -s tests -p "test_windows_restricted_primary.py" -v
+      - name: 17S-12 native restricted-thread file and runtime ACL triage (NOT primary launch)
+        run: python -m unittest discover -s tests -p "test_windows_startup_acl_probe.py" -v
       - name: Option C consumer-history proof gates stay blocked
         run: |
           python -m unittest discover -s tests -p "test_option_c_gate.py" -v
