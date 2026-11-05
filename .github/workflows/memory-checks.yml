@@ -93,6 +93,13 @@ jobs:
         run: python -m unittest discover -s tests -p "test_official_relay_workbench_tk.py" -v
       - name: 17S-29 Windows portable offline-only entry and SHA256 release contract
         run: python -m unittest discover -s tests -p "test_portable_windows_release.py" -v
+      - name: 17S-30 official supported native ZIP transfer direction, eligibility and strict manual consent
+        run: |
+          python -m unittest discover -s tests -p "test_native_history_import.py" -v
+          python -m unittest discover -s tests -p "test_option_c_gate.py" -v
+      - name: 17S-30 hosted Windows native Gemini import guide and private ZIP non-access
+        if: runner.os == 'Windows'
+        run: python -m unittest discover -s tests -p "test_native_history_import_tk.py" -v
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
       - name: Synthetic-only desktop boundary and disposable sample cleanup
