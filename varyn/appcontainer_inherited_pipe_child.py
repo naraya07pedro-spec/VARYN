@@ -70,22 +70,33 @@ def main(argv):
     except Exception:
         return 112  # Native library loader unavailable.
     try:
-        # The unlisted handle refers to a deliberately unsignaled EVENT in
-        # the parent. If inherited, wait(0) returns TIMEOUT or signaled.
-        # If absent, the native kernel returns WAIT_FAILED + ERROR_INVALID_HANDLE.
-        k.WaitForSingleObject.argtypes = [wintypes.HANDLE, wintypes.DWORD]
-        k.WaitForSingleObject.restype = wintypes.DWORD
+        k.GetStdHandle.argtypes = [wintypes.DWORD]
+        k.GetStdHandle.restype = wintypes.HANDLE
+        k.GetHandleInformation.argtypes = [
+            wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+        k.GetHandleInformation.restype = wintypes.BOOL
+        inherited_stdin = k.GetStdHandle(0xfffffff6)  # STD_INPUT_HANDLE
+        positive_flags = wintypes.DWORD()
+        if not inherited_stdin or not k.GetHandleInformation(
+                inherited_stdin, ctypes.byref(positive_flags)):
+            return 123  # The authorized pipe must exist as kernel handle.
     except Exception:
-        return 113
+        return 124  # Cannot establish valid positive kernel control.
     try:
-        observed = k.WaitForSingleObject(decoy, 0)
+        decoy_flags = wintypes.DWORD()
+        present = k.GetHandleInformation(decoy, ctypes.byref(decoy_flags))
         error = ctypes.get_last_error()
-        if observed in (0, 258):
-            return 92  # Decoy event is present in the sandbox child.
-        if observed != 0xffffffff or error != 6:
-            return 120  # Unknown OS result cannot certify no handle leak.
+        if present:
+            return 92  # Unlisted event was inherited despite handle list.
+        if error != 6:  # ERROR_INVALID_HANDLE
+            return 125  # Unrecognized kernel denial is not proof.
+    except OSError as exc:
+        # ctypes may surface an invalid handle as an OSError instead of
+        # returning FALSE. Accept only the exact native WinError 6.
+        if getattr(exc, "winerror", None) != 6:
+            return 126
     except Exception:
-        return 121  # No proof if the native invalid-handle check raises.
+        return 127
 
     try:
         with open(allowed, "rb") as resource:
