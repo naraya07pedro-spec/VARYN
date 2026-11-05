@@ -79,8 +79,16 @@ def main(argv):
         flags = wintypes.DWORD()
         if k.GetHandleInformation(decoy, ctypes.byref(flags)):
             return 92  # Unlisted decoy was unexpectedly inherited.
+    except ctypes.ArgumentError:
+        return 115  # Native argument marshaling failure.
+    except OSError:
+        return 116  # Runtime OS exception.
+    except TypeError:
+        return 117  # Python type mismatch.
+    except AttributeError:
+        return 118  # Native attribute unavailable.
     except Exception:
-        return 114  # Decoy handle verification call itself failed.
+        return 119  # Remaining test-only exception category.
 
     try:
         with open(allowed, "rb") as resource:
