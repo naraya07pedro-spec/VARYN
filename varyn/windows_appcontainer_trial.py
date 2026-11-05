@@ -173,7 +173,7 @@ def _attest_child(process, expected_sid, advapi, kernel):
 
 
 
-def _copy_runtime_into_owned_profile(exe, sid, kernel, advapi, userenv):
+def _copy_runtime_into_owned_profile(exe, sid, kernel, advapi, userenv, *, broker_trial=False):
     """Only a disposable CI-created AppContainer's OS-approved storage.
 
     Do not grant broad access to host Python, account directories or System32.
@@ -213,6 +213,20 @@ def _copy_runtime_into_owned_profile(exe, sid, kernel, advapi, userenv):
         for name in ("os.py", "codecs.py"):
             if (standard / name).is_file():
                 shutil.copy2(standard / name, runtime / "Lib" / name)
+        if broker_trial:
+            # Offline Python stdlib dependencies of HMAC/JSON/pathlib are
+            # required for the real native IPC proof. Copy ONLY trusted
+            # standard-library code into the disposable profile-owned tree.
+            # No site-packages, env secrets, user's files, or host ACL edits.
+            shutil.copytree(
+                standard, runtime / "Lib", dirs_exist_ok=True,
+                ignore=shutil.ignore_patterns(
+                    "site-packages", "__pycache__", "test", "tests",
+                    "ensurepip", "venv", "idlelib", "tkinter",
+                    "turtledemo", "pydoc_data"))
+            dll_dir = Path(sys.base_prefix) / "DLLs"
+            if dll_dir.is_dir():
+                shutil.copytree(dll_dir, runtime / "DLLs")
         return runtime / exe.name
     finally:
         if folder_text:
@@ -265,7 +279,7 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False):
         if not sid or not advapi.IsValidSid(sid):
             raise PublicToolRejected("Created CI AppContainer SID invalid")
         trusted_copy = _copy_runtime_into_owned_profile(
-            exe, sid, kernel, advapi, userenv)
+            exe, sid, kernel, advapi, userenv, broker_trial=broker_trial)
         runtime_parent = trusted_copy.parent
         length = ctypes.c_size_t()
         measured = kernel.InitializeProcThreadAttributeList(
