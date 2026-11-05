@@ -34,6 +34,10 @@ class PortableEntryContractTests(unittest.TestCase):
     def test_smoke_only_constructs_real_module_contract_without_dispatch(self):
         mocked_window = MagicMock()
         mocked_window._relay_workbench.winfo_exists.return_value = True
+        mocked_window._model_center.winfo_exists.return_value = True
+        mocked_window._model_center.network.get.return_value = False
+        mocked_window._model_center._offers = []
+        mocked_window._universal_model_live_capability = False
         ctrl = MagicMock()
         ctrl.status.return_value = {"mode": "offline_simulation"}
         with patch.object(portable_entry, "DesktopController",
@@ -45,6 +49,7 @@ class PortableEntryContractTests(unittest.TestCase):
         controller.assert_called_once_with(allow_live_providers=False)
         mocked_window.withdraw.assert_called_once()
         mocked_window._open_relay_workbench.assert_called_once()
+        mocked_window._open_model_control_center.assert_called_once()
         mocked_window.update_idletasks.assert_called_once()
         mocked_window._close.assert_called_once()
         mocked_window.mainloop.assert_not_called()
