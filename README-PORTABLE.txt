@@ -151,3 +151,30 @@ OWNER ACCEPTANCE IN THE APP (17S-32)
   DPAPI regressions do NOT independently prove live model routing.
 - ChatGPT/Claude/Gemini official consumer-app account history and memory
   are NOT synchronized by this gateway. Option C remains BLOCKED.
+
+17S-40 | MODEL CONTROL CENTER REAL WINDOWS GUI (OPT-IN, NOT NATIVE APP SYNC)
+- Main VARYN Tk: "17S-40 | Open Model Control Center (owner opt-in)".
+- Add a provider/model plus your OWN verified USD per 1 million input/output
+  tokens, price date and two separately checked quote/route confirmations.
+  This is RAM only; do not assume VARYN verified real pricing or free quotas.
+- Route Auto picks the lowest owner-quoted eligible estimate, OR explicitly
+  select an exact registered model. Price age >30 days is refused.
+- Preview: NO network. For a real model, choose one bounded fictional
+  SYNTHETIC: task, enter estimated input/output token limits and estimated
+  USD ceiling, check network ON, and separately authorize 9Router upstream.
+- The EXACT approved request is shown in a scrollable modal. Only a fresh
+  affirmative owner decision may dispatch ONE request. No auto-retry.
+- API key is read only from your operating-system environment when dispatched:
+  OPENROUTER_API_KEY, DEEPSEEK_API_KEY, VARYN_9ROUTER_API_KEY.
+  NEVER paste secrets into GUI task, chat logs or source code.
+- 9Router endpoint stays http://127.0.0.1:20128; upstream account behavior
+  and provider fallback are NOT attested. No consumer login/cookie scraping.
+- The old Portable provider controller stays OFFLINE; the new Model Control
+  Center separately permits owner-consented live requests only in NORMAL
+  user-launched mode. --smoke-only NEVER permits live network.
+- GUI uses a dedicated thread for request execution, not for Tk updates.
+  Closing after dispatch cannot cancel an in-flight provider charge.
+- The preview budget is only an ESTIMATE, not guaranteed provider billing;
+  RAM request count limits reset after the application restarts.
+- Neither developer tests nor the EXE smoke verify real external API delivery.
+  Native app ChatGPT/Claude/Gemini two-way memory sync (Option C) remains BLOCKED.
