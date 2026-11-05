@@ -72,6 +72,11 @@ jobs:
       - name: 17S-25 native Windows Tk working context owner review, copy and discard
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_relay_working_context_tk.py" -v
+      - name: 17S-26 one-click owner Windows pilot contracts (no real app login)
+        run: |
+          python -m unittest discover -s tests -p "test_owner_pilot_launcher.py" -v
+          python -m unittest discover -s tests -p "test_desktop_packaging.py" -v
+          python -m unittest discover -s tests -p "test_acceptance_packaging.py" -v
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
       - name: Synthetic-only desktop boundary and disposable sample cleanup
@@ -204,7 +209,7 @@ jobs:
       - name: Build deterministic desktop source ZIP
         run: python -m varyn.package_desktop --output varyn-desktop-ci.zip
       - name: Inspect source ZIP entries (no DB, key, or executable)
-        run: python -c "import zipfile; z=zipfile.ZipFile('varyn-desktop-ci.zip'); names=z.namelist(); assert 'VARYN/Launch-VARYN.cmd' in names; assert 'VARYN/Verify-VARYN-Synthetic.cmd' in names; assert 'VARYN/Record-VARYN-GUI-Checks.cmd' in names; assert all(n.endswith('.py') or n.endswith('.cmd') or n.endswith('.md') for n in names)"
+        run: python -c "import zipfile; z=zipfile.ZipFile('varyn-desktop-ci.zip'); names=z.namelist(); assert 'VARYN/Launch-VARYN.cmd' in names; assert 'VARYN/Verify-VARYN-Synthetic.cmd' in names; assert 'VARYN/Record-VARYN-GUI-Checks.cmd' in names; assert 'VARYN/Try-VARYN-Official-Apps.cmd' in names; assert 'VARYN/varyn/owner_pilot_launcher.py' in names; assert all(n.endswith('.py') or n.endswith('.cmd') or n.endswith('.md') for n in names)"
       - name: Publish source-only Windows launcher ZIP as CI artifact
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
