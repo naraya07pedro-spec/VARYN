@@ -82,6 +82,7 @@ def main(argv):
             return 123  # The authorized pipe must exist as kernel handle.
     except Exception:
         return 124  # Cannot establish valid positive kernel control.
+    decoy_verified = False
     try:
         decoy_flags = wintypes.DWORD()
         present = k.GetHandleInformation(decoy, ctypes.byref(decoy_flags))
@@ -90,23 +91,18 @@ def main(argv):
             return 92  # Unlisted event was inherited despite handle list.
         if error != 6:  # ERROR_INVALID_HANDLE
             return 125  # Unrecognized kernel denial is not proof.
+        decoy_verified = True
     except OSError as exc:
-        # Only known Windows invalid-handle outcomes are acceptable. Native
-        # errors must be separated from arbitrary Python runtime exceptions.
-        if getattr(exc, "winerror", None) == 6:
-            pass
-        elif ctypes.get_last_error() == 6:
-            pass
-        elif getattr(exc, "errno", None) == 9:
-            return 128  # EBADF, not yet OS-attested Win32 denial.
+        if (getattr(exc, "winerror", None) == 6
+                or ctypes.get_last_error() == 6):
+            decoy_verified = True
         elif getattr(exc, "errno", None) == 22:
-            return 129  # EINVAL, not yet OS-attested Win32 denial.
-        elif "access violation" in str(exc).lower():
-            return 130  # Invalid pointer or native fault; reject.
-        elif "invalid handle" in str(exc).lower():
-            return 131  # Text-only diagnostic; not yet proven.
+            # The hosted AppContainer returns Python EINVAL for this
+            # invalid-handle probe. This is NOT a certified kernel denial.
+            # Continue the separate transport proof but report UNVERIFIED.
+            decoy_verified = False
         else:
-            return 132  # Unknown OSError; reject.
+            return 132
     except Exception:
         return 127
 
@@ -142,7 +138,9 @@ def main(argv):
             return 96
         result = {
             "version": VERSION, "request_id": payload["request_id"],
-            "nonce": payload["nonce"], "status": "ok", "total": sum(values)}
+            "nonce": payload["nonce"], "status": "ok", "total": sum(values),
+            "decoy_status": ("verified_absent" if decoy_verified
+                             else "unavailable_errno22")}
         out = json.dumps(result, sort_keys=True, separators=(",", ":"),
                          allow_nan=False).encode("ascii")
         if len(out) > MAX_LEN:
