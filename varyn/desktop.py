@@ -507,7 +507,7 @@ class VarynDesktop(tk.Tk):
                 "\\n\\nAction: read one generated counts-only JSON, then add "
                 "its validated integers INSIDE this trusted desktop parent."
                 "\\nPreview digest: " + preview.digest +
-                "\\nExpires at: " + str(preview.expires_at) +
+                "\\nValid for 20 seconds after preview." +
                 "\\n\\nNo user-selected paths, private documents, AI, "
                 "network, or AppContainer subprocess are involved. "
                 "A temporary metadata-only journal is deleted with "
