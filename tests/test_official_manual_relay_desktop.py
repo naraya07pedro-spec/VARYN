@@ -36,6 +36,71 @@ class FakeRelayDesktop:
 
 
 class OfficialManualDesktopTests(unittest.TestCase):
+    def test_open_official_site_requires_separate_owner_consent(self):
+        ui = FakeRelayDesktop(task="SYNTHETIC: never passed in URL",
+                              provider="claude")
+        with patch("varyn.desktop.messagebox.askyesno",
+                   return_value=False) as approval, \
+             patch("varyn.desktop.webbrowser.open_new_tab") as opener:
+            VarynDesktop._open_selected_official_app(ui)
+        approval.assert_called_once()
+        opener.assert_not_called()
+        self.assertEqual(ui._official_relay.status()["hops_used"], 0)
+        self.assertIn("declined", ui.messages[-1][1])
+
+        with patch("varyn.desktop.messagebox.askyesno",
+                   return_value=True) as approval, \
+             patch("varyn.desktop.webbrowser.open_new_tab",
+                   return_value=True) as opener:
+            VarynDesktop._open_selected_official_app(ui)
+        approval.assert_called_once()
+        opener.assert_called_once_with("https://claude.ai/")
+        self.assertEqual(ui._official_relay.status()["hops_used"], 0)
+        self.assertNotIn("never passed in URL", str(opener.call_args))
+        self.assertIn("Browser launch requested", ui.messages[-1][1])
+
+    def test_browser_failure_and_unknown_provider_cannot_claim_open(self):
+        ui = FakeRelayDesktop(provider="fake")
+        with patch("varyn.desktop.messagebox.askyesno") as ask, \
+             patch("varyn.desktop.webbrowser.open_new_tab") as open_tab:
+            VarynDesktop._open_selected_official_app(ui)
+        ask.assert_not_called()
+        open_tab.assert_not_called()
+        self.assertIn("Unknown official app", ui.messages[-1][1])
+
+        ui = FakeRelayDesktop(provider="gemini")
+        with patch("varyn.desktop.messagebox.askyesno",
+                   return_value=True), \
+             patch("varyn.desktop.webbrowser.open_new_tab",
+                   return_value=False) as open_tab:
+            VarynDesktop._open_selected_official_app(ui)
+        open_tab.assert_called_once_with("https://gemini.google.com/")
+        self.assertIn("could not be launched", ui.messages[-1][1])
+
+    def test_open_official_site_during_nested_window_close_refuses(self):
+        ui = FakeRelayDesktop()
+        def close_in_modal(*args, **kwargs):
+            ui._closing = True
+            return True
+        with patch("varyn.desktop.messagebox.askyesno",
+                   side_effect=close_in_modal), \
+             patch("varyn.desktop.webbrowser.open_new_tab") as open_tab:
+            VarynDesktop._open_selected_official_app(ui)
+        open_tab.assert_not_called()
+
+    def test_preview_expired_during_review_preserves_clipboard(self):
+        ui = FakeRelayDesktop()
+        def review_and_expire(preview):
+            ui._official_relay._clock = lambda: preview.expires_at + 2
+            return True
+        ui._review_manual_relay_packet = review_and_expire
+        VarynDesktop._copy_official_app_relay(ui)
+        self.assertEqual(ui._clipboard, "USER_EXISTING_CLIPBOARD")
+        self.assertEqual(ui.copies, 0)
+        self.assertEqual(ui._official_relay.status()["hops_used"], 0)
+        self.assertFalse(ui._official_relay.status()["awaiting_user_pasteback"])
+        self.assertIn("failed/expired", ui.messages[-1][1])
+
     def test_declined_never_touches_clipboard(self):
         ui = FakeRelayDesktop(approved=False)
         VarynDesktop._copy_official_app_relay(ui)
