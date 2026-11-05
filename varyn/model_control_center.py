@@ -10,9 +10,12 @@ import json
 import queue
 import threading
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, filedialog
 
 from varyn.gateway_chat import KEY_ENVS
+from varyn.provider_readiness import (
+    readiness, local_observation, receipt_json, save_new, ReadinessRejected,
+)
 from varyn.model_registry import Offer, Registry, RegistryRejected
 from varyn.providers import ProviderError
 from varyn.universal_gateway import UniversalGateway
@@ -91,6 +94,8 @@ class ModelControlCenter(tk.Toplevel):
         self._closed = False
         self._results = queue.Queue()
         self._poll_id = None
+        self._active_offer = None
+        self._last_receipt = None
         self.title("VARYN 17S-40 | Model Control Center")
         self.geometry("760x640")
         self.minsize(540, 440)
@@ -222,6 +227,18 @@ class ModelControlCenter(tk.Toplevel):
             command=self._send,
         )
         self.send_button.pack(side="left", padx=(6, 0))
+        readiness_buttons = ttk.Frame(control)
+        readiness_buttons.pack(fill="x", padx=6, pady=(0, 5))
+        ttk.Button(
+            readiness_buttons, text="17S-41 | Check readiness (NO network)",
+            command=self._check_readiness,
+        ).pack(side="left")
+        self.receipt_button = ttk.Button(
+            readiness_buttons,
+            text="17S-41 | Review & save content-free receipt",
+            command=self._save_receipt, state="disabled",
+        )
+        self.receipt_button.pack(side="left", padx=(7, 0))
         ttk.Label(shell, textvariable=self.status, wraplength=710).pack(
             anchor="w", pady=(4, 6),
         )
@@ -271,6 +288,8 @@ class ModelControlCenter(tk.Toplevel):
         if not self._allowed() or self._running:
             return
         self._offers.clear()
+        self._last_receipt = None
+        self.receipt_button.configure(state="disabled")
         self._refresh_options()
         self.network.set(False)
         self.upstream.set(False)
@@ -314,6 +333,85 @@ class ModelControlCenter(tk.Toplevel):
         except (ValueError, RegistryRejected, ModelCenterRejected):
             self.status.set("BLOCKED: no fresh approved quote within estimate ceiling.")
 
+    def _check_readiness(self):
+        if not self._allowed() or self._running:
+            return
+        try:
+            chosen, _amount, _task, _inp, _out, _ceiling = self._plan()
+            state = readiness(
+                chosen,
+                live_capability=self._owner._universal_model_live_capability,
+                enabled_network=self.network.get(),
+                upstream_authorized=self.upstream.get(),
+            )
+            if chosen.provider == "fake":
+                self.status.set(
+                    "FAKE only: simulated request; no API endpoint or provider key."
+                )
+            elif state["ready_for_live_attempt"]:
+                self.status.set(
+                    "READY FOR ONE OWNER-APPROVED ATTEMPT, NOT CONNECTED/VERIFIED: "
+                    + chosen.provider + "/" + chosen.model + "; "
+                    + state["key_env_name"] + " is configured. "
+                    "No network call was made."
+                )
+            else:
+                self.status.set(
+                    "NOT READY (NO network): " + ", ".join(state["missing"])
+                    + "; expected env " + state["key_env_name"] +
+                    "; credential " + (
+                        "present" if state["key_present"] else "missing"
+                    ) + ". No request dispatched."
+                )
+        except (ValueError, RegistryRejected, ModelCenterRejected,
+                ReadinessRejected):
+            self.status.set(
+                "BLOCKED: register and select a fresh reviewed model quote first."
+            )
+
+    def _save_receipt(self):
+        if not self._allowed() or self._running or self._last_receipt is None:
+            return
+        try:
+            receipt = self._last_receipt
+            text = receipt_json(receipt)
+            digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+            confirmed = self._owner._review_scrollable_manual_text(
+                title="VARYN | Save local model observation (metadata only)",
+                heading="Adapter parsed a response; provider account NOT attested",
+                digest=digest, content=text,
+                warning="Only locally observed metadata, no prompt, reply, "
+                        "API key, token, or provider-billing proof. "
+                        "This is NOT native ChatGPT/Claude/Gemini memory sync. "
+                        "New file only; user must explicitly choose path.",
+                approve_label="Approve metadata-only NEW receipt",
+            )
+            if not confirmed or not self._allowed():
+                self.status.set("Receipt review declined; no file written.")
+                return
+            if self._running or self._last_receipt is not receipt:
+                self.status.set("BLOCKED: observation changed during review.")
+                return
+            target = filedialog.asksaveasfilename(
+                parent=self,
+                title="Save NEW metadata-only model observation JSON",
+                defaultextension=".json",
+                filetypes=[("Local observation", "*.json")],
+            )
+            if not target or not self._allowed() or self._last_receipt is not receipt:
+                self.status.set("Receipt file selection cancelled.")
+                return
+            save_new(target, receipt)
+            self.status.set(
+                "Saved a NEW metadata-only observation file. "
+                "Provider authenticity and actual billing remain unverified."
+            )
+        except (ReadinessRejected, OSError, ValueError):
+            self.status.set(
+                "BLOCKED: invalid receipt, missing path or existing file. "
+                "No overwrite allowed."
+            )
+
     def _send(self):
         if not self._allowed() or self._running:
             return
@@ -356,6 +454,9 @@ class ModelControlCenter(tk.Toplevel):
                 raise ModelCenterRejected("Request changed during approval")
             self.network.set(False)
             self.upstream.set(False)
+            self._last_receipt = None
+            self.receipt_button.configure(state="disabled")
+            self._active_offer = chosen
             self._running = True
             self.send_button.configure(state="disabled")
             self.status.set("Approved one request. Awaiting result; no automatic retry.")
@@ -406,14 +507,33 @@ class ModelControlCenter(tk.Toplevel):
         self._running = False
         self.send_button.configure(state="normal")
         if kind == "ok":
+            if (data["reply"].provider != "fake" and
+                    self._transport is None and self._active_offer is not None):
+                try:
+                    self._last_receipt = local_observation(
+                        data, quoted_offer=self._active_offer,
+                    )
+                    self.receipt_button.configure(state="normal")
+                except ReadinessRejected:
+                    self._last_receipt = None
             self.answer.configure(state="normal")
             self.answer.delete("1.0", "end")
             self.answer.insert("1.0", data["reply"].text)
             self.answer.configure(state="disabled")
+            claimed = data.get("provider_reported_model")
+            claimed_text = (
+                "Provider-claimed model label: " + claimed
+                if claimed is not None else
+                "Provider returned no usable model label"
+            )
+            mismatch = data.get("provider_reported_model_matches_selected")
+            if mismatch is False:
+                claimed_text += "; MODEL LABEL DIFFERS FROM SELECTION"
             self.status.set(
-                "Completed: " + data["reply"].provider + "/" + data["reply"].model +
-                ". Owner-reviewable UNTRUSTED output, RAM only. "
-                "Actual charges and model origin NOT independently verified."
+                "Completed: selected " + data["reply"].provider + "/" +
+                data["reply"].model + ". " + claimed_text +
+                ". Untrusted answer RAM-only; model origin and actual billing "
+                "NOT independently verified."
             )
         else:
             self.status.set(
@@ -434,5 +554,7 @@ class ModelControlCenter(tk.Toplevel):
         if getattr(self._owner, "_model_center", None) is self:
             self._owner._model_center = None
         self._offers.clear()
+        self._last_receipt = None
+        self._active_offer = None
         self.destroy()
         # In-flight requests, if any, cannot be unsent; never redispatch.
