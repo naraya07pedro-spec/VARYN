@@ -231,7 +231,12 @@ def run_ci_only_zero_capability_trial():
                 str(exe), command, None, None, False, flags,
                 ctypes.cast(environment, ctypes.c_void_p), str(exe.parent),
                 ctypes.byref(si), ctypes.byref(proc)):
-            raise PublicToolRejected("AppContainer process creation denied")
+            code = ctypes.get_last_error()
+            # The Win32 numeric status is safe to report in an OFFLINE CI
+            # diagnostic; never include raw executable/owner paths.
+            raise PublicToolRejected(
+                "AppContainer process creation denied (win32="
+                + str(code) + ")")
         process_created = True
         _attest_child(proc.hProcess, sid, advapi, kernel)
         # Keep process suspended until its actual primary token is attested.
