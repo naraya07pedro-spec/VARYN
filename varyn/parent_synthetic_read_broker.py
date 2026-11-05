@@ -20,6 +20,7 @@ from varyn.bounded_broker_protocol import (
     BrokerRejected, canonical, strict_json,
 )
 from varyn.durable_broker_journal import DurableOneShotJournal
+from varyn.synthetic_fixture import SyntheticParentCountsFixture
 
 VERSION = "varyn.anon-pipes.v1"
 ACTION = "sum_synthetic_counts"
@@ -46,10 +47,22 @@ class ParentSyntheticReadBroker:
     a general file-reading broker or a new production permission.
     """
 
-    def __init__(self, fixture_root, journal, *, clock=None):
-        if os.environ.get("GITHUB_ACTIONS") != "true" or (
-                os.environ.get("VARYN_CI_APPCONTAINER_TRIAL") != "1"):
-            raise BrokerRejected("Synthetic broker requires opted-in hosted CI")
+    def __init__(self, fixture_root, journal, *, clock=None, desktop_fixture=None):
+        ci_trial = (os.environ.get("GITHUB_ACTIONS") == "true" and
+                    os.environ.get("VARYN_CI_APPCONTAINER_TRIAL") == "1")
+        if desktop_fixture is None:
+            if not ci_trial:
+                raise BrokerRejected("Synthetic broker requires opted-in hosted CI")
+            self._desktop_synthetic_only = False
+        else:
+            # This path authorizes ONLY a newly generated exact source and a
+            # parent-side local sum. It NEVER permits child/process dispatch.
+            if (type(desktop_fixture) is not SyntheticParentCountsFixture or
+                    desktop_fixture._tempdir is None or
+                    type(fixture_root) is not type(desktop_fixture.root) or
+                    fixture_root != desktop_fixture.root):
+                raise BrokerRejected("Desktop broker requires its own generated fixture")
+            self._desktop_synthetic_only = True
         if not isinstance(journal, DurableOneShotJournal):
             raise BrokerRejected("Parent-only durable journal required")
         root = Path(fixture_root)
@@ -191,6 +204,8 @@ class ParentSyntheticReadBroker:
         return dict(request)
 
     def complete(self, raw_response):
+        if self._desktop_synthetic_only:
+            raise BrokerRejected("Desktop local demo cannot claim sandbox reply")
         if self._state != "dispatched":
             raise BrokerRejected("No live approved dispatch to finalize")
         # Any attempt burns the single reply slot. Crash leaves claimed.
@@ -222,6 +237,19 @@ class ParentSyntheticReadBroker:
             raise BrokerRejected("Approved synthetic response rejected") from None
         self._state = "completed"
         return reply["total"]
+
+    def complete_local_synthetic(self):
+        """Finish a trusted-parent integer sum; NO sandbox or model involved."""
+        if not self._desktop_synthetic_only or self._state != "dispatched":
+            raise BrokerRejected("No authorized desktop-only local completion")
+        self._state = "result_seen"
+        try:
+            self._journal.finalize(self._request_id, succeeded=True)
+        except Exception:
+            self._state = "failed"
+            raise BrokerRejected("Local synthetic completion not journaled") from None
+        self._state = "completed"
+        return self._expected
 
     def revoke(self):
         if self._state in ("denied", "completed", "failed", "revoked"):
