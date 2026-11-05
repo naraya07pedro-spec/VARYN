@@ -282,6 +282,9 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False,
     pipe_handle_array = None
     inherited_response_verified = False
     inherited_decoy_excluded = False
+    suspended_fixture_attested = False
+    job_guard = None
+    job_attested = False
     try:
         hr = userenv.CreateAppContainerProfile(
             name, name, "Disposable offline VARYN CI restricted process test",
@@ -480,9 +483,28 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False,
         process_created = True
         _attest_child(proc.hProcess, sid, advapi, kernel)
         if inherited_trial:
-            # Native child token proven BEFORE any synthetic request enters.
-            # Parent closes its two child-side handles immediately after
-            # CreateProcessW, so only the child can use those descriptors.
+            from varyn.windows_suspended_handle_audit import (
+                attest_suspended_child_fixture_handles,
+            )
+            from varyn.windows_child_job import WindowsSuspendedAppContainerJob
+            # Real native inspection while the child is still suspended.
+            attestation = attest_suspended_child_fixture_handles(
+                proc.hProcess, inherited_pipes)
+            suspended_fixture_attested = bool(
+                attestation["two_expected_pipe_objects_verified"] and
+                attestation["excluded_parent_event_verified_absent"] and
+                attestation["process_was_suspended"] and
+                not attestation["full_handle_table_audited"])
+            if not suspended_fixture_attested:
+                raise PublicToolRejected("Native pre-resume handle audit incomplete")
+            # KILL_ON_JOB_CLOSE, process count=1, bounded memory; membership
+            # is verified before ResumeThread and any child execution.
+            job_guard = WindowsSuspendedAppContainerJob(proc.hProcess)
+            job_attested = bool(
+                job_guard.attached and job_guard.active_process_limit == 1
+                and job_guard.memory_cap_bytes == 192 * 1024 * 1024)
+            if not job_attested:
+                raise PublicToolRejected("AppContainer job membership unverified")
             from varyn.bounded_broker_protocol import canonical
             inherited_pipes.mark_child_created()
             inherited_pipes.send_once(canonical(broker_request))
@@ -542,10 +564,11 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False,
                     payload["total"] != 21):
                 raise PublicToolRejected("Inherited pipe response correlation refused")
             inherited_response_verified = True
-            inherited_decoy_excluded = (
-                payload["decoy_status"] == "verified_absent")
-            # Unlike successful transport, a decoy OSError(EINVAL) is NOT
-            # accepted as actual native handle-leak denial evidence.
+            # The child-side Python invalid-handle probe can return EINVAL.
+            # The INDEPENDENT parent kernel DuplicateHandle + object
+            # identity audit on the still-suspended child is the proof,
+            # not child-reported decoy_status.
+            inherited_decoy_excluded = suspended_fixture_attested
             if not journal_claimed or journal is None:
                 raise PublicToolRejected("Inherited pipe parent claim unavailable")
             journal_finalized = (
@@ -588,6 +611,11 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False,
             pipe_guard.close()
         if inherited_pipes is not None:
             inherited_pipes.close()
+        # Closing the verified Job is a native KILL_ON_JOB_CLOSE boundary.
+        # Even if the child is stuck, its Job closes before handle/profile
+        # teardown. Do not substitute unguarded ResumeThread.
+        if job_guard is not None:
+            job_guard.close()
         # Terminate unresponsive/test-crashed child before profile deletion.
         if process_created:
             if not completed:
@@ -624,6 +652,12 @@ def run_ci_only_zero_capability_trial(*, broker_trial=False, pipe_trial=False,
         "exact_two_endpoint_allowlist_used": inherited_response_verified,
         "unlisted_decoy_handle_denied": inherited_decoy_excluded,
         "inherited_pipe_response_verified": inherited_response_verified,
+        "native_pre_resume_fixture_handle_attested": suspended_fixture_attested,
+        "native_job_attested_before_resume": job_attested,
+        "native_job_memory_cap_bytes": (192 * 1024 * 1024
+                                        if job_attested else 0),
+        "native_job_active_process_limit": (1 if job_attested else 0),
+        "full_child_handle_table_audited": False,
         "process_terminated": True,
         "disposable_profile_deleted": cleaned,
         "python_runtime_executed": exit_code in (73, 81, 82, 83, 84, 85),
