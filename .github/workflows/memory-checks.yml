@@ -342,14 +342,30 @@ jobs:
         shell: pwsh
         run: |
           Copy-Item -LiteralPath "README-PORTABLE.txt" -Destination "dist/VARYN-Portable/README-PORTABLE.txt"
+          Copy-Item -LiteralPath "Start-VARYN-OwnerPilot.ps1" -Destination "dist/VARYN-Portable/Start-VARYN-OwnerPilot.ps1"
           if (-not (Test-Path -LiteralPath "dist/VARYN-Portable/_internal" -PathType Container)) {
             throw "PyInstaller internal Python/Tk runtime missing"
           }
           if (-not (Test-Path -LiteralPath "dist/VARYN-Portable/VARYN-Portable.exe" -PathType Leaf)) {
             throw "Portable EXE missing"
           }
+      - name: 17S-44 validate bundled PowerShell owner launcher is syntactically readable without secrets
+        shell: pwsh
+        run: |
+          $e = $null
+          $t = [System.Management.Automation.PSParser]::Tokenize(
+            (Get-Content -LiteralPath "dist/VARYN-Portable/Start-VARYN-OwnerPilot.ps1" -Raw),
+            [ref]$e)
+          if ($e.Count -gt 0 -or $t.Count -lt 50) {
+            throw "Owner launcher contains parsing errors or missing source"
+          }
       - name: Generate bounded, unsigned file-by-file SHA256 inventory
         run: python -m varyn.portable_release --directory dist/VARYN-Portable --create
+      - name: 17S-44 run actual bundled read-only owner launcher full SHA256 verification
+        shell: pwsh
+        run: |
+          & "dist/VARYN-Portable/Start-VARYN-OwnerPilot.ps1" -VerifyOnly
+          if ($LASTEXITCODE -ne 0) { throw "Owner pilot full manifest verification failed" }
       - name: Verify complete portable executable and runtime inventory
         run: python -m varyn.portable_release --directory dist/VARYN-Portable --verify
       - name: 17S-43 actual frozen Windows GUI synthetic model workflow and default-off model catalog (no provider requests)
