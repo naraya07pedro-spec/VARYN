@@ -161,6 +161,8 @@ jobs:
       - name: 17S-43 actual hosted Windows Tk read-only model listing and no automatic free quote
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_model_catalog_tk.py" -v
+      - name: 17S-44 Windows owner pilot script source contract and real PowerShell manifest tamper denial
+        run: python -m unittest discover -s tests -p "test_portable_owner_ps1.py" -v
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
       - name: Synthetic-only desktop boundary and disposable sample cleanup
