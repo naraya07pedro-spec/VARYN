@@ -12,6 +12,8 @@ owner acceptance or remote app connectivity.
 import argparse
 import ctypes
 import os
+import sys
+from pathlib import Path
 import tkinter as tk
 from tkinter import messagebox
 
@@ -46,6 +48,18 @@ def create_portable_desktop(*, smoke_only=False):
     )
     window.title("VARYN | Local AI, Tasks & Integrations (EXPERIMENTAL)")
     if smoke_only:
+        # Verify shipped third-party brand artwork is present and valid PNG.
+        # Only the frozen distribution is required to include these resources;
+        # running source tree tests doesn't require generated build products.
+        if getattr(sys, "frozen", False):
+            icon_root = Path(getattr(sys, "_MEIPASS", "")) / "assets" / "brand_png"
+            for brand in ("github", "telegram", "gmail", "supabase", "netlify"):
+                image = tk.PhotoImage(
+                    master=window, file=str(icon_root / (brand + ".png")),
+                )
+                if image.width() != 48 or image.height() != 48:
+                    window._close()
+                    raise RuntimeError("Bundled authentic app logo missing or invalid")
         # CI uses actual Tk creation, a workbench widget, and close on
         # Windows hosted runner; never calls browser, clipboard or AI APIs.
         window.withdraw()

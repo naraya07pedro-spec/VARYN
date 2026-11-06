@@ -35,6 +35,15 @@ CREDENTIAL_PAGES = {
 }
 _GUIDES = {
     "gmail": "https://developers.google.com/workspace/gmail/api/auth/about-auth",
+    "google_calendar": "https://developers.google.com/workspace/calendar/api/auth",
+    "google_drive": "https://developers.google.com/workspace/drive/api/guides/about-auth",
+    "linkedin": "https://learn.microsoft.com/en-us/linkedin/shared/authentication/authorization-code-flow",
+    "canva": "https://www.canva.dev/docs/connect/",
+    "descript": "https://www.descript.com/",
+    "hostinger_mail": "https://www.hostinger.com/tutorials/how-to-set-up-hostinger-email",
+    "automations": "https://help.openai.com/",
+    "plugin_management": "https://help.openai.com/",
+    "writing_style": "https://help.openai.com/",
     "google-drive": "https://developers.google.com/workspace/drive/api/guides/about-auth",
     "google-calendar": "https://developers.google.com/workspace/calendar/api/auth",
     "slack": "https://api.slack.com/apps",

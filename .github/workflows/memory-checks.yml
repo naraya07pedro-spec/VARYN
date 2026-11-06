@@ -10,6 +10,30 @@ permissions:
   contents: read
 
 jobs:
+  brand-icons:
+    name: Render verified brand SVG artwork to bundled PNG
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install rasterizer for curated locally committed SVG assets
+        run: python -m pip install "CairoSVG==2.7.1"
+      - name: Convert authentic trademark artwork into offline 48px PNG files
+        run: python -m varyn.brand_asset_render assets/brand_svg dist/brand_png
+      - name: Upload offline GUI images with this exact source revision
+        uses: actions/upload-artifact@v4
+        with:
+          name: varyn-brand-icons
+          path: dist/brand_png/
+          retention-days: 7
+          if-no-files-found: error
+
   # Fast *actual* desktop integration gate for experimental Windows release.
   # The old 100+ step research suite remains manually runnable below and
   # is not deleted or misrepresented as having passed.
@@ -31,6 +55,7 @@ jobs:
       - name: No-network owner connector / model / privacy regression
         shell: bash
         run: |
+          python -m unittest discover -s tests -p 'test_brand_icons_alpha10.py' -v
           python -m unittest discover -s tests -p 'test_app_connections_alpha9.py' -v
           python -m unittest discover -s tests -p 'test_owner_memory_telegram.py' -v
           python -m unittest discover -s tests -p 'test_provider_http_diagnostics.py' -v
@@ -354,7 +379,7 @@ jobs:
   portable-windows:
     name: Portable Windows x64 bundle (unsigned, no Python installer)
     if: github.event_name == 'push' && github.ref == 'refs/heads/feat/local-memory-prototype-20261103'
-    needs: owner-release-gate
+    needs: [owner-release-gate, brand-icons]
     runs-on: windows-latest
     timeout-minutes: 15
     permissions:
@@ -369,10 +394,26 @@ jobs:
           architecture: 'x64'
       - name: Install pinned Windows packaging tool
         run: python -m pip install --disable-pip-version-check "pyinstaller==6.22.3"
+      - name: Download committed-source third-party brand PNGs
+        uses: actions/download-artifact@v4
+        with:
+          name: varyn-brand-icons
+          path: assets/brand_png
+      - name: Verify offline logos exist before compiling EXE
+        shell: pwsh
+        run: |
+          foreach ($brand in @('github','notion','telegram','whatsapp',
+                  'gmail','google_calendar','google_drive','supabase',
+                  'netlify','linkedin','hostinger_mail')) {
+            $file = "assets/brand_png/$brand.png"
+            if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
+              throw "Missing genuine logo file: $brand"
+            }
+          }
       - name: Verify pinned Windows packaging tool version
         run: python -c "import PyInstaller; assert PyInstaller.__version__ == '6.22.3', PyInstaller.__version__"
       - name: Build optional unsigned one-folder GUI executable
-        run: python -m PyInstaller --noconfirm --clean --onedir --windowed --name VARYN-Portable --paths . --add-data "integrations/catalog.json;integrations" varyn/portable_entry.py
+        run: python -m PyInstaller --noconfirm --clean --onedir --windowed --name VARYN-Portable --paths . --add-data "integrations/catalog.json;integrations" --add-data "assets/brand_png;assets/brand_png" varyn/portable_entry.py
       - name: Include explicit unsigned safety and no-sync owner instructions
         shell: pwsh
         run: |
@@ -472,7 +513,7 @@ jobs:
       - name: Package the verified unsigned folder and generate SHA256
         shell: pwsh
         run: |
-          $tag = 'v0.1.0-alpha.9'
+          $tag = 'v0.1.0-alpha.10'
           $zip = "VARYN-Windows-x64-$tag-unsigned.zip"
           Compress-Archive -LiteralPath 'dist/VARYN-Portable' -DestinationPath $zip -CompressionLevel Optimal
           if (-not (Test-Path -LiteralPath $zip -PathType Leaf)) { throw 'Release ZIP not created' }
@@ -485,7 +526,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = 'v0.1.0-alpha.9'
+          $tag = 'v0.1.0-alpha.10'
           $sha = $env:GITHUB_SHA
           $note = @"
           Experimental unsigned Windows x64 VARYN Portable build from source commit $sha.
@@ -513,6 +554,13 @@ jobs:
           picker via RAM-only handoff (never saved). Other app entries show
           setup guidance only. Legacy Tk root hidden, one visible window.
           WhatsApp remains not connected.
+          Alpha 10 replaces hand-drawn/fake initials with curated original
+          branded third-party SVG marks rasterized into offline packaged PNGs
+          (MIT SuperTinyIcons or CC0 Simple Icons; brands retain trademarks).
+          App directory has direct clickable official setup links, working
+          read-only GitHub/Notion/Netlify/Supabase token connections, and an
+          issue-request link when no adapter or official guide exists.
+          No OAuth connection is implied for unsupported apps.
           Also includes owner-reviewed model API requests and offline fake model.
           Not production-safe, not a signed binary, not a hard billing cap, and NOT
           native two-way consumer ChatGPT/Claude/Gemini history sync.
@@ -523,5 +571,5 @@ jobs:
           https://github.com/naraya07pedro-spec/VARYN/tree/$sha
           "@
           $note | Set-Content -LiteralPath 'release-notes-alpha.txt' -Encoding UTF8
-          gh release create $tag $env:RELEASE_ZIP --target $sha --prerelease --title 'VARYN v0.1.0-alpha.9 | read-only service connections and model browser' --notes-file 'release-notes-alpha.txt'
+          gh release create $tag $env:RELEASE_ZIP --target $sha --prerelease --title 'VARYN v0.1.0-alpha.10 | authentic app logos and direct setup' --notes-file 'release-notes-alpha.txt'
           if ($LASTEXITCODE -ne 0) { throw 'GitHub prerelease publish failed' }

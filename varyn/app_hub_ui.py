@@ -8,6 +8,8 @@ an actual documented setup path or disclose that no adapter exists.
 from __future__ import annotations
 
 import queue
+import sys
+from pathlib import Path
 import threading
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -31,22 +33,26 @@ LOC = {
            "Available to configure", "Not yet implemented",
            "Browse", "Disconnect", "Search apps", "More services",
            "A connected credential is needed for this action.",
-           "This integration is not implemented. No account was accessed."),
+           "This integration is not implemented. No account was accessed.",
+           "Official guide", "Request connector"),
     "id": ("Hubungkan", "Panduan", "Terhubung", "Belum terhubung",
            "Bisa diatur", "Belum tersedia",
            "Jelajahi", "Putuskan", "Cari aplikasi", "Aplikasi lainnya",
            "Hubungkan akun terlebih dahulu.",
-           "Integrasi ini belum dibuat. Tidak ada akun yang diakses."),
+           "Integrasi ini belum dibuat. Tidak ada akun yang diakses.",
+           "Panduan resmi", "Minta konektor"),
     "es": ("Conectar", "Ver guía", "Conectado", "Sin conexión",
            "Se puede configurar", "Todavía no disponible",
            "Explorar", "Desconectar", "Buscar aplicaciones", "Más servicios",
            "Conecta una cuenta primero.",
-           "Esta integración no está implementada."),
+           "Esta integración no está implementada.",
+           "Guía oficial", "Solicitar conector"),
     "fr": ("Connecter", "Voir le guide", "Connecté", "Non connecté",
            "Configuration possible", "Pas encore disponible",
            "Explorer", "Déconnecter", "Chercher des applications", "Autres services",
            "Connectez d'abord votre compte.",
-           "Cette intégration n'est pas disponible."),
+           "Cette intégration n'est pas disponible.",
+           "Guide officiel", "Demander le connecteur"),
 }
 
 FEATURED = (
@@ -108,8 +114,37 @@ class AppHubMixin:
     def _loc(self, index):
         return LOC.get(self.language, LOC["en"])[index]
 
+    def _brand_logo(self, parent, app_id, title, color, symbol=None):
+        """Load ORIGINAL locally bundled raster brand artwork, not fake initials.
+
+        Offline PNGs are generated from curated, license-documented SVGs.
+        A neutral fallback is used only for services without licensed artwork.
+        """
+        key = app_id
+        if key not in self._brand_images:
+            root = Path(getattr(
+                sys, "_MEIPASS", Path(__file__).resolve().parent.parent,
+            ))
+            img_path = root / "assets" / "brand_png" / (app_id + ".png")
+            try:
+                self._brand_images[key] = (
+                    tk.PhotoImage(master=self, file=str(img_path))
+                    if img_path.is_file() else None
+                )
+            except (tk.TclError, OSError):
+                self._brand_images[key] = None
+        asset = self._brand_images[key]
+        if asset is not None:
+            return tk.Label(
+                parent, image=asset, bg=PAPER,
+                borderwidth=0, width=48, height=48,
+            )
+        # Never pretend initials are an official logo.
+        return badge(parent, title, color, symbol)
+
     def _build_app_hub(self, frame):
         self._app_credentials = {}
+        self._brand_images = {}
         self._app_labels = {}
         self._app_buttons = {}
         self._app_status = {}
@@ -137,8 +172,8 @@ class AppHubMixin:
         heading.pack(fill="x",padx=25,pady=(13,16))
         tk.Label(heading,text="Apps",bg=BG,fg=INK,
                  font=("Segoe UI",24,"bold")).pack(anchor="w")
-        tk.Label(heading,text="Connect the services you actually use. "
-                 "No inherited accounts or hidden permissions.",
+        tk.Label(heading,text="Pick an app. Connect supported services with "
+                 "your own account, or open the official setup guide.",
                  bg=BG,fg=SUB,font=("Segoe UI",10)).pack(anchor="w",pady=(7,0))
         featured = tk.Frame(body,bg=BG)
         featured.pack(fill="x",padx=24)
@@ -150,7 +185,7 @@ class AppHubMixin:
             card.grid(row=i//2,column=i%2,sticky="nsew",padx=5,pady=6)
             item = tk.Frame(card,bg=PAPER)
             item.pack(fill="x",padx=15,pady=(15,11))
-            badge(item,name,color,mark).pack(side="left")
+            self._brand_logo(item,service,name,color,mark).pack(side="left")
             heading_col=tk.Frame(item,bg=PAPER)
             heading_col.pack(side="left",fill="x",expand=True,padx=12)
             tk.Label(heading_col,text=name,bg=PAPER,fg=INK,
@@ -199,6 +234,10 @@ class AppHubMixin:
         except (CatalogRejected,OSError):
             self._app_entries=()
         for entry in self._app_entries:
+            # Only actual named app candidates belong in the Apps directory;
+            # generic plugin/skill workflow labels do not imply an app login.
+            if entry.kind != "connector":
+                continue
             # Telegram/WhatsApp/GitHub/Notion are represented as first-class
             # featured service cards above, not duplicated in the catalog.
             if entry.id in ("github","notion","netlify","supabase","telegram","whatsapp"):
@@ -207,7 +246,9 @@ class AppHubMixin:
                           highlightthickness=1)
             card.pack(fill="x",pady=3)
             kind_color=BRAND_COLORS.get(entry.id, "#637887")
-            badge(card,entry.name,kind_color).pack(side="left",padx=(13,8),pady=7)
+            self._brand_logo(
+                card, entry.id, entry.name, kind_color,
+            ).pack(side="left",padx=(13,8),pady=7)
             middle=tk.Frame(card,bg=PAPER)
             middle.pack(side="left",fill="x",expand=True,pady=8)
             tk.Label(middle,text=entry.name,bg=PAPER,fg=INK,
@@ -215,7 +256,8 @@ class AppHubMixin:
             tk.Label(middle,text=self._loc(5),bg=PAPER,fg=SUB,
                      font=("Segoe UI",9)).pack(anchor="w",pady=(3,0))
             button=tk.Button(
-                card,text=self._loc(1),bg=BG,fg=BLUE,bd=0,
+                card,text=(self._loc(12) if guide_for(entry.id)
+                           else self._loc(13)),bg=BG,fg=BLUE,bd=0,
                 relief="flat",padx=14,pady=8,cursor="hand2",
                 command=lambda k=entry.id,n=entry.name:self._explain_app(k,n),
             )
@@ -260,19 +302,21 @@ class AppHubMixin:
             self._connect_app(service)
 
     def _explain_app(self,service,name):
-        guide=guide_for(service)
-        detail=(
-            name+" has no implemented account adapter in VARYN yet. "
-            "No account was connected or accessed."
-        )
+        """A single click opens real documentation or a feature request.
+
+        Never ask the owner to paste credentials into an unsupported adapter.
+        This is setup HELP, not a connection or OAuth claim.
+        """
+        guide = guide_for(service)
         if guide:
-            if messagebox.askyesno(
-                name+" | Setup",detail+"\n\nOpen the official setup documentation?",
-                parent=self,
-            ):
-                webbrowser.open(guide)
+            webbrowser.open(guide)
         else:
-            messagebox.showinfo(name+" | Integration",detail,parent=self)
+            from urllib.parse import quote
+            query = quote("Connector request: " + name)
+            webbrowser.open(
+                "https://github.com/naraya07pedro-spec/VARYN/issues/new?title="
+                + query
+            )
 
     def _connect_app(self,service):
         if service not in ("github","notion","netlify","supabase") or service in self._app_busy:
@@ -428,8 +472,10 @@ class AppHubMixin:
                 var.set(self._loc(2)+": "+self._app_labels[service])
             elif service != "telegram":
                 var.set(self._loc(3))
-        for _,_,button in getattr(self,"_app_rows",[]):
-            button.configure(text=self._loc(1))
+        for entry,_,button in getattr(self,"_app_rows",[]):
+            button.configure(text=(
+                self._loc(12) if guide_for(entry.id) else self._loc(13)
+            ))
 
     def close(self):
         self._app_credentials.clear()

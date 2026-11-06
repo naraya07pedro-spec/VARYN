@@ -45,6 +45,25 @@ WHAT TO OPEN
    Personal API tokens may grant more than read-only privileges at the
    provider itself: create limited-scope credentials whenever supported.
 
+REAL APP ICONS + SIMPLE, HONEST CONNECT FLOW (ALPHA 10)
+- Apps page displays original logos bundled as LOCAL PNG art from SuperTinyIcons,
+  Simple Icons, Devicon, and Gilbarbara Logos. Logos do not mean VARYN is
+  endorsed by these companies. See assets/BRAND-LICENSES.md in source.
+- Supported account connections: GitHub, Notion, Netlify and Supabase.
+  Click Connect, choose Create token to open that service's own account page,
+  paste your provider-issued token locally, then Connect. Only after a real
+  account API response will the status change to Connected. Click Browse to
+  see read-only authorized resources. Disconnect clears in-memory credential.
+  Use minimal permissions/scopes when issuing tokens.
+- Telegram uses an independently created @BotFather bot and your numeric
+  Telegram user ID. It is a real owner-only channel, not a directory link.
+- Unsupported apps (Gmail, Calendar, Google Drive, WhatsApp, etc.) have
+  an 'Official guide' action when a provider guide exists, or a link to
+  request a connector. These actions DO NOT connect the account.
+- The app never reads or reuses existing ChatGPT connectors, cookies,
+  OAuth sessions or other app logins. This requires fresh authorization.
+- Images work fully OFFLINE. No logos are fetched by the Windows app.
+
 MEMORY AND TELEGRAM (ALPHA 7 EXPERIMENTAL)
 - Memory page: manually select an official ChatGPT export ZIP (or
   conversations.json), select conversations, and confirm import. Selected
