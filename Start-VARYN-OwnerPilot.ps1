@@ -96,8 +96,9 @@ try {
         throw 'Windows required'
     }
     $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-    $principal = New-Object Security.Principal.WindowsPrincipal($identity)
-    if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+    $principal = [Security.Principal.WindowsPrincipal]::new($identity)
+    if ((-not $VerifyOnly) -and
+        $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
         throw 'Must run as normal non-elevated Windows user'
     }
 
