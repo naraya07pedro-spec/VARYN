@@ -32,6 +32,14 @@ Telegram is an actual separately configured owner-only Bot API long-poll channel
 
 WhatsApp, Gmail, Google Drive, Calendar, Slack and most other catalog entries still **do not have authenticated adapters**. Setup buttons only open official docs or clearly explain the absence of a connector. ChatGPT plugin/account access does not transfer to VARYN. Official WhatsApp Cloud API requires Meta Business access and a public HTTPS webhook with signature verification, which this Windows-only release does not provide.
 
+## Desktop release verification
+
+The first Alpha 9 push CI run `42227475122` was **cancelled** while running the inherited 100+ step Windows research suite, so no Alpha 9 ZIP was published from that run. This is NOT a passing verification.
+
+The corrected workflow defines a focused, cross-platform **Owner UI + connector smoke** gate which compiles all Python source and runs the official adapter, model pricing/list, Telegram privacy, provider diagnostics, and actual Windows Tk owner-workspace tests. Windows Portable PyInstaller packaging, frozen synthetic GUI smoke, DPAPI separate-process persistence and full SHA256 manifest verification remain mandatory for release. The original exhaustive Windows/Ubuntu research suite remains in the workflow under **manual workflow_dispatch**, with a 25-minute timeout; its unexecuted status must not be called success.
+
+A successful focused release gate demonstrates targeted code/GUI behavior and reproducible packaging, not comprehensive regression coverage or live owner-account acceptance.
+
 ## Validation boundaries
 
 CI validates deterministic network-free synthetic provider responses and Native Windows Tk app construction, not an actual logged-in owner session. No API key, bot token, browser cookies, user memory or project files are committed to GitHub. Publicly offered ZIP is unsigned, not production certified.
