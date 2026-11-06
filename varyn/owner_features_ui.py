@@ -339,6 +339,8 @@ class OwnerFeaturesMixin:
         self.telegram_token.delete(0,"end")
         bot.start()
         self.telegram_status.set(self._f("tg_on"))
+        if hasattr(self, "_app_status"):
+            self._app_status["telegram"].set(self._f("tg_on"))
         self.after(200,self._poll_telegram)
 
     def _poll_telegram(self):
@@ -359,6 +361,8 @@ class OwnerFeaturesMixin:
             self._telegram = None
         if not self.closed:
             self.telegram_status.set(self._f("tg_off"))
+            if hasattr(self, "_app_status"):
+                self._app_status["telegram"].set(self._f("tg_off"))
 
     def _apply_features_language(self):
         for widget, key in getattr(self,"_feature_labels",[]):

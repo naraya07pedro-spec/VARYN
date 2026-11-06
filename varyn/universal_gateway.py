@@ -17,7 +17,7 @@ from varyn.usage_budget import UsageBudget
 
 class UniversalGateway:
     def __init__(self, registry, *, allow_network=False, budget=None,
-                 transport=None):
+                 transport=None, api_key=None):
         if type(registry) is not Registry or type(allow_network) is not bool:
             raise TypeError("Gateway requires explicit registry and network policy")
         if budget is not None and type(budget) is not UsageBudget:
@@ -25,6 +25,9 @@ class UniversalGateway:
         self.registry = registry
         self.allow_network = allow_network
         self.budget = budget if budget is not None else UsageBudget()
+        if api_key is not None and (type(api_key) is not str or not 8 <= len(api_key) <= 1000):
+            raise ValueError("Invalid session-only provider key")
+        self.api_key = api_key
         self.transport = transport
 
     def generate(self, task, *, input_estimate, max_output_tokens=512,
@@ -51,7 +54,8 @@ class UniversalGateway:
                 raise PermissionError("Model network disabled")
             if selected.provider == "9router" and authorized_upstream is not True:
                 raise PermissionError("9Router upstream account use not approved")
-            key = os.environ.get(KEY_ENVS[selected.provider], "")
+            key = (self.api_key if self.api_key is not None else
+                   os.environ.get(KEY_ENVS[selected.provider], ""))
             if type(key) is not str or not key.strip():
                 raise ProviderError("Model API credential missing")
         self.budget.reserve(max_output_tokens)

@@ -53,14 +53,16 @@ class TelegramChannel:
     Each approved outgoing /ask is capped to one call, with no retries.
     """
 
-    def __init__(self, token, user_id, offer, *, budget, callback=None, transport=None):
+    def __init__(self, token, user_id, offer, *, budget, callback=None, transport=None,
+                 api_key=None):
         from varyn.usage_budget import UsageBudget
-        self.allowed_id = validate_config(token, user_id, offer)
+        self.allowed_id = validate_config(token, user_id, offer, key=api_key)
         if type(budget) is not UsageBudget:
             raise TelegramRejected("Missing shared request budget")
         self._token = token
         self.offer = offer
         self._budget = budget
+        self._api_key = api_key
         self.callback = callback
         self._transport = transport
         self._stop = threading.Event()
@@ -140,6 +142,7 @@ class TelegramChannel:
             gateway = UniversalGateway(
                 registry, allow_network=True,
                 budget=self._budget,
+                api_key=self._api_key,
             )
             answer = gateway.generate(
                 pending[1], input_estimate=512, max_output_tokens=512,

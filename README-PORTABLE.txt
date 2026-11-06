@@ -21,9 +21,14 @@ WHAT TO OPEN
    yet-to-be-connected apps. History is RAM-only for this app session.
    Type a message in the chat and click Send.
    Offline demo never returns an actual AI-generated answer.
-   To receive live answers choose OpenRouter/DeepSeek, use your own local
-   provider API key and configure the exact reviewed model/price once in
-   Model Settings. Every real prompt needs fresh explicit approval.
+   For real AI answers, select AI settings and: choose OpenRouter/DeepSeek,
+   paste your provider API key, press Load models, search and select a model,
+   review its published prices, then press Use selected model. The key remains
+   in this app process RAM only and is not written to disk/env or GitHub.
+   Provider /models returns available IDs but cannot guarantee actual credit
+   balance; prices are snapshots, NOT hard provider billing caps.
+   Each real prompt still needs ONE network consent and exact text approval.
+   The obsolete technical Tk root window no longer appears behind the home.
    Tasks save in unencrypted user-local SQLite and update DUE status while
    the app is running, but DO NOT automatically execute.
    Connector, plugin and skill entries are NOT authenticated connections.
@@ -338,3 +343,17 @@ OWNER ACCEPTANCE IN THE APP (17S-32)
   plus tests the script inside the real packaged one-folder EXE artifact.
   CI does NOT test your actual API credential, account, PC or provider bill.
 - See docs/owner-pc-pilot-17s-44.md for full owner acceptance steps.
+
+
+CONSUMER APPS HUB (ALPHA 8)
+- Apps now shows logo-style local vector app markers and clickable controls.
+  GitHub and Notion support real independent access-token probes via official
+  HTTPS endpoints and an owner-triggered list of allowed resources.
+  Their tokens stay in RAM. The app NEVER claims write access or OAuth scope
+  inheritance from ChatGPT. Disconnect clears the token in this process.
+- Telegram remains a real owner-approved Bot API connector (BotFather token,
+  numeric owner Telegram user ID, local app must be running).
+- WhatsApp and the remaining app/skill directory are NOT CONNECTED. Clicking
+  a listed integration offers an official setup guide if one is known, or
+  explains plainly that its adapter is not yet implemented. A clickable
+  setup guide is NOT an authenticated connection.

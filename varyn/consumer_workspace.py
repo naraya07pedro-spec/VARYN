@@ -13,6 +13,7 @@ from tkinter import ttk
 
 from varyn.owner_home import OwnerHome
 from varyn.owner_features_ui import OwnerFeaturesMixin
+from varyn.app_hub_ui import AppHubMixin
 from varyn.integration_catalog import load_catalog, CatalogRejected
 from varyn.unlimited_task_store import TaskRejected
 from varyn.consumer_chat import ConsumerChat
@@ -63,7 +64,7 @@ def _button(parent, caption, command, *, primary=False):
     )
 
 
-class ConsumerWorkspace(OwnerFeaturesMixin, OwnerHome):
+class ConsumerWorkspace(AppHubMixin, OwnerFeaturesMixin, OwnerHome):
     """Real working owner home that does not require engineering terminology."""
 
     def __init__(self, desktop, *, database_path=None):
@@ -340,38 +341,7 @@ class ConsumerWorkspace(OwnerFeaturesMixin, OwnerHome):
         self.feedback_widget.pack(fill="x", padx=24, pady=(0, 20))
 
     def _build_connectors(self, frame):
-        self._section_header(frame, "apps", "apps_intro")
-        self._build_telegram(frame)
-        self._caption(
-            frame, "apps_warning", size=10, fg=ACCENT,
-        ).pack(anchor="w", padx=24, pady=(0, 16))
-        holder = tk.Frame(frame, bg=BG)
-        holder.pack(fill="both", expand=True, padx=24)
-        self.app_tree = ttk.Treeview(
-            holder, columns=("kind", "name", "status"),
-            show="headings", style="VarynConsumer.Treeview",
-        )
-        for key, col, width in (
-            ("type_col", "kind", 160),
-            ("app_col", "name", 340),
-            ("connection_col", "status", 170),
-        ):
-            self.app_tree.heading(col, text=self._t(key))
-            self.app_tree.column(
-                col, width=width, minwidth=90, stretch=col=="name",
-            )
-        self.app_tree.pack(fill="both", expand=True)
-        try:
-            self._app_entries = load_catalog()
-        except (CatalogRejected, OSError):
-            self._app_entries = ()
-        self._refresh_apps()
-        self._caption(
-            frame, "apps_footnote", size=10, fg=MUTED,
-        ).pack(anchor="w", padx=24, pady=15)
-        self._action(
-            frame, "advanced", self._advanced,
-        ).pack(anchor="w", padx=24, pady=(0, 20))
+        self._build_app_hub(frame)
 
     def _refresh_apps(self):
         for child in self.app_tree.get_children():
@@ -437,6 +407,7 @@ class ConsumerWorkspace(OwnerFeaturesMixin, OwnerHome):
         self.chat_surface.set_language(self.language)
         self._nav["memory"].configure(text=self._f("memory"))
         self._apply_features_language()
+        self._apply_app_language()
         for col, key in (
             ("title", "task_col"), ("status", "status_col"),
             ("due", "due_col"),
@@ -566,3 +537,11 @@ class ConsumerWorkspace(OwnerFeaturesMixin, OwnerHome):
         except (TaskRejected, OSError, sqlite3.Error):
             self.feedback.set(self._t("due_error"))
         self.tick_id = self.after(30000, self._tick)
+
+    def close(self):
+        if self.closed:
+            return
+        close_internal_root = bool(getattr(self, "_close_root_on_exit", False))
+        super().close()
+        if close_internal_root and not getattr(self.desktop, "_closing", False):
+            self.desktop._close()

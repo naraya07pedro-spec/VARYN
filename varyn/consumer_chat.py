@@ -15,6 +15,7 @@ from varyn.premium_chat import PremiumChatSurface
 from varyn.simple_chat import ChatSurface
 from varyn.ui_language import text as tr
 from varyn.owner_memory_import import search_memory, MemoryImportRejected
+from varyn.consumer_model_dialog import ModelSelectionDialog
 
 BG = "#FAFAF7"
 WHITE = "#FFFFFF"
@@ -105,6 +106,10 @@ class ConsumerChat(PremiumChatSurface):
         )
         self.model_box.pack(side="left")
         self.model_box.bind("<<ComboboxSelected>>", self._select_mode)
+        self.active_model_label = _label(
+            controls, "No online model selected", size=9, fg=SOFT, bg=WHITE,
+        )
+        self.active_model_label.pack(side="left", padx=(12, 0))
         self.use_memory = tk.BooleanVar(master=self, value=False)
         self.memory_toggle = tk.Checkbutton(
             controls, variable=self.use_memory,
@@ -361,72 +366,5 @@ class ConsumerChat(PremiumChatSurface):
     def open_settings(self):
         if self._closed or self._busy:
             return
-        provider = self.mode.get()
-        if provider not in ("OpenRouter", "DeepSeek"):
-            self.status.set(self._t("model_setup_hint"))
-            return
-        name = provider.lower()
-        popup = tk.Toplevel(self)
-        popup.title("VARYN | " + self._t("settings_ai"))
-        popup.geometry("480x465")
-        popup.configure(bg=BG)
-        popup.transient(self.winfo_toplevel())
-        popup.grab_set()
-        frame = tk.Frame(popup, bg=BG)
-        frame.pack(fill="both", expand=True, padx=25, pady=23)
-        _label(frame, self._t("settings_ai"), size=18, bold=True).pack(anchor="w")
-        _label(frame, self._t("settings_explainer"), size=10, fg=SOFT).pack(
-            anchor="w", pady=(9, 15),
-        )
-        model = tk.StringVar(master=popup)
-        price_in = tk.StringVar(master=popup)
-        price_out = tk.StringVar(master=popup)
-        checked = tk.BooleanVar(master=popup, value=False)
-        for title, value in (
-            ("model_id", model), ("input_price", price_in),
-            ("output_price", price_out),
-        ):
-            _label(frame, self._t(title), size=10, fg=SOFT).pack(
-                anchor="w", pady=(5, 5),
-            )
-            tk.Entry(
-                frame, textvariable=value,
-                bg=WHITE, fg=NAVY, insertbackground=NAVY,
-                font=("Segoe UI", 11), relief="flat",
-            ).pack(fill="x", ipady=9)
-        tk.Checkbutton(
-            frame, text=self._t("review_prices"),
-            variable=checked, bg=BG, fg=NAVY, selectcolor=BG,
-            font=("Segoe UI", 9),
-        ).pack(anchor="w", pady=(12, 8))
-        info = tk.StringVar(master=popup)
-        _label(frame, "", size=10, fg=SOFT).pack_forget()
-        feedback = tk.Label(
-            frame, textvariable=info, bg=BG, fg=SOFT,
-            anchor="w", font=("Segoe UI", 10),
-        )
-        feedback.pack(anchor="w", pady=(0, 8))
-        def save():
-            if not checked.get():
-                info.set(self._t("price_required"))
-                return
-            try:
-                offer = create_reviewed_offer(
-                    provider=name, model=model.get().strip(),
-                    input_usd=price_in.get().strip(),
-                    output_usd=price_out.get().strip(),
-                    date_text=date.today().isoformat(), reviewed=True,
-                    fixed=True,
-                )
-                Registry([offer])
-            except (ValueError, RegistryRejected):
-                info.set(self._t("invalid_model"))
-                return
-            self._offers[name] = offer
-            self.status.set(self._t("model_saved"))
-            popup.destroy()
-        tk.Button(
-            frame, text=self._t("save_model"), command=save,
-            bg=ACCENT, fg=WHITE, relief="flat", bd=0,
-            padx=16, pady=10,
-        ).pack(anchor="e")
+        ModelSelectionDialog(self)
+

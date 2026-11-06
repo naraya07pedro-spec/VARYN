@@ -69,15 +69,22 @@ def create_portable_desktop(*, smoke_only=False):
         finally:
             window._close()
         return None
-    # Launch a real owner home, with existing model & relay tools one click away.
+    # This Tk root runs internal controllers; it must never appear as a second window.
+    window.withdraw()
     # The local task database is never created in smoke-only mode.
     def open_home():
         try:
             window._owner_home = ConsumerWorkspace(window)
+            window._owner_home._close_root_on_exit = True
         except (OSError, ValueError):
             # A corrupt or inaccessible task DB must not prevent the owner from
             # using the existing, separately approved model controls.
-            window._open_model_control_center()
+            # Do not reopen the obsolete technical controller on startup error.
+            messagebox.showerror(
+                "VARYN | Startup error",
+                "Could not open the workspace. Check local task database permissions.",
+            )
+            window._close()
     window.after_idle(open_home)
     return window
 

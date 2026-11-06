@@ -33,6 +33,7 @@ class ChatSurface(ttk.Frame):
         super().__init__(parent)
         self.desktop = desktop
         self._offers = {}
+        self._session_keys = {}  # RAM-only, never environment or disk
         self._busy = False
         self._closed = False
         self._queue = queue.Queue()
@@ -168,7 +169,7 @@ class ChatSurface(ttk.Frame):
             self.status.set("Offline simulation. No real AI or internet request.")
         else:
             provider = _PROVIDER[self.mode.get()]
-            if not os.environ.get(KEY_ENVS[provider], "").strip():
+            if not (self._session_keys.get(provider) or os.environ.get(KEY_ENVS[provider], "")).strip():
                 self.status.set("Provider key missing. Relaunch using the owner launcher "
                                 "with -Provider " + provider + ".")
             elif provider not in self._offers:
@@ -268,7 +269,7 @@ class ChatSurface(ttk.Frame):
             self.status.set("Set up an exact model and reviewed prices first (Model Settings).")
             self.open_settings()
             return
-        if not os.environ.get(KEY_ENVS[provider], "").strip():
+        if not (self._session_keys.get(provider) or os.environ.get(KEY_ENVS[provider], "")).strip():
             self.status.set("No " + provider + " API key. Relaunch with -Provider " + provider + ".")
             return
         if not self.desktop._universal_model_live_capability or not self.allow_network.get():
@@ -320,6 +321,7 @@ class ChatSurface(ttk.Frame):
         gateway = UniversalGateway(
             registry, allow_network=True,
             budget=self.desktop._universal_model_budget,
+            api_key=self._session_keys.get(provider),
         )
         self._request = (content, provider, offer)
         thread = threading.Thread(
@@ -389,4 +391,5 @@ class ChatSurface(ttk.Frame):
                 pass
             self._after_id = None
         self._offers.clear()
+        self._session_keys.clear()
         self._request = None
