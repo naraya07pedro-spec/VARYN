@@ -28,6 +28,20 @@ if ([string]::IsNullOrWhiteSpace($root)) {
     exit 2
 }
 
+function Get-PortableSha256 {
+    param([string]$Path)
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    $stream = [IO.File]::OpenRead($Path)
+    try {
+        return [BitConverter]::ToString($algorithm.ComputeHash($stream)).
+            Replace('-','').ToLowerInvariant()
+    }
+    finally {
+        $stream.Dispose()
+        $algorithm.Dispose()
+    }
+}
+
 function Assert-VerifiedPortable {
     param([string]$Folder)
     $exe = Join-Path $Folder 'VARYN-Portable.exe'
@@ -81,7 +95,7 @@ function Assert-VerifiedPortable {
         if (-not $expected.ContainsKey($relative) -or $seen.ContainsKey($relative)) {
             throw 'Unexpected or duplicate portable file'
         }
-        $actualHash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
+        $actualHash = Get-PortableSha256 -Path $path
         if ($actualHash -cne $expected[$relative]) {
             throw 'Portable file SHA256 mismatch'
         }
@@ -90,7 +104,7 @@ function Assert-VerifiedPortable {
     if ($seen.Count -ne $expected.Count) {
         throw 'Portable file missing compared with manifest'
     }
-    $exeHash = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant()
+    $exeHash = Get-PortableSha256 -Path $exe
     if ($exeHash -cne [string]$manifest.main_executable_sha256) {
         throw 'Portable EXE SHA256 does not match manifest'
     }
