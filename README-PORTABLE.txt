@@ -247,3 +247,41 @@ OWNER ACCEPTANCE IN THE APP (17S-32)
 - Frozen EXE --smoke-only tests only offline default and rejects catalogue
   access even if its local toggle is ON; it cannot validate your actual API.
 - See docs/model-discovery-17s-43.md in repository for the full scope.
+
+
+17S-44 | OWNER PC PILOT LAUNCHER INCLUDED AND SHA256-VERIFIED
+- A NEW OPTIONAL Windows PowerShell script now ships inside the SAME portable
+  folder: Start-VARYN-OwnerPilot.ps1. Keep it beside VARYN-Portable.exe,
+  _internal, README-PORTABLE.txt, and BUNDLE-SHA256.json.
+- Before opening ANY executable, compare the ORIGINAL downloaded whole ZIP
+  SHA256 with the exact GitHub Actions artifact digest from PR #1. The local
+  manifest is UNSIGNED and does not independently prove publisher identity.
+- Open a NORMAL (not Administrator) Windows PowerShell in the EXTRACTED
+  VARYN-Portable folder. Basic no-app, no-credential verification:
+    powershell.exe -NoProfile -File .\Start-VARYN-OwnerPilot.ps1 -VerifyOnly
+  Then normal OFFLINE pilot (no provider key inherited into child):
+    powershell.exe -NoProfile -File .\Start-VARYN-OwnerPilot.ps1 -Provider offline
+- OPTIONAL real-provider pilot, only with YOUR own legitimate provider API key:
+    powershell.exe -NoProfile -File .\Start-VARYN-OwnerPilot.ps1 -Provider openrouter
+  Or choose -Provider deepseek / -Provider 9router. The script verifies all
+  bundled files first, then asks for key via HIDDEN PowerShell prompt.
+  It does NOT print the key, place it on command line, or save it to disk.
+  The process environment still contains the key in VARYN until VARYN exits;
+  other sufficiently privileged local software may read that environment.
+- Launcher clears common inherited provider/GitHub/AWS tokens in its own
+  process before spawning VARYN, then sets only the selected provider key.
+  It does not create permanent system environment variables or use setx.
+  No provider network call occurs automatically after launching.
+- The application still requires separate model GET or inference network
+  toggle and exact owner review, even after credential setup.
+  Provider pricing/free tiers/authorization and actual billing remain unknown
+  until independently checked. Cost estimates are NOT hard billing caps.
+- This launcher is UNSIGNED; if Windows PowerShell execution policy or
+  Defender/SmartScreen blocks it, STOP. Do NOT bypass execution policy,
+  elevate to Administrator or disable antivirus. For offline operation, the
+  normal EXE can still be launched directly if Windows allows it.
+- GitHub CI tests a REAL Windows PowerShell -VerifyOnly against clean
+  synthetic bundle and deliberately tampered/missing/extraneous file cases,
+  plus tests the script inside the real packaged one-folder EXE artifact.
+  CI does NOT test your actual API credential, account, PC or provider bill.
+- See docs/owner-pc-pilot-17s-44.md for full owner acceptance steps.
