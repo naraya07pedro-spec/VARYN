@@ -1,8 +1,10 @@
 """17S-29 Windows portable desktop entry, independent of installed Python.
 
-Experimental manual official-app workbench. Shipped GUI is offline for model
-API providers; NO automatic consumer app history access, private-file grants,
-network sync, or background service is activated by this entry point.
+Experimental manual official-app workbench. The legacy model controller is
+OFFLINE in Portable, while the new Model Control Center permits owner-reviewed
+pinned API calls only in normal non-smoke mode, after an independent network
+toggle and OS environment credential. Neither mode auto-reads consumer app
+history/memory, private files or browser session secrets.
 
 Portable --smoke-only is a no-action GUI construction/teardown probe, NOT
 owner acceptance or remote app connectivity.

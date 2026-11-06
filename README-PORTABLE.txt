@@ -18,9 +18,12 @@ IMPORTANT SECURITY AND PRIVACY BOUNDARIES
   If Windows blocks it, stop and use the reviewed source-only ZIP instead.
 - No automatic sync with official ChatGPT, Claude or Gemini consumer app
   histories/memories. No account cookie extraction or login capture.
-- Model API calls are disabled by the portable entrypoint. Other features in
-  the existing desktop may request separately approved public network access;
-  don't enable them during the offline pilot.
+- LEGACY provider calls remain offline in the portable entrypoint. The
+  separate Universal Model Gateway is live-CAPABLE in normal user launch,
+  but every model GET or chat request still requires explicit owner review,
+  independent network permission and your OWN OS environment API credential.
+  No such model request is made automatically. Other older features may also
+  have separate public network approvals; leave them OFF during offline tests.
 - Opening a provider homepage and clipboard copying require separate user
   approval. The provider/browser runs independently from VARYN.
 - This is NOT a production OS sandbox or confidential encrypted storage.
@@ -219,3 +222,28 @@ OWNER ACCEPTANCE IN THE APP (17S-32)
 - This smoke proves real frozen Tk fake-workflow wiring, NOT real model API,
   current free quotas, a signed executable, owner PC acceptance, or native
   ChatGPT/Claude/Gemini history/memory sync.
+
+17S-43 | DISCOVER OFFICIAL API MODEL IDS BEFORE A LIVE PILOT
+- Open main VARYN > 17S-40 Model Control Center > "17S-43 | Discover model
+  IDs (official GET /models)". This is a NEW, separately reviewed network
+  action, distinct from a billable inference request. There is NO automatic
+  discovery, fallback, history import or hidden login.
+- Choose OpenRouter, DeepSeek, or LOCAL 9Router. The network toggle is OFF
+  by default; 9Router upstream authorization is also OFF. Store YOUR OWN key
+  only in the current normal-user OS environment (never in chat or GitHub):
+  OPENROUTER_API_KEY / DEEPSEEK_API_KEY / VARYN_9ROUTER_API_KEY.
+- Tap "Review exact GET /models & request ONCE". Inspect endpoint/method
+  and approve explicitly. List is capped to 60 safe model ID strings. An ID
+  appearing does NOT prove the key works for inference, model availability,
+  free usage, provider identity, or any price/quota/cost guarantee. OpenRouter
+  GET /models can list public models without proving account entitlement.
+- Select one ID and choose "Use selected ID". Both estimated price fields are
+  BLANKED, quote review and route review flags reset OFF, and network/upstream
+  permissions reset OFF. Manually verify actual prices/account status with
+  the official provider before registering a quote or approving inference.
+- Never use a fake 0 USD entry to bypass the need for price verification.
+  VARYN cost estimation is NOT an actual hard spending cap. Real providers
+  and routers can charge and switch providers even when a request fails.
+- Frozen EXE --smoke-only tests only offline default and rejects catalogue
+  access even if its local toggle is ON; it cannot validate your actual API.
+- See docs/model-discovery-17s-43.md in repository for the full scope.
