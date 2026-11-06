@@ -290,9 +290,9 @@ class ModelSelectionDialog(tk.Toplevel):
         self.chat.mode.set("OpenRouter" if model.provider == "openrouter" else "DeepSeek")
         self.chat._model_values()
         self.chat._select_mode()
-        self.chat.active_model_label.configure(
-            text=model.label + "  ·  " + model.provider,
-        )
+        # Keep the main composer compact; the full identity is in this dialog.
+        short = model.label if len(model.label) <= 24 else model.label[:21] + "…"
+        self.chat.active_model_label.configure(text=short)
         self.chat.status.set("Model ready. Approve each online request before sending.")
         self.api_key.set("")
         self._close()

@@ -99,7 +99,7 @@ class ConsumerChat(PremiumChatSurface):
         controls = tk.Frame(self.composer, bg=WHITE)
         controls.pack(fill="x", padx=17, pady=(2, 13))
         self.model_box = ttk.Combobox(
-            controls, state="readonly", width=24,
+            controls, state="readonly", width=17,
             textvariable=self.display_mode,
             style="Consumer.Model.TCombobox",
             font=("Segoe UI", 10),
@@ -232,6 +232,13 @@ class ConsumerChat(PremiumChatSurface):
             return
         self.mode.set(name)
         self._mode_changed()
+        offer = self._offers.get(self.mode.get().lower())
+        if hasattr(self, "active_model_label"):
+            if offer is None or self.mode.get() == "Offline demo (not AI)":
+                self.active_model_label.configure(text="Browse AI models")
+            else:
+                short = offer.model if len(offer.model) <= 24 else offer.model[:21]+"…"
+                self.active_model_label.configure(text=short)
         self.live_permission.pack_forget()
         if name != "Offline demo (not AI)":
             self.live_permission.pack(
