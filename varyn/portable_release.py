@@ -13,6 +13,7 @@ from pathlib import Path
 _MANIFEST = "BUNDLE-SHA256.json"
 _EXECUTABLE = "VARYN-Portable.exe"
 _README = "README-PORTABLE.txt"
+_LAUNCHER = "Start-VARYN-OwnerPilot.ps1"
 _MAX_FILES = 6000
 _MAX_TOTAL_BYTES = 700 * 1024 * 1024
 
@@ -27,7 +28,8 @@ def _inventory(directory):
         raise PortableBundleRejected("Portable root must be a directory")
     if (not (root / _EXECUTABLE).is_file() or
             not (root / "_internal").is_dir() or
-            not (root / _README).is_file()):
+            not (root / _README).is_file() or
+            not (root / _LAUNCHER).is_file()):
         raise PortableBundleRejected("Missing executable, runtime or safety notes")
     entries = {}
     total = 0
@@ -54,7 +56,8 @@ def _inventory(directory):
         with path.open("rb") as stream:
             digest = hashlib.file_digest(stream, "sha256").hexdigest()
         entries[name] = digest
-    if _EXECUTABLE not in entries or _README not in entries or not any(
+    if _EXECUTABLE not in entries or _README not in entries or
+            _LAUNCHER not in entries or not any(
         n.startswith("_internal/") for n in entries
     ):
         raise PortableBundleRejected("Incomplete portable directory")
@@ -76,6 +79,7 @@ def create_manifest(directory):
         "file_count": len(inventory),
         "bundle_bytes_excluding_manifest": total,
         "main_executable_sha256": inventory[_EXECUTABLE],
+        "owner_pilot_launcher_sha256": inventory[_LAUNCHER],
         "publisher_codesign_verified": False,
         "human_owner_acceptance_verified": False,
         "official_consumer_history_two_way_sync_verified": False,
@@ -108,6 +112,7 @@ def verify_manifest(directory):
             type(payload.get("bundle_bytes_excluding_manifest")) is not int or
             payload["bundle_bytes_excluding_manifest"] != total or
             payload.get("main_executable_sha256") != expected[_EXECUTABLE] or
+            payload.get("owner_pilot_launcher_sha256") != expected[_LAUNCHER] or
             payload.get("publisher_codesign_verified") is not False or
             payload.get("human_owner_acceptance_verified") is not False or
             payload.get("official_consumer_history_two_way_sync_verified") is not False or

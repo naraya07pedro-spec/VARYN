@@ -92,6 +92,9 @@ class PortableManifestTests(unittest.TestCase):
         (self._internal / "python312.dll").write_bytes(b"synthetic-runtime")
         (self.root / "README-PORTABLE.txt").write_text(
             "Unsigned experimental synthetic portable", encoding="utf-8")
+        (self.root / "Start-VARYN-OwnerPilot.ps1").write_text(
+            "# SYNTHETIC: demo PowerShell fixture, no network",
+            encoding="utf-8")
 
     def tearDown(self):
         self.temp.cleanup()
@@ -99,7 +102,9 @@ class PortableManifestTests(unittest.TestCase):
     def test_expected_inventory_and_source_free_release(self):
         report = create_manifest(self.root)
         self.assertEqual(report["build_mode"], "windows_amd64_onedir")
-        self.assertEqual(report["file_count"], 3)
+        self.assertEqual(report["file_count"], 4)
+        self.assertEqual(report["owner_pilot_launcher_sha256"],
+                         hashlib.sha256((self.root / "Start-VARYN-OwnerPilot.ps1").read_bytes()).hexdigest())
         self.assertFalse(report["publisher_codesign_verified"])
         self.assertFalse(report["official_consumer_history_two_way_sync_verified"])
         checked = verify_manifest(self.root)
@@ -109,6 +114,13 @@ class PortableManifestTests(unittest.TestCase):
             checked["exe_sha256"],
             hashlib.sha256((self.root / "VARYN-Portable.exe").read_bytes()).hexdigest(),
         )
+
+    def test_tamper_detected_for_launcher(self):
+        create_manifest(self.root)
+        (self.root / "Start-VARYN-OwnerPilot.ps1").write_text(
+            "# INJECTED SYNTHETIC ALTERATION", encoding="utf-8")
+        with self.assertRaises(PortableBundleRejected):
+            verify_manifest(self.root)
 
     def test_tamper_detected_for_binary_and_hidden_runtime(self):
         create_manifest(self.root)
