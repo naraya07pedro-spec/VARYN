@@ -393,3 +393,82 @@ jobs:
           path: dist/VARYN-Portable/
           if-no-files-found: error
           retention-days: 7
+
+  publish-preview-release:
+    name: Publish unsigned Windows alpha as GitHub prerelease
+    # Only intentional release commits run this step; normal development does not publish.
+    if: >
+      github.event_name == 'push' &&
+      github.repository == 'naraya07pedro-spec/VARYN' &&
+      github.ref == 'refs/heads/feat/local-memory-prototype-20261103' &&
+      startsWith(github.event.head_commit.message, 'release:')
+    needs: portable-windows
+    runs-on: windows-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Checkout tagged exact source
+        uses: actions/checkout@v4
+      - name: Set up Python for bundle manifest verification
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: 'x64'
+      - name: Retrieve bundle from successful same-commit workflow job
+        uses: actions/download-artifact@v4
+        with:
+          name: varyn-windows-portable
+          path: dist/VARYN-Portable
+      - name: Independently check the release contents against bundled SHA256 inventory
+        shell: pwsh
+        run: |
+          python -m varyn.portable_release --directory dist/VARYN-Portable --verify
+          if ($LASTEXITCODE -ne 0) { throw "Release artifact integrity verification failed" }
+          foreach ($file in @(
+            'VARYN-Portable.exe',
+            'BUNDLE-SHA256.json',
+            'Start-VARYN-OwnerPilot.ps1',
+            'README-PORTABLE.txt'
+          )) {
+            if (-not (Test-Path -LiteralPath "dist/VARYN-Portable/$file" -PathType Leaf)) {
+              throw "Missing release file: $file"
+            }
+          }
+      - name: Package the verified unsigned folder and generate SHA256
+        shell: pwsh
+        run: |
+          $tag = 'v0.1.0-alpha.1'
+          $zip = "VARYN-Windows-x64-$tag-unsigned.zip"
+          Compress-Archive -LiteralPath 'dist/VARYN-Portable' -DestinationPath $zip -CompressionLevel Optimal
+          if (-not (Test-Path -LiteralPath $zip -PathType Leaf)) { throw 'Release ZIP not created' }
+          $sha = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          "RELEASE_ZIP=$zip" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "RELEASE_SHA256=$sha" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "SHA256: $sha"
+      - name: Create visible prerelease with exact source commit, no automatic main merge
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = 'v0.1.0-alpha.1'
+          $sha = $env:GITHUB_SHA
+          $note = @"
+          Experimental unsigned Windows x64 VARYN Portable build from source commit $sha.
+
+          Download `$env:RELEASE_ZIP`, verify its SHA-256:
+          `$env:RELEASE_SHA256`
+
+          Includes owner-reviewed model API requests, offline fake model, and manual official-app relay.
+          Not production-safe, not a signed binary, not a hard billing cap, and NOT
+          native two-way consumer ChatGPT/Claude/Gemini history sync.
+          Run only as a normal, non-administrator Windows user; do not bypass
+          Defender or SmartScreen warnings. Do not use private/customer data.
+
+          Full source, scope, and install instructions:
+          https://github.com/naraya07pedro-spec/VARYN/tree/$sha
+          "@
+          $note | Set-Content -LiteralPath 'release-notes-alpha.txt' -Encoding UTF8
+          gh release create $tag $env:RELEASE_ZIP --target $sha --prerelease --title 'VARYN v0.1.0-alpha.1 | experimental Windows pilot' --notes-file 'release-notes-alpha.txt'
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub prerelease publish failed' }
