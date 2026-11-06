@@ -33,8 +33,8 @@ function Get-PortableSha256 {
     $algorithm = [Security.Cryptography.SHA256]::Create()
     $stream = [IO.File]::OpenRead($Path)
     try {
-        return [BitConverter]::ToString($algorithm.ComputeHash($stream)).
-            Replace('-','').ToLowerInvariant()
+        $hex = [BitConverter]::ToString($algorithm.ComputeHash($stream))
+        return $hex.Replace('-','').ToLowerInvariant()
     }
     finally {
         $stream.Dispose()

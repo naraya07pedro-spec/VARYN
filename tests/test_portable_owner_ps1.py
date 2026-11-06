@@ -17,7 +17,7 @@ class PortablePilotPowerShellSourceTests(unittest.TestCase):
         text = (REPO / SCRIPT).read_text(encoding="utf-8").lower()
         for expected in (
             "verifyonly", "'offline'", "securestringtobstr",
-            "zerofreebstr", "get-filehash", "bundle-sha256.json",
+            "zerofreebstr", "get-portablesha256", "bundle-sha256.json",
             "read-host", "start-process", "isinrole",
         ):
             with self.subTest(expected=expected):
