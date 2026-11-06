@@ -13,6 +13,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog
 
 from varyn.gateway_chat import KEY_ENVS
+from varyn.model_catalog_window import ModelCatalogWindow
 from varyn.provider_readiness import (
     readiness, local_observation, receipt_json, save_new, ReadinessRejected,
 )
@@ -96,6 +97,8 @@ class ModelControlCenter(tk.Toplevel):
         self._poll_id = None
         self._active_offer = None
         self._last_receipt = None
+        self._catalog_window = None
+        self._catalog_lock = False
         self.title("VARYN 17S-40 | Model Control Center")
         self.geometry("760x640")
         self.minsize(540, 440)
@@ -183,7 +186,12 @@ class ModelControlCenter(tk.Toplevel):
             side="left", padx=(6, 0),
         )
         self.listbox = tk.Listbox(quote, height=4)
-        self.listbox.pack(fill="x", padx=6, pady=(0, 6))
+        self.listbox.pack(fill="x", padx=6, pady=(0, 4))
+        ttk.Button(
+            quote,
+            text="17S-43 | Discover model IDs (official GET /models)",
+            command=self._open_catalog,
+        ).pack(anchor="w", padx=6, pady=(0, 6))
 
         control = ttk.LabelFrame(shell, text="2. Inspect the selected model and request")
         control.pack(fill="x", pady=(0, 6))
@@ -251,7 +259,20 @@ class ModelControlCenter(tk.Toplevel):
         )
 
     def _allowed(self):
-        return not self._closed and not self._owner._closing and not self._owner._busy
+        return (not self._closed and not self._owner._closing and
+                not self._owner._busy and not self._catalog_lock)
+
+    def _open_catalog(self):
+        if not self._allowed() or self._running:
+            return
+        # Lock this model center while its separately reviewed GET is pending.
+        self._catalog_lock = True
+        try:
+            self._catalog_window = ModelCatalogWindow(self)
+        except BaseException:
+            self._catalog_lock = False
+            self._catalog_window = None
+            raise
 
     def _refresh_options(self):
         items = ["auto"] + [x.provider + ":" + x.model for x in self._offers]
@@ -545,6 +566,11 @@ class ModelControlCenter(tk.Toplevel):
         if self._closed:
             return
         self._closed = True
+        catalog = self._catalog_window
+        if catalog is not None and catalog.winfo_exists():
+            catalog._dismiss()
+        self._catalog_window = None
+        self._catalog_lock = False
         if self._poll_id is not None:
             try:
                 self.after_cancel(self._poll_id)
