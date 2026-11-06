@@ -53,46 +53,105 @@ class ChatSurface(ttk.Frame):
         self._build()
 
     def _build(self):
-        header = ttk.Frame(self)
-        header.pack(fill="x", pady=(0, 10))
-        ttk.Label(header, text="Chat with VARYN", font=("Segoe UI", 16, "bold")).pack(
-            side="left")
-        ttk.Button(header, text="Model Settings", command=self.open_settings).pack(
-            side="right")
-        options = ttk.Frame(self)
-        options.pack(fill="x", pady=(0, 8))
-        ttk.Label(options, text="Model").pack(side="left")
+        bg = "#111b2d"
+        surface = "#162339"
+        text = "#f4f7fc"
+        muted = "#93a5c0"
+        accent = "#7868fa"
+        style = ttk.Style(self)
+        style.configure("Varyn.Chat.TFrame", background=bg)
+        style.configure("Varyn.Combo.TCombobox",
+                        fieldbackground=surface, background=surface,
+                        foreground=text, arrowcolor=text,
+                        bordercolor="#283952", padding=7)
+        style.map("Varyn.Combo.TCombobox",
+                  fieldbackground=[("readonly", surface)],
+                  foreground=[("readonly", text)])
+        self.configure(style="Varyn.Chat.TFrame")
+        head = tk.Frame(self, bg=bg)
+        head.pack(fill="x", pady=(1, 19))
+        tk.Label(head, text="AI Chat", bg=bg, fg=text,
+                 font=("Segoe UI", 24, "bold")).pack(side="left")
+        tk.Button(head, text="⚙  Model settings",
+                  command=self.open_settings, relief="flat",
+                  bg=surface, fg=text, activebackground="#2b3c59",
+                  activeforeground=text, cursor="hand2", bd=0,
+                  font=("Segoe UI", 10, "bold"), padx=16, pady=10).pack(
+                      side="right")
+        controls = tk.Frame(self, bg=bg)
+        controls.pack(fill="x", pady=(0, 14))
+        tk.Label(controls, text="MODEL", bg=bg, fg=muted,
+                 font=("Segoe UI", 9, "bold")).pack(side="left", padx=(0, 11))
         self.model_box = ttk.Combobox(
-            options, state="readonly", textvariable=self.mode,
-            values=_MODES, width=24,
+            controls, state="readonly", textvariable=self.mode,
+            values=_MODES, width=24, style="Varyn.Combo.TCombobox",
+            font=("Segoe UI", 10),
         )
-        self.model_box.pack(side="left", padx=(8, 8))
+        self.model_box.pack(side="left")
         self.model_box.bind("<<ComboboxSelected>>", self._mode_changed)
-        ttk.Checkbutton(options, variable=self.allow_network,
-                        text="Allow ONE internet request").pack(side="left")
-        ttk.Label(self, textvariable=self.status, wraplength=760).pack(
-            anchor="w", pady=(0, 8))
+        tk.Checkbutton(
+            controls, text="Allow one network request",
+            variable=self.allow_network,
+            bg=bg, fg=muted, selectcolor=surface,
+            activebackground=bg, activeforeground=text,
+            font=("Segoe UI", 9),
+        ).pack(side="right")
+        notice = tk.Frame(self, bg=surface, padx=13, pady=10)
+        notice.pack(fill="x", pady=(0, 15))
+        tk.Label(notice, text="●", bg=surface, fg="#6ad5a4",
+                 font=("Segoe UI", 10, "bold")).pack(side="left", padx=(0, 8))
+        tk.Label(notice, textvariable=self.status, bg=surface, fg=muted,
+                 font=("Segoe UI", 9), anchor="w",
+                 justify="left", wraplength=520).pack(side="left", fill="x",
+                                                        expand=True)
+        # Separate empty-state panel is styled as a conversation rather
+        # than a technical log with fields and long notices.
+        conversation = tk.Frame(self, bg="#0e1626")
+        conversation.pack(fill="both", expand=True)
         self.chat = tk.Text(
-            self, height=13, bg="#101827", fg="#f2f5fa",
-            insertbackground="#ffffff", font=("Segoe UI", 10), wrap="word",
-            padx=14, pady=12, relief="flat", state="disabled",
+            conversation, height=14,
+            bg="#0e1626", fg=text, insertbackground=text,
+            font=("Segoe UI", 11), wrap="word",
+            padx=23, pady=20, relief="flat", state="disabled",
+            spacing1=4, spacing3=8, borderwidth=0,
+            highlightthickness=0,
         )
-        self.chat.pack(fill="both", expand=True)
-        self._append("VARYN", "Type a question below. Offline demo does not call a real AI. "
-                     "For real answers, select OpenRouter or DeepSeek, enter the provider "
-                     "key locally at launch, then configure a model once in Settings.")
-        footer = ttk.Frame(self)
-        footer.pack(fill="x", pady=(9, 0))
-        self.input = tk.Text(footer, height=3, wrap="word", font=("Segoe UI", 11),
-                             padx=8, pady=6, relief="solid")
+        self.chat.pack(side="left", fill="both", expand=True)
+        scrollbar = tk.Scrollbar(conversation, command=self.chat.yview,
+                                 bg=surface, troughcolor="#0e1626",
+                                 relief="flat", width=10)
+        scrollbar.pack(side="right", fill="y")
+        self.chat.configure(yscrollcommand=scrollbar.set)
+        self._append("VARYN", "Welcome to your workspace. Write a message below. "
+                     "Offline demo is only a simulation. To get a genuine "
+                     "AI answer, choose a provider and configure its model "
+                     "under Model settings.")
+        composer = tk.Frame(self, bg=surface, highlightbackground="#30425e",
+                            highlightthickness=1)
+        composer.pack(fill="x", pady=(16, 9))
+        self.input = tk.Text(
+            composer, height=3, wrap="word",
+            bg=surface, fg=text, insertbackground=text,
+            selectbackground="#374a7d",
+            font=("Segoe UI", 11), padx=14, pady=14, relief="flat",
+            borderwidth=0, highlightthickness=0,
+        )
         self.input.pack(side="left", fill="both", expand=True)
-        self.send = ttk.Button(footer, text="Send", command=self.send_message)
-        self.send.pack(side="right", padx=(9, 0))
-        ttk.Label(self, wraplength=790, text=(
-            "One-turn messages only. No files, memory or prior chat history are "
-            "sent. External prompts may be retained or billed by the provider; "
-            "estimated prices are NOT billing limits."
-        )).pack(anchor="w", pady=(8, 0))
+        self.send = tk.Button(
+            composer, text="Send  ↗", command=self.send_message,
+            bg=accent, fg="#ffffff", activebackground="#9488ff",
+            activeforeground="#ffffff", font=("Segoe UI", 11, "bold"),
+            relief="flat", bd=0, padx=19, pady=12, cursor="hand2",
+        )
+        self.send.pack(side="right", padx=10, pady=10)
+        self.input.bind("<Control-Return>",
+                        lambda event: (self.send_message(), "break")[1])
+        tk.Label(
+            self, text="Ctrl+Enter to send   •   One message per request   "
+                       "•   Your data is not uploaded without approval",
+            bg=bg, fg=muted, font=("Segoe UI", 9),
+            anchor="w", justify="left",
+        ).pack(fill="x", pady=(0, 2))
 
     def _append(self, who, message):
         self.chat.configure(state="normal")

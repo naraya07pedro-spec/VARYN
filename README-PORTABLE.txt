@@ -11,7 +11,8 @@ WHAT TO OPEN
 4. Extract the whole archive into a normal-user folder. Keep the EXE,
    _internal runtime, manifest and owner PowerShell launcher together.
 5. Run the launcher as a NORMAL Windows user, NOT Administrator.
-6. VARYN opens directly to a CHAT, with My Tasks and Connectors tabs.
+6. VARYN opens directly to redesigned dark AI CHAT with a sidebar for
+   My Tasks and Connectors. Use the message composer and Send button.
    Type a message in the chat and click Send.
    Offline demo never returns an actual AI-generated answer.
    To receive live answers choose OpenRouter/DeepSeek, use your own local
