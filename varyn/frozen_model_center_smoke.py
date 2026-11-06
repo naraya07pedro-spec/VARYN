@@ -126,6 +126,25 @@ def synthetic_center_acceptance(owner):
             "BLOCKED" not in center.status.get() or
             center._budget.snapshot()["requests_reserved"] != 1):
         raise FrozenModelSmokeRejected("Offline frozen API request was not refused")
+    # 17S-43: real frozen Tk new model catalogue must be present but NEVER
+    # contact any remote endpoint in smoke-only mode.
+    center._open_catalog()
+    catalog = center._catalog_window
+    if (catalog is None or not catalog.winfo_exists() or
+            not center._catalog_lock or catalog.allow_network.get() or
+            catalog.authorize_upstream.get() or catalog._attempted or
+            catalog.models.size() != 0):
+        raise FrozenModelSmokeRejected("Unsafe default model catalogue in frozen EXE")
+    catalog.provider.set("deepseek")
+    catalog.allow_network.set(True)
+    catalog._request_models()
+    if (catalog._attempted or catalog._running or
+            "BLOCKED" not in catalog.status.get() or
+            catalog.models.size() != 0):
+        raise FrozenModelSmokeRejected("Frozen offline catalogue GET not denied")
+    catalog._dismiss()
+    if center._catalog_lock or center._catalog_window is not None:
+        raise FrozenModelSmokeRejected("Frozen catalogue did not discard RAM")
     center._dismiss()
     if owner._model_center is not None:
         raise FrozenModelSmokeRejected("Model Center failed to discard RAM data")
@@ -139,6 +158,8 @@ def synthetic_center_acceptance(owner):
         "provider_receipt_disabled": True,
         "legacy_offline_provider_still_disabled": True,
         "live_model_dispatch_denied": True,
+        "model_catalog_default_off": True,
+        "model_catalog_network_denied": True,
         "external_provider_requests": 0,
         "operator_personally_approved": False,
         "real_owner_pc_tested": False,
