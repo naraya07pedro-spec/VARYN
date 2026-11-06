@@ -1,0 +1,24 @@
+name: Feature request
+description: Suggest a bounded, testable improvement
+title: "[Feature] "
+labels: []
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: What concrete workflow currently fails?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior and alternatives
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Permission, privacy and cost risks
+    validations:
+      required: false

@@ -1,0 +1,41 @@
+name: Bug report
+description: Report a reproducible VARYN issue without sharing confidential data
+title: "[Bug] "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: "VARYN is experimental. Never include API keys, private chat exports, personal data, access tokens, or customer records."
+  - type: input
+    id: version
+    attributes:
+      label: Exact commit or build run
+      placeholder: "Commit SHA or GitHub Actions run URL"
+    validations:
+      required: true
+  - type: input
+    id: platform
+    attributes:
+      label: OS and runtime
+      placeholder: "Windows 11 x64 Portable, or Python 3.12 on Ubuntu"
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps using synthetic data only
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: checkboxes
+    id: sanitized
+    attributes:
+      label: Privacy confirmation
+      options:
+        - label: I have removed secrets and private data from the report.
+          required: true
