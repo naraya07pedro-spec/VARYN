@@ -61,6 +61,8 @@ class FrozenCenterNativeTkTests(unittest.TestCase):
             self.assertTrue(result["fake_review_rejected"])
             self.assertTrue(result["one_mock_owner_approved_fake_execution"])
             self.assertTrue(result["live_model_dispatch_denied"])
+            self.assertTrue(result["model_catalog_default_off"])
+            self.assertTrue(result["model_catalog_network_denied"])
             self.assertFalse(result["operator_personally_approved"])
             self.assertFalse(result["actual_provider_api_tested"])
             self.assertEqual(result["external_provider_requests"], 0)
