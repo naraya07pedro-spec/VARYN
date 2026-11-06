@@ -22,8 +22,8 @@ Owner-approved model API requests, manual multi-AI handoffs, and prototype local
 
 ## Quick start: Windows Portable (experimental)
 
-1. Open the **[verified 17S-46 GitHub Actions run](https://github.com/naraya07pedro-spec/VARYN/actions/runs/42162535996)**. In **Artifacts**, download `varyn-windows-portable`. You may need to sign in to GitHub. This Actions artifact expires **November 13, 2026**, unless a separate public Release is subsequently published.
-2. Confirm the **downloaded artifact ZIP SHA-256** equals `13dd7e068698840e001c6556f4e7cfa746ca4509e1b514c310d329bc476a733b` (SHA-256 of GitHub's artifact ZIP, not of the contained executable).
+1. Download the **[public v0.1.0-alpha.1 experimental Windows ZIP](https://github.com/naraya07pedro-spec/VARYN/releases/download/v0.1.0-alpha.1/VARYN-Windows-x64-v0.1.0-alpha.1-unsigned.zip)**. This is an UNSIGNED pre-release built from commit `ac547f15c6db10fd25754cb4e0e2bbdce8d12906`, not a stable software release.
+2. Confirm the **downloaded release ZIP SHA-256** equals `dbd81452b9af7322da201979bcc2a92112b8bd8c67994ad76938c0498bc3b162`. This is the ZIP archive's checksum, not the contained executable's hash.
 3. Extract the **entire folder**, keeping `VARYN-Portable.exe`, `_internal/`, `BUNDLE-SHA256.json`, and `Start-VARYN-OwnerPilot.ps1` together. Run as a **normal, non-administrator** Windows user.
 4. From the extracted folder in PowerShell, optionally verify the embedded file manifest, then launch the *offline* mode:
 
@@ -37,7 +37,7 @@ Owner-approved model API requests, manual multi-AI handoffs, and prototype local
 
 **Do not put API keys, private conversations, or customer data in issues, screenshots, or the app.** No default confidential-data protection is claimed. Do not disable Defender or SmartScreen to run an unsigned binary.
 
-No stable GitHub Release exists yet. [Release-readiness notes](docs/RELEASE.md).
+**Public GitHub pre-release is available**, but there is no stable release or production support. [Release and provenance notes](docs/RELEASE.md).
 
 ## Architecture
 

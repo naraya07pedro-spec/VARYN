@@ -1,6 +1,6 @@
 # Community launch materials (English) | Draft, NOT published
 
-**Before submitting:** Public main currently contains only a stub; the full code lives in draft PR #1. Do not announce that `main` is installable or that a stable Release exists. Publish only after a downloadable pre-release, clear README, genuine demo and independent user acceptance become available. Respect all community rules and do not mass-post identical messages.
+**Before submitting:** Public `main` currently contains only a stub; the full code lives in draft PR #1. A downloadable **unsigned experimental pre-release** is now published at https://github.com/naraya07pedro-spec/VARYN/releases/tag/v0.1.0-alpha.1. There is **no stable release**. Avoid claiming main is installable; hold broad promotion until at least one honest user-device demo and basic independent user acceptance exist. Respect community rules and do not mass-post identical messages.
 
 ## Launch positioning
 

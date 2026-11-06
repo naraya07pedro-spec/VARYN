@@ -1,8 +1,8 @@
 # Experimental Windows distribution | Release checklist
 
-**As of 2026-11-06:** GitHub Releases in `naraya07pedro-spec/VARYN` are **empty**. No `v1.0` release, signed installer, publisher certificate, user-device acceptance, or stable support claim.
+**As of 2026-11-06:** [v0.1.0-alpha.1](https://github.com/naraya07pedro-spec/VARYN/releases/tag/v0.1.0-alpha.1) was published successfully as a **public experimental GitHub Pre-release** from exact source commit `ac547f15c6db10fd25754cb4e0e2bbdce8d12906`. No signed installer, publisher certificate, user-device acceptance, or stable support claim.
 
-## Exact verified build to promote (if separately approved)
+## Historical verified precursor build (17S-46 before public prerelease)
 
 - Source commit: `b52a774241825f596fc0ccb063de190a9b520994`.
 - GitHub Actions run: https://github.com/naraya07pedro-spec/VARYN/actions/runs/42162535996
@@ -12,11 +12,17 @@
 - CI artifact expires: `2026-11-13T04:31:32Z`. GitHub Actions artifacts are not durable public releases.
 - The embedded files also have a `BUNDLE-SHA256.json` integrity manifest. That manifest alone is **not** a signature.
 
-## Proposed release identity
+## Actual published prerelease
 
-Draft release name: **VARYN experimental Windows pilot 17S-46**. Suggested semver tag: `v0.1.0-alpha.1` **only if** the tag is created at the exact source SHA above; otherwise never reuse this digest/claim. Mark as **Pre-release**, not stable.
+- Tag: `v0.1.0-alpha.1`.
+- Exact tagged source commit: `ac547f15c6db10fd25754cb4e0e2bbdce8d12906`.
+- Actions run: https://github.com/naraya07pedro-spec/VARYN/actions/runs/42170609120 ; Ubuntu, Windows and portable build as well as release publication jobs **all SUCCESS**.
+- Public binary: https://github.com/naraya07pedro-spec/VARYN/releases/download/v0.1.0-alpha.1/VARYN-Windows-x64-v0.1.0-alpha.1-unsigned.zip
+- Published ZIP SHA-256: `dbd81452b9af7322da201979bcc2a92112b8bd8c67994ad76938c0498bc3b162`.
+- Byte size: `13798293`.
+- The release tag predates this documentation correction. Historical CI artifact digests above are for **different ZIP bytes**; never mix them with the public release ZIP digest.
 
-## Required actions to actually create a GitHub Release
+## Release reproduction checklist for future tags
 
 1. Publish a tag pointing to the exact reviewed source commit **without merging draft PR #1** unless separately approved.
 2. Download the matching Actions artifact, verify the exact ZIP digest above, verify the internal file manifest, and inspect the archive contents for unexpected data.
@@ -24,7 +30,7 @@ Draft release name: **VARYN experimental Windows pilot 17S-46**. Suggested semve
 4. Link the released asset from README and verify it can be downloaded anonymously. Update the real Release URL and digest only after publication.
 5. Record a genuine, sanitized screenshot/GIF from a real GUI launch; owner-PC acceptance must be stated separately.
 
-**No GitHub Release has been created by this document.** This checkpoint prepares exact reproducible release input and honest notes; it does not claim that the connected GitHub app has a binary-upload/release-publishing capability.
+**The initial GitHub Pre-release has been independently verified by reading the Releases API.** The release publishing workflow runs only on intentional `release:` commits and does not merge the draft PR into `main`.
 
 ## Release notes draft
 

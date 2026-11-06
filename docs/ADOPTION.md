@@ -19,3 +19,7 @@ Check GitHub repository stars/forks/issues from https://github.com/naraya07pedro
 Useful early goals to **measure**, not guarantees: 25 organic stars, 5 independent testers and 2 actionable technical feedback reports. Hiring signal comes from reproducible shipped behavior and thoughtful fixes, not purchased stars or fake engagement.
 
 Current public code is still on draft PR #1; published adoption claims should reflect which revision and branch an outsider could actually download.
+
+## Update | 2026-11-06 (after baseline)
+
+The first public [experimental pre-release v0.1.0-alpha.1](https://github.com/naraya07pedro-spec/VARYN/releases/tag/v0.1.0-alpha.1) is now published with a downloadable unsigned Windows ZIP (release job 42170609120 SUCCESS). The baseline table records the earlier snapshot *before* this release, not today's latest count. No external downloads, user installations or active users were independently verified by this publication alone.
