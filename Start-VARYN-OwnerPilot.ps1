@@ -60,7 +60,7 @@ function Assert-VerifiedPortable {
         throw 'Portable manifest file count mismatch'
     }
     $seen = @{}
-    $folderPrefix = [IO.Path]::GetFullPath($Folder).TrimEnd('\','/') + [IO.Path]::DirectorySeparatorChar
+    $folderPrefix = [IO.Path]::GetFullPath($Folder).TrimEnd([char[]]@('\','/')) + [IO.Path]::DirectorySeparatorChar
     foreach ($item in @(Get-ChildItem -LiteralPath $Folder -Force -Recurse)) {
         if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
             throw 'Portable symlink/reparse point is not permitted'
