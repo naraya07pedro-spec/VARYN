@@ -106,10 +106,14 @@ class ConsumerChat(PremiumChatSurface):
         )
         self.model_box.pack(side="left")
         self.model_box.bind("<<ComboboxSelected>>", self._select_mode)
-        self.active_model_label = _label(
-            controls, "No online model selected", size=9, fg=SOFT, bg=WHITE,
+        self.active_model_label = tk.Button(
+            controls, text="Browse AI models",
+            command=self.open_settings, cursor="hand2",
+            bg=WHITE, fg=ACCENT, activebackground=WHITE,
+            activeforeground=ACCENT, bd=0, relief="flat",
+            padx=10, pady=7, font=("Segoe UI", 10, "bold"),
         )
-        self.active_model_label.pack(side="left", padx=(12, 0))
+        self.active_model_label.pack(side="left", padx=(10, 0))
         self.use_memory = tk.BooleanVar(master=self, value=False)
         self.memory_toggle = tk.Checkbutton(
             controls, variable=self.use_memory,

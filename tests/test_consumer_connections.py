@@ -61,7 +61,8 @@ class OwnerModelPickerTests(unittest.TestCase):
         def send(provider,payload,key,timeout):
             sends.append((provider,payload,key,timeout))
             return json.dumps({
-                "choices":[{"message":{"content":"Fictional answer"}}],
+                "choices":[{"finish_reason":"stop",
+                            "message":{"content":"Fictional answer"}}],
                 "model":"fictional/model",
                 "usage":{"prompt_tokens":10,"completion_tokens":10},
             }).encode()
