@@ -11,8 +11,11 @@ WHAT TO OPEN
 4. Extract the whole archive into a normal-user folder. Keep the EXE,
    _internal runtime, manifest and owner PowerShell launcher together.
 5. Run the launcher as a NORMAL Windows user, NOT Administrator.
-6. VARYN opens directly to redesigned dark AI CHAT with a sidebar for
-   My Tasks and Connectors. Use the message composer and Send button.
+6. VARYN opens to the Premium Workspace screen: sunset mountain banner,
+   central chat composer, quick-access Tugas/Aplikasi/Template cards,
+   navigation for Chat/Tugas/Aplikasi/Riwayat and Pengaturan.
+   Send one message to transition from the home page to conversation.
+   History is RAM-only for this app session; tasks remain local SQLite.
    Type a message in the chat and click Send.
    Offline demo never returns an actual AI-generated answer.
    To receive live answers choose OpenRouter/DeepSeek, use your own local

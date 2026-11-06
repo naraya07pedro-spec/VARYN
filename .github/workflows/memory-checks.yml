@@ -439,7 +439,7 @@ jobs:
       - name: Package the verified unsigned folder and generate SHA256
         shell: pwsh
         run: |
-          $tag = 'v0.1.0-alpha.4'
+          $tag = 'v0.1.0-alpha.5'
           $zip = "VARYN-Windows-x64-$tag-unsigned.zip"
           Compress-Archive -LiteralPath 'dist/VARYN-Portable' -DestinationPath $zip -CompressionLevel Optimal
           if (-not (Test-Path -LiteralPath $zip -PathType Leaf)) { throw 'Release ZIP not created' }
@@ -452,7 +452,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = 'v0.1.0-alpha.4'
+          $tag = 'v0.1.0-alpha.5'
           $sha = $env:GITHUB_SHA
           $note = @"
           Experimental unsigned Windows x64 VARYN Portable build from source commit $sha.
@@ -470,5 +470,5 @@ jobs:
           https://github.com/naraya07pedro-spec/VARYN/tree/$sha
           "@
           $note | Set-Content -LiteralPath 'release-notes-alpha.txt' -Encoding UTF8
-          gh release create $tag $env:RELEASE_ZIP --target $sha --prerelease --title 'VARYN v0.1.0-alpha.4 | redesigned dark workspace' --notes-file 'release-notes-alpha.txt'
+          gh release create $tag $env:RELEASE_ZIP --target $sha --prerelease --title 'VARYN v0.1.0-alpha.5 | premium workspace, sunset edition' --notes-file 'release-notes-alpha.txt'
           if ($LASTEXITCODE -ne 0) { throw 'GitHub prerelease publish failed' }
