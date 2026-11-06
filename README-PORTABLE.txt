@@ -10,7 +10,11 @@ WHAT TO OPEN
 3. Verify the ZIP SHA256 against that exact release's digest.
 4. Extract the whole archive into a normal-user folder. Keep the EXE,
    _internal runtime, manifest and owner PowerShell launcher together.
-5. Run the launcher as a NORMAL Windows user, NOT Administrator.
+5. Run VARYN-Portable.exe directly as a NORMAL Windows user,
+   NOT Administrator. You do NOT need PowerShell or Python to open the
+   regular graphical app. The optional owner PowerShell launcher is only
+   for users who specifically need its separate environment-key workflow;
+   Windows may block unsigned scripts. Do not weaken execution policy.
 6. VARYN opens to the new calm, nontechnical Home screen (no robot imagery).
    English is the default, with Indonesian, Spanish and French available
    from the visible language dropdown and Settings. Language preference is
@@ -21,9 +25,12 @@ WHAT TO OPEN
    yet-to-be-connected apps. History is RAM-only for this app session.
    Type a message in the chat and click Send.
    Offline demo never returns an actual AI-generated answer.
-   For real AI answers, select AI settings and: choose OpenRouter/DeepSeek,
-   paste your provider API key, press Load models, search and select a model,
-   review its published prices, then press Use selected model. The key remains
+   For real AI answers, select AI settings and choose OpenRouter/DeepSeek.
+   In OpenRouter you may first press Browse models WITHOUT a key to see its
+   public catalog (the provider can change this behavior), filter for models
+   with reported $0 input/output prices, then paste your API key, select a
+   model and review provider pricing. In DeepSeek enter key first.
+   Press Use selected model to start using it. The key remains
    in this app process RAM only and is not written to disk/env or GitHub.
    Provider /models returns available IDs but cannot guarantee actual credit
    balance; prices are snapshots, NOT hard provider billing caps.
@@ -31,7 +38,12 @@ WHAT TO OPEN
    The obsolete technical Tk root window no longer appears behind the home.
    Tasks save in unencrypted user-local SQLite and update DUE status while
    the app is running, but DO NOT automatically execute.
-   Connector, plugin and skill entries are NOT authenticated connections.
+   Only GitHub, Notion, Netlify and Supabase have actual owner-authenticated
+   read-only API probes and resource browser flows. Telegram Bot API has a
+   separate owner-only config. All OTHER catalog/plugins/skill entries are
+   discovery/setup guidance, NOT connected accounts or agent permissions.
+   Personal API tokens may grant more than read-only privileges at the
+   provider itself: create limited-scope credentials whenever supported.
 
 MEMORY AND TELEGRAM (ALPHA 7 EXPERIMENTAL)
 - Memory page: manually select an official ChatGPT export ZIP (or

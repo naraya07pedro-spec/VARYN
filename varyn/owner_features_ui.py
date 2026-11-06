@@ -329,6 +329,9 @@ class OwnerFeaturesMixin:
                 self.telegram_id.get().strip(),
                 offer,
                 budget=self.desktop._universal_model_budget,
+                # Reuse only the RAM-held key the owner pasted into Model
+                # Picker. Do not require another launcher or environment copy.
+                api_key=self.chat_surface._session_keys.get(provider),
                 callback=lambda line:self._telegram_queue.put(line),
             )
         except (TelegramRejected, ValueError, TypeError):

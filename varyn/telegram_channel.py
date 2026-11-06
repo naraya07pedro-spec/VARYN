@@ -112,8 +112,11 @@ class TelegramChannel:
         })
 
     def _prepare(self, text):
-        if len(text) > 3500 or not text.strip():
-            return "Please send a question of 1–3500 characters."
+        # Telegram sendMessage has a fixed body cap in this client. Keep enough
+        # room for the *entire* prompt, provider/model and approval code.
+        # Never truncate away the /confirm code or hide content from review.
+        if len(text) > 2600 or not text.strip():
+            return "Please send a question of 1–2600 characters."
         code = secrets.token_hex(3).upper()
         self._pending = (code, text, time.monotonic() + 120)
         self._send(

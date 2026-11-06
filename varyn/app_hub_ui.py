@@ -1,8 +1,8 @@
 """Clickable, visual application hub.
 
 Telegram uses the preexisting official Bot API setup.
-GitHub/Notion connect through independent user-supplied credentials and
-a single official read-only account probe. Other catalog entries open
+GitHub/Notion/Netlify/Supabase connect with user-supplied independent tokens
+and a single official read-only account probe. Other catalog entries open
 an actual documented setup path or disclose that no adapter exists.
 """
 from __future__ import annotations
@@ -52,6 +52,8 @@ LOC = {
 FEATURED = (
     ("github", "GitHub", "#24292F", "GH", "Read account and repositories"),
     ("notion", "Notion", "#202020", "N", "Explore accessible pages"),
+    ("netlify", "Netlify", "#007F83", "N", "Browse your sites, read-only"),
+    ("supabase", "Supabase", "#3E8E61", "S", "Browse your projects, read-only"),
     ("telegram", "Telegram", "#229ED9", "✈", "Owner-only private bot"),
     ("whatsapp", "WhatsApp", "#25D366", "☎", "Official Meta setup required"),
 )
@@ -59,7 +61,7 @@ BRAND_COLORS = {
     "github":"#24292F", "notion":"#202020", "telegram":"#229ED9",
     "whatsapp":"#25D366", "gmail":"#EA4335", "google-drive":"#4285F4",
     "google-calendar":"#4285F4", "slack":"#4A154B", "discord":"#5865F2",
-    "supabase":"#3ECF8E", "google-sheets":"#34A853",
+    "supabase":"#3ECF8E", "netlify":"#007F83", "google-sheets":"#34A853",
     "google-docs":"#4285F4", "hubspot":"#FF7A59",
     "canva":"#00C4CC", "linkedin":"#0A66C2",
 }
@@ -86,6 +88,15 @@ def badge(parent, title, color, symbol=None):
         canvas.create_rectangle(12,10,31,33,outline="white",width=2)
         canvas.create_text(21,21,text="N",fill="white",
                            font=("Georgia",16,"bold"))
+    elif title.casefold() == "netlify":
+        # Locally rendered brand-inspired mark; no remote logo calls.
+        canvas.create_polygon(21,7,35,21,21,35,7,21,
+                              fill="white",outline="")
+        canvas.create_polygon(21,13,29,21,21,29,13,21,
+                              fill=color,outline="")
+    elif title.casefold() == "supabase":
+        canvas.create_polygon(25,7,14,23,22,23,18,36,
+                              32,17,23,17,fill="white",outline="")
     else:
         glyph = symbol or "".join(w[0] for w in title.split()[:2]).upper()[:2]
         canvas.create_text(21,21,text=glyph,fill="white",
@@ -161,7 +172,7 @@ class AppHubMixin:
             )
             action.pack(side="left")
             self._app_buttons[service]=action
-            if service in ("github","notion"):
+            if service in ("github","notion","netlify","supabase"):
                 tk.Button(
                     controls,text=self._loc(7),bd=0,relief="flat",
                     bg=PAPER,fg=SUB,cursor="hand2",padx=9,pady=7,
@@ -190,7 +201,7 @@ class AppHubMixin:
         for entry in self._app_entries:
             # Telegram/WhatsApp/GitHub/Notion are represented as first-class
             # featured service cards above, not duplicated in the catalog.
-            if entry.id in ("github","notion","telegram","whatsapp"):
+            if entry.id in ("github","notion","netlify","supabase","telegram","whatsapp"):
                 continue
             card=tk.Frame(list_area,bg=PAPER,highlightbackground=LINE,
                           highlightthickness=1)
@@ -264,18 +275,21 @@ class AppHubMixin:
             messagebox.showinfo(name+" | Integration",detail,parent=self)
 
     def _connect_app(self,service):
-        if service not in ("github","notion") or service in self._app_busy:
+        if service not in ("github","notion","netlify","supabase") or service in self._app_busy:
             return
         popup=tk.Toplevel(self)
         popup.title("VARYN | Connect "+service.title())
-        popup.geometry("535x280")
+        popup.geometry("535x330")
         popup.transient(self)
         popup.configure(bg=BG)
         popup.grab_set()
         tk.Label(popup,text="Connect "+service.title(),bg=BG,fg=INK,
                  font=("Segoe UI",18,"bold")).pack(anchor="w",padx=24,pady=(22,8))
         tk.Label(popup,text="Paste a token issued by this service. "
-                 "VARYN will only verify the account (read-only GET). "
+                 "VARYN will only make a read-only account verification GET "
+                 "and resource-listing calls when you click Browse. "
+                 "The token itself may have broader permissions. "
+                 "Use the least-privileged scope available. "
                  "Token stays in RAM, never saved.",
                  bg=BG,fg=SUB,font=("Segoe UI",10),
                  wraplength=470,justify="left").pack(anchor="w",padx=24)

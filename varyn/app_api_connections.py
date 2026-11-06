@@ -1,4 +1,4 @@
-"""Small official read-only connection probes for GitHub and Notion.
+"""Small official read-only connection probes for GitHub, Notion, Netlify and Supabase.
 
 They establish a session-owned API credential ONLY after manual user action;
 they do not inherit ChatGPT plugins, scan browsers or run autonomous actions.
@@ -19,10 +19,19 @@ _PINNED = {
         "Accept": "application/json",
         "Notion-Version": "2025-09-03",
     }),
+    "netlify": ("https://api.netlify.com/api/v1/sites?per_page=20", {
+        "Accept": "application/json",
+        "User-Agent": "VARYN (local owner-approved read-only client)",
+    }),
+    "supabase": ("https://api.supabase.com/v1/projects", {
+        "Accept": "application/json",
+    }),
 }
 CREDENTIAL_PAGES = {
     "github": "https://github.com/settings/personal-access-tokens",
     "notion": "https://www.notion.so/profile/integrations",
+    "netlify": "https://app.netlify.com/user/applications#personal-access-tokens",
+    "supabase": "https://supabase.com/dashboard/account/tokens",
 }
 _GUIDES = {
     "gmail": "https://developers.google.com/workspace/gmail/api/auth/about-auth",
@@ -31,7 +40,8 @@ _GUIDES = {
     "slack": "https://api.slack.com/apps",
     "discord": "https://discord.com/developers/applications",
     "whatsapp": "https://developers.facebook.com/docs/whatsapp/cloud-api/",
-    "supabase": "https://supabase.com/docs/guides/api",
+    "supabase": CREDENTIAL_PAGES["supabase"],
+    "netlify": CREDENTIAL_PAGES["netlify"],
     "telegram": "https://core.telegram.org/bots/tutorial",
     "linear": "https://developers.linear.app/docs/graphql/working-with-the-graphql-api",
     "hubspot": "https://developers.hubspot.com/docs/api/private-apps",
@@ -39,6 +49,7 @@ _GUIDES = {
     "spotify": "https://developer.spotify.com/dashboard",
     "github": CREDENTIAL_PAGES["github"],
     "notion": CREDENTIAL_PAGES["notion"],
+    "netlify": CREDENTIAL_PAGES["netlify"],
 }
 
 
@@ -80,16 +91,24 @@ def probe_connection(app_id, token, *, transport=None):
         raise AppConnectionError("Provider returned invalid account information")
     try:
         account = json.loads(raw)
-        if type(account) is not dict:
-            raise ValueError()
-        if app_id == "github":
-            label = account.get("login")
-            if type(account.get("id")) is not int:
+        if app_id in ("netlify", "supabase"):
+            if type(account) is not list or len(account) > 10000:
                 raise ValueError()
+            if any(type(item) is not dict for item in account):
+                raise ValueError()
+            label = str(len(account)) + (" accessible sites" if app_id == "netlify"
+                                         else " accessible projects")
         else:
-            label = account.get("name") or account.get("id")
-            if account.get("object") != "user":
+            if type(account) is not dict:
                 raise ValueError()
+            if app_id == "github":
+                label = account.get("login")
+                if type(account.get("id")) is not int:
+                    raise ValueError()
+            else:
+                label = account.get("name") or account.get("id")
+                if account.get("object") != "user":
+                    raise ValueError()
         if type(label) is not str or not re.fullmatch(r"[\w .@-]{1,80}", label):
             raise ValueError()
     except (ValueError, TypeError, UnicodeError):
@@ -107,9 +126,12 @@ def browse_resources(app_id, token, *, transport=None):
         if app_id == "github":
             url = "https://api.github.com/user/repos?per_page=20&sort=updated"
             payload = None
-        else:
+        elif app_id == "notion":
             url = "https://api.notion.com/v1/search"
             payload = b'{"page_size":20}'
+        else:
+            url = _PINNED[app_id][0]
+            payload = None
         headers = {**_PINNED[app_id][1], "Authorization":"Bearer " + token}
         if payload is not None:
             headers["Content-Type"] = "application/json"
@@ -132,29 +154,38 @@ def browse_resources(app_id, token, *, transport=None):
         raise AppConnectionError("Invalid resource listing")
     try:
         data = json.loads(raw)
-        if app_id == "github":
-            if type(data) is not list:
-                raise ValueError()
-            entries = data
-        else:
+        if app_id == "notion":
             if type(data) is not dict or type(data.get("results")) is not list:
                 raise ValueError()
             entries = data["results"]
+        else:
+            if type(data) is not list:
+                raise ValueError()
+            entries = data
         rows = []
         for item in entries[:20]:
             if type(item) is not dict:
                 continue
             if app_id == "github":
-                name = item.get("full_name")
-                url = item.get("html_url")
+                name, url = item.get("full_name"), item.get("html_url")
+                allowed = ("https://github.com/",)
+            elif app_id == "notion":
+                name, url = item.get("id"), item.get("url")
+                allowed = ("https://www.notion.so/", "https://notion.so/")
+            elif app_id == "netlify":
+                name, url = item.get("name"), item.get("admin_url")
+                allowed = ("https://app.netlify.com/",)
             else:
-                name = item.get("id")
-                url = item.get("url")
-            if type(name) is not str or len(name) > 150:
+                # Never build a URL from unvalidated source content.
+                ref = item.get("ref")
+                name = item.get("name")
+                if type(ref) is not str or not re.fullmatch(r"[a-z0-9]{10,32}", ref):
+                    continue
+                url = "https://supabase.com/dashboard/project/" + ref
+                allowed = ("https://supabase.com/dashboard/project/",)
+            if type(name) is not str or not 1 <= len(name) <= 150:
                 continue
-            if type(url) is not str or not url.startswith(
-                ("https://github.com/", "https://www.notion.so/", "https://notion.so/")
-            ):
+            if type(url) is not str or not url.startswith(allowed):
                 continue
             rows.append((name, url))
         return tuple(rows)

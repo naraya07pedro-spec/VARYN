@@ -109,17 +109,21 @@ def parse_list(provider, raw):
 def fetch_models(provider, credential, *, timeout=12, transport=None):
     if provider not in ("openrouter", "deepseek"):
         raise ModelListError("Unsupported AI provider")
-    if type(credential) is not str or not 8 <= len(credential) <= 1000:
+    if type(credential) is not str or (
+        provider == "deepseek" and not 8 <= len(credential) <= 1000
+    ) or (provider == "openrouter" and credential and
+          not 8 <= len(credential) <= 1000):
         raise ModelListError("API key is missing or invalid")
     if transport is not None:
         return parse_list(provider, transport(provider, credential))
     endpoint = PINNED_MODEL_URLS[provider]
-    request = urllib.request.Request(
-        endpoint, headers={
-            "Authorization": "Bearer " + credential,
-            "Accept": "application/json",
-        }, method="GET",
-    )
+    headers = {"Accept": "application/json"}
+    # OpenRouter's global catalog currently responds without auth. This is
+    # best-effort public browsing, not proof a model/account is eligible.
+    # DeepSeek documents bearer auth, so it always requires the owner key.
+    if credential:
+        headers["Authorization"] = "Bearer " + credential
+    request = urllib.request.Request(endpoint, headers=headers, method="GET")
     class DenyRedirect(urllib.request.HTTPRedirectHandler):
         def redirect_request(self, req, fp, code, msg, headers, newurl):
             return None

@@ -439,7 +439,7 @@ jobs:
       - name: Package the verified unsigned folder and generate SHA256
         shell: pwsh
         run: |
-          $tag = 'v0.1.0-alpha.8'
+          $tag = 'v0.1.0-alpha.9'
           $zip = "VARYN-Windows-x64-$tag-unsigned.zip"
           Compress-Archive -LiteralPath 'dist/VARYN-Portable' -DestinationPath $zip -CompressionLevel Optimal
           if (-not (Test-Path -LiteralPath $zip -PathType Leaf)) { throw 'Release ZIP not created' }
@@ -452,7 +452,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = 'v0.1.0-alpha.8'
+          $tag = 'v0.1.0-alpha.9'
           $sha = $env:GITHUB_SHA
           $note = @"
           Experimental unsigned Windows x64 VARYN Portable build from source commit $sha.
@@ -471,8 +471,15 @@ jobs:
           pricing, and explicit price/route review. No silent paid requests.
           New actionable Apps hub: Telegram plus read-only official GitHub
           and Notion credential probes and owner-triggered resource lists.
-          Other apps show setup guidance only. The legacy internal Tk root
-          is hidden: one visible owner workspace. No WhatsApp connection.
+          Alpha 9 adds official read-only token checks and resource browsing
+          for Netlify sites and Supabase projects as well as GitHub/Notion.
+          OpenRouter can browse its currently public model catalog without
+          an API key; using the selected model ALWAYS requires the owner's
+          key and fresh request approval. DeepSeek catalog still needs key.
+          Telegram now receives the AI key already pasted into the model
+          picker via RAM-only handoff (never saved). Other app entries show
+          setup guidance only. Legacy Tk root hidden, one visible window.
+          WhatsApp remains not connected.
           Also includes owner-reviewed model API requests and offline fake model.
           Not production-safe, not a signed binary, not a hard billing cap, and NOT
           native two-way consumer ChatGPT/Claude/Gemini history sync.
@@ -483,5 +490,5 @@ jobs:
           https://github.com/naraya07pedro-spec/VARYN/tree/$sha
           "@
           $note | Set-Content -LiteralPath 'release-notes-alpha.txt' -Encoding UTF8
-          gh release create $tag $env:RELEASE_ZIP --target $sha --prerelease --title 'VARYN v0.1.0-alpha.8 | connected apps and simple model picker' --notes-file 'release-notes-alpha.txt'
+          gh release create $tag $env:RELEASE_ZIP --target $sha --prerelease --title 'VARYN v0.1.0-alpha.9 | read-only service connections and model browser' --notes-file 'release-notes-alpha.txt'
           if ($LASTEXITCODE -ne 0) { throw 'GitHub prerelease publish failed' }

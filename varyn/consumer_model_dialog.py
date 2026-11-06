@@ -49,8 +49,9 @@ class ModelSelectionDialog(tk.Toplevel):
         )
         self.api_key = tk.StringVar(master=self, value="")
         self.query = tk.StringVar(master=self, value="")
-        self.status = tk.StringVar(master=self, value="Select a provider and load its live model catalog.")
+        self.status = tk.StringVar(master=self, value="Browse models. OpenRouter catalog browsing can work without a key; sending always requires one.")
         self.reviewed = tk.BooleanVar(master=self, value=False)
+        self.free_only = tk.BooleanVar(master=self, value=False)
         self._build()
         self.protocol("WM_DELETE_WINDOW", self._close)
         self.grab_set()
@@ -77,7 +78,7 @@ class ModelSelectionDialog(tk.Toplevel):
         p.pack(fill="both", expand=True, padx=26, pady=(21, 17))
         self._txt(p, "Choose your AI", size=21, bold=True).pack(anchor="w")
         self._txt(
-            p, "Use your own API key. Model names and available prices come from the provider.",
+            p, "Browse live models first. Paste your own API key before using a model.",
             muted=True,
         ).pack(anchor="w", pady=(5, 19))
 
@@ -105,7 +106,7 @@ class ModelSelectionDialog(tk.Toplevel):
         right.pack(side="left", padx=(14, 0))
         self._txt(right, " ", bold=True).pack(anchor="w")
         self.load_button = self._btn(
-            right, "Load models", self._load_models, primary=True,
+            right, "Browse models", self._load_models, primary=True,
         )
         self.load_button.pack(pady=(3, 0))
         links = tk.Frame(p, bg=BASE)
@@ -114,6 +115,13 @@ class ModelSelectionDialog(tk.Toplevel):
         self._btn(links, "View provider prices", self._open_price_page).pack(
             side="left", padx=(9, 0),
         )
+        self.free_toggle = tk.Checkbutton(
+            links, text="Show $0 input/output models only",
+            variable=self.free_only, command=self._filter_models,
+            bg=BASE, fg=INK, selectcolor=BASE,
+            activebackground=BASE, font=("Segoe UI", 9),
+        )
+        self.free_toggle.pack(side="right")
         self._txt(
             p, "Model list (search by name, company or model ID)", bold=True,
         ).pack(anchor="w")
@@ -181,23 +189,27 @@ class ModelSelectionDialog(tk.Toplevel):
         self.api_key.set("")
         self.query.set("")
         self.reviewed.set(False)
+        self.free_only.set(False)
         self._filter_models()
-        self.status.set("Enter your key, then click Load models.")
+        self.status.set("Browse models. DeepSeek requires a key; OpenRouter public listing may work without one.")
 
     def _load_models(self):
         if self._closed or self._request_running:
             return
         provider = self.provider.get().lower()
         credential = self.api_key.get().strip()
-        if not 8 <= len(credential) <= 1000:
-            self.status.set("Paste your own provider API key first.")
+        if provider == "deepseek" and not 8 <= len(credential) <= 1000:
+            self.status.set("DeepSeek requires your API key to list models.")
+            return
+        if credential and not 8 <= len(credential) <= 1000:
+            self.status.set("Enter a valid API key or clear it to browse OpenRouter.")
             return
         self._request_running = True
         self.load_button.configure(state="disabled")
         self.provider_box.configure(state="disabled")
         self._models = ()
         self._filter_models()
-        self.status.set("Loading the current model list from " + self.provider.get() + "...")
+        self.status.set("Requesting the current model list from " + self.provider.get() + "...")
         def work():
             try:
                 models = fetch_models(provider, credential)
@@ -222,7 +234,7 @@ class ModelSelectionDialog(tk.Toplevel):
         self.load_button.configure(state="normal")
         self.provider_box.configure(state="readonly")
         if state != "ok":
-            self.status.set("Could not load models. Check key, credits and network. No chat sent.")
+            self.status.set("Model catalog unavailable. For OpenRouter, paste a key and retry. No chat was sent.")
             return
         self._models = result
         self._filter_models()
@@ -233,7 +245,10 @@ class ModelSelectionDialog(tk.Toplevel):
             return
         q = self.query.get().casefold().strip()
         matches = tuple(m for m in self._models if (
-            not q or q in m.label.casefold() or q in m.id.casefold()
+            (not q or q in m.label.casefold() or q in m.id.casefold()) and
+            (not self.free_only.get() or
+             (m.input_usd_m is not None and m.output_usd_m is not None and
+              float(m.input_usd_m) == 0 and float(m.output_usd_m) == 0))
         ))
         self._visible = matches[:180]
         for existing in self.tree.get_children():
@@ -270,7 +285,7 @@ class ModelSelectionDialog(tk.Toplevel):
             return
         key = self.api_key.get().strip()
         if not 8 <= len(key) <= 1000:
-            self.status.set("Missing API key.")
+            self.status.set("Paste your provider API key to use the selected model.")
             return
         try:
             offer = create_reviewed_offer(
