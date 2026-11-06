@@ -23,10 +23,9 @@ class PortableEntryContractTests(unittest.TestCase):
         self.assertIs(result, mocked_window)
         controller.assert_called_once_with(allow_live_providers=False)
         mocked_window.after_idle.assert_called_once()
-        self.assertEqual(
-            mocked_window.after_idle.call_args.args,
-            (mocked_window._open_relay_workbench,),
-        )
+        # The normal portable entry now schedules the owner home, not the
+        # older manual relay window. No external request is made on startup.
+        self.assertTrue(callable(mocked_window.after_idle.call_args.args[0]))
         mocked_window.mainloop.assert_not_called()
         mocked_window._open_selected_official_app.assert_not_called()
         mocked_window._copy_official_app_relay.assert_not_called()

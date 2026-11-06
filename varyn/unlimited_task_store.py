@@ -135,7 +135,7 @@ class TaskStore:
             raise TaskRejected("Invalid task state transition")
         allowed = {
             "paused": ("pending","due"),
-            "completed": ("due",),
+            "completed": ("pending","due","paused"),
             "cancelled": ("pending","due","paused"),
         }[status]
         placeholders = ",".join("?" for _ in allowed)

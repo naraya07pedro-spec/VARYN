@@ -22,8 +22,8 @@ Owner-approved model API requests, manual multi-AI handoffs, and prototype local
 
 ## Quick start: Windows Portable (experimental)
 
-1. Download the **[public v0.1.0-alpha.1 experimental Windows ZIP](https://github.com/naraya07pedro-spec/VARYN/releases/download/v0.1.0-alpha.1/VARYN-Windows-x64-v0.1.0-alpha.1-unsigned.zip)**. This is an UNSIGNED pre-release built from commit `ac547f15c6db10fd25754cb4e0e2bbdce8d12906`, not a stable software release.
-2. Confirm the **downloaded release ZIP SHA-256** equals `dbd81452b9af7322da201979bcc2a92112b8bd8c67994ad76938c0498bc3b162`. This is the ZIP archive's checksum, not the contained executable's hash.
+1. Visit **[GitHub Releases](https://github.com/naraya07pedro-spec/VARYN/releases)** and download the latest **successfully published** experimental Windows ZIP. Alpha.2 introduces the integrated home; alpha.1 is the preceding model-center pilot.
+2. Verify that **exact ZIP's SHA256** against the digest listed on its GitHub Release page. Do not reuse checksums from an earlier version.
 3. Extract the **entire folder**, keeping `VARYN-Portable.exe`, `_internal/`, `BUNDLE-SHA256.json`, and `Start-VARYN-OwnerPilot.ps1` together. Run as a **normal, non-administrator** Windows user.
 4. From the extracted folder in PowerShell, optionally verify the embedded file manifest, then launch the *offline* mode:
 
@@ -32,16 +32,16 @@ Owner-approved model API requests, manual multi-AI handoffs, and prototype local
    powershell.exe -NoProfile -File .\Start-VARYN-OwnerPilot.ps1 -Provider offline
    ```
 
-5. In the main app, open **17S-40 | Open Model Control Center (owner opt-in)**. The fake model works without a paid model account; its reply is explicitly synthetic.
+5. In alpha.2, **VARYN Home** opens with **Ask AI**, **My Tasks**, and **Connectors / Skills** tabs. In Ask AI, click **Open Model Control Center**. The fake model works without a paid account, and its reply is explicitly synthetic.
 6. For an actual external AI reply, **separately** obtain your own API key, verify the provider's current model ID/prices and account eligibility, start the launcher with `-Provider openrouter` or `-Provider deepseek`, add the reviewed model quote, type your question, check the **real-task** and **one-request network** permissions, review the exact outgoing request, and approve once.
 
 **Do not put API keys, private conversations, or customer data in issues, screenshots, or the app.** No default confidential-data protection is claimed. Do not disable Defender or SmartScreen to run an unsigned binary.
 
 **Public GitHub pre-release is available**, but there is no stable release or production support. [Release and provenance notes](docs/RELEASE.md).
 
-## Task and integration foundations (development branch only)
+## Task and integration features (alpha.2; development branch)
 
-VARYN includes a **local task ledger with no hardcoded total-item cap**, indexed due-state tracking and bounded pagination, and a **read-only integration directory** for connectors, plugins and skills observed in the current ChatGPT workspace. This is **not** a promise of unlimited CPU/disk, autonomous scheduling, or inherited ChatGPT app login.
+VARYN's **My Tasks** interface can add, list, complete, pause and cancel local tasks with no hardcoded total-item cap. It checks due-state while open every 30 seconds; it does **not** execute tasks or start background cloud jobs. Task titles/dates live in **unencrypted** `%LOCALAPPDATA%\\VARYN\\tasks.sqlite3`. The **Connectors / Skills** tab shows the read-only directory of candidates, all **NOT CONNECTED**. The separate CLI remains available. This is not a promise of unlimited physical resources, autonomous scheduling or inherited ChatGPT account login. This is **not** a promise of unlimited CPU/disk, autonomous scheduling, or inherited ChatGPT app login.
 
 ```bash
 python -m varyn.integration_catalog

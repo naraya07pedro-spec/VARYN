@@ -339,7 +339,7 @@ jobs:
       - name: Verify pinned Windows packaging tool version
         run: python -c "import PyInstaller; assert PyInstaller.__version__ == '6.22.3', PyInstaller.__version__"
       - name: Build optional unsigned one-folder GUI executable
-        run: python -m PyInstaller --noconfirm --clean --onedir --windowed --name VARYN-Portable --paths . varyn/portable_entry.py
+        run: python -m PyInstaller --noconfirm --clean --onedir --windowed --name VARYN-Portable --paths . --add-data "integrations/catalog.json;integrations" varyn/portable_entry.py
       - name: Include explicit unsigned safety and no-sync owner instructions
         shell: pwsh
         run: |
@@ -439,7 +439,7 @@ jobs:
       - name: Package the verified unsigned folder and generate SHA256
         shell: pwsh
         run: |
-          $tag = 'v0.1.0-alpha.1'
+          $tag = 'v0.1.0-alpha.2'
           $zip = "VARYN-Windows-x64-$tag-unsigned.zip"
           Compress-Archive -LiteralPath 'dist/VARYN-Portable' -DestinationPath $zip -CompressionLevel Optimal
           if (-not (Test-Path -LiteralPath $zip -PathType Leaf)) { throw 'Release ZIP not created' }
@@ -452,7 +452,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = 'v0.1.0-alpha.1'
+          $tag = 'v0.1.0-alpha.2'
           $sha = $env:GITHUB_SHA
           $note = @"
           Experimental unsigned Windows x64 VARYN Portable build from source commit $sha.

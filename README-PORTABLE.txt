@@ -5,12 +5,17 @@ This is an unsigned, non-production, single-folder Windows desktop build.
 It includes the Python runtime. Python does NOT need to be installed on the PC.
 
 WHAT TO OPEN
-1. Download the artifact named varyn-windows-portable (NOT the source ZIP).
-2. Extract the entire archive into a normal-user folder you control.
-3. Keep VARYN-Portable.exe and the _internal directory together.
-4. Run VARYN-Portable.exe as a NORMAL Windows user, NOT Administrator.
-5. The manual official-app relay workbench opens automatically.
-   Use harmless SYNTHETIC: data only.
+1. Open https://github.com/naraya07pedro-spec/VARYN/releases
+2. Download the latest successfully published unsigned Windows x64 ZIP.
+3. Verify the ZIP SHA256 against that exact release's digest.
+4. Extract the whole archive into a normal-user folder. Keep the EXE,
+   _internal runtime, manifest and owner PowerShell launcher together.
+5. Run the launcher as a NORMAL Windows user, NOT Administrator.
+6. VARYN Home opens with Ask AI, My Tasks, and Connectors / Skills.
+   Real AI requests need YOUR provider API key and on-screen approval.
+   Tasks save in unencrypted user-local SQLite and update DUE status while
+   the app is running, but DO NOT automatically execute.
+   Connector, plugin and skill entries are NOT authenticated connections.
 
 IMPORTANT SECURITY AND PRIVACY BOUNDARIES
 - The code is unsigned. This is NOT a Microsoft-certified release.

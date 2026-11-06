@@ -16,6 +16,7 @@ import tkinter as tk
 from tkinter import messagebox
 
 from varyn.desktop import VarynDesktop
+from varyn.owner_home import OwnerHome
 from varyn.desktop_controller import DesktopController
 from varyn.frozen_draft_probe import run_probe_phase, FrozenProbeRejected
 from varyn.dpapi_vault import SealedDataError, UnsupportedPlatformError
@@ -43,7 +44,7 @@ def create_portable_desktop(*, smoke_only=False):
         # The pre-existing portable provider controller REMAINS offline.
         allow_universal_model_network=not smoke_only,
     )
-    window.title("VARYN | Portable manual official-app workbench (EXPERIMENTAL)")
+    window.title("VARYN | Local AI, Tasks & Integrations (EXPERIMENTAL)")
     if smoke_only:
         # CI uses actual Tk creation, a workbench widget, and close on
         # Windows hosted runner; never calls browser, clipboard or AI APIs.
@@ -68,9 +69,16 @@ def create_portable_desktop(*, smoke_only=False):
         finally:
             window._close()
         return None
-    # Real user sees the focused workbench without needing to discover the
-    # long legacy desktop control list. The main UI remains available.
-    window.after_idle(window._open_relay_workbench)
+    # Launch a real owner home, with existing model & relay tools one click away.
+    # The local task database is never created in smoke-only mode.
+    def open_home():
+        try:
+            window._owner_home = OwnerHome(window)
+        except (OSError, ValueError):
+            # A corrupt or inaccessible task DB must not prevent the owner from
+            # using the existing, separately approved model controls.
+            window._open_model_control_center()
+    window.after_idle(open_home)
     return window
 
 

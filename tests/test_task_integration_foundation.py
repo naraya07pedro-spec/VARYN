@@ -39,9 +39,12 @@ class CatalogAndTaskTests(unittest.TestCase):
                 with self.assertRaises(TaskRejected):
                     store.create("a",due_utc="2026-11-06T08:00:00")
                 key=store.create("No network job")
+                store.transition(key,"completed")
+                self.assertEqual(store.count(status="completed"),1)
                 with self.assertRaises(TaskRejected):
-                    store.transition(key,"completed")
-                store.transition(key,"cancelled")
+                    store.transition(key,"cancelled")
+                other=store.create("Cancel me")
+                store.transition(other,"cancelled")
                 self.assertEqual(store.count(status="cancelled"),1)
                 self.assertEqual(store.mark_due(now="2030-01-01T00:00:00+00:00"),[])
 
