@@ -40,9 +40,9 @@ def render(source: Path, dest: Path):
         # Curated SVG files are immutable inputs from the verified source
         # commits. Do not permit fetching external assets or injecting code.
         if re.search(r"(?i)<script|<!DOCTYPE|<!ENTITY|<foreignObject|<image|"
-                     r"\bhref\s*=|\burl\s*\(\s*['\"]?https?\s*:",
+                     r"\bhref\s*=\s*['\"](?!#)|\burl\s*\(\s*['\"]?https?\s*:",
                      data):
-            raise RuntimeError("Unsafe external SVG features refused")
+            raise RuntimeError("Unsafe external SVG features refused: " + path.name)
         fill = BRAND_COLORS.get(path.stem)
         if fill is not None:
             # CC0 single-color Simple Icons assets inherit root fill. MIT
