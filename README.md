@@ -39,6 +39,18 @@ Owner-approved model API requests, manual multi-AI handoffs, and prototype local
 
 **Public GitHub pre-release is available**, but there is no stable release or production support. [Release and provenance notes](docs/RELEASE.md).
 
+## Task and integration foundations (development branch only)
+
+VARYN includes a **local task ledger with no hardcoded total-item cap**, indexed due-state tracking and bounded pagination, and a **read-only integration directory** for connectors, plugins and skills observed in the current ChatGPT workspace. This is **not** a promise of unlimited CPU/disk, autonomous scheduling, or inherited ChatGPT app login.
+
+```bash
+python -m varyn.integration_catalog
+python -m varyn.unlimited_task_store --db ./varyn-tasks.sqlite3 add --title "Synthetic owner task"
+python -m varyn.unlimited_task_store --db ./varyn-tasks.sqlite3 list
+```
+
+**Critical:** All third-party app entries are `catalog_only`, **not connected or callable**. No credentials are copied. The task ledger marks due items but never silently executes them. See [Task and integration boundaries](docs/TASKS-CONNECTORS-SKILLS.md).
+
 ## Architecture
 
 ```mermaid

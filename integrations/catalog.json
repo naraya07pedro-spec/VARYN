@@ -1,0 +1,344 @@
+{
+  "schema": "varyn.integration_catalog.v1",
+  "note": "Discovery only. These labels describe integrations seen in the ChatGPT environment on 2026-11-06. VARYN cannot inherit ChatGPT credentials, accounts, scopes or plugin sessions. Every external action needs a separately implemented official adapter and owner authorization.",
+  "connectors": [
+    {
+      "id": "github",
+      "name": "GitHub",
+      "kind": "connector",
+      "status": "catalog_only",
+      "credential_inherited": false,
+      "execution_enabled": false,
+      "implementation": "not_implemented",
+      "auth": "separate_official_oauth_or_provider_credential_required"
+    },
+    {
+      "id": "gmail",
+      "name": "Gmail",
+      "kind": "connector",
+      "status": "catalog_only",
+      "credential_inherited": false,
+      "execution_enabled": false,
+      "implementation": "not_implemented",
+      "auth": "separate_official_oauth_or_provider_credential_required"
+    },
+    {
+      "id": "google_calendar",
+      "name": "Google Calendar",
+      "kind": "connector",
+      "status": "catalog_only",
+      "credential_inherited": false,
+      "execution_enabled": false,
+      "implementation": "not_implemented",
+      "auth": "separate_official_oauth_or_provider_credential_required"
+    },
+    {
+      "id": "google_drive",
+      "name": "Google Drive / Docs / Sheets / Slides",
+      "kind": "connector",
+      "status": "catalog_only",
+      "credential_inherited": false,
+      "execution_enabled": false,
+      "implementation": "not_implemented",
+      "auth": "separate_official_oauth_or_provider_credential_required"
+    },
+    {
+      "id": "notion",
+      "name": "Notion",
+      "kind": "connector",
+      "status": "catalog_only",
+      "credential_inherited": false,
+      "execution_enabled": false,
+      "implementation": "not_implemented",
+      "auth": "separate_official_oauth_or_provider_credential_required"
+    },
+    {
+      "id": "supabase",
+      "name": "Supabase",
+      "kind": "connector",
+      "status": "catalog_only",
+      "credential_inherited": false,
+      "execution_enabled": false,
+      "implementation": "not_implemented",
+      "auth": "separate_official_oauth_or_provider_credential_required"
+    },
+    {
+      "id": "netlify",
+      "name": "Netlify",
+      "kind": "connector",
+      "status": "catalog_only",
+      "credential_inherited": false,
+      "execution_enabled": false,
+      "implementation": "not_implemented",
+      "auth": "separate_official_oauth_or_provider_credential_required"
+    },
+    {
+      "id": "linkedin",
+      "name": "LinkedIn",
+      "kind": "connector",
+      "status": "catalog_only",
+      "credential_inherited": false,
+      "execution_enabled": false,
+      "implementation": "not_implemented",
+      "auth": "separate_official_oauth_or_provider_credential_required"
+    },
+    {
+      "id": "hostinger_mail",
+      "name": "Hostinger Mail",
+      "kind": "connector",
+      "status": "catalog_only",
+      "credential_inherited": false,
+      "execution_enabled": false,
+      "implementation": "not_implemented",
+      "auth": "separate_official_oauth_or_provider_credential_required"
+    },
+    {
+      "id": "canva",
+      "name": "Canva",
+      "kind": "connector",
+      "status": "catalog_only",
+      "credential_inherited": false,
+      "execution_enabled": false,
+      "implementation": "not_implemented",
+      "auth": "separate_official_oauth_or_provider_credential_required"
+    },
+    {
+      "id": "descript",
+      "name": "Descript",
+      "kind": "connector",
+      "status": "catalog_only",
+      "credential_inherited": false,
+      "execution_enabled": false,
+      "implementation": "not_implemented",
+      "auth": "separate_official_oauth_or_provider_credential_required"
+    },
+    {
+      "id": "instavar_video_templates",
+      "name": "Instavar Video Templates",
+      "kind": "connector",
+      "status": "catalog_only",
+      "credential_inherited": false,
+      "execution_enabled": false,
+      "implementation": "not_implemented",
+      "auth": "separate_official_oauth_or_provider_credential_required"
+    },
+    {
+      "id": "automations",
+      "name": "ChatGPT Automations",
+      "kind": "connector",
+      "status": "catalog_only",
+      "credential_inherited": false,
+      "execution_enabled": false,
+      "implementation": "not_implemented",
+      "auth": "separate_official_oauth_or_provider_credential_required"
+    },
+    {
+      "id": "writing_style",
+      "name": "Writing Style",
+      "kind": "connector",
+      "status": "catalog_only",
+      "credential_inherited": false,
+      "execution_enabled": false,
+      "implementation": "not_implemented",
+      "auth": "separate_official_oauth_or_provider_credential_required"
+    },
+    {
+      "id": "plugin_management",
+      "name": "ChatGPT Plugin Management",
+      "kind": "connector",
+      "status": "catalog_only",
+      "credential_inherited": false,
+      "execution_enabled": false,
+      "implementation": "not_implemented",
+      "auth": "separate_official_oauth_or_provider_credential_required"
+    }
+  ],
+  "plugins": [
+    {
+      "id": "github",
+      "name": "GitHub",
+      "kind": "plugin_candidate",
+      "status": "catalog_only",
+      "execution_enabled": false,
+      "credential_inherited": false
+    },
+    {
+      "id": "google-drive",
+      "name": "Google Drive",
+      "kind": "plugin_candidate",
+      "status": "catalog_only",
+      "execution_enabled": false,
+      "credential_inherited": false
+    },
+    {
+      "id": "notion",
+      "name": "Notion",
+      "kind": "plugin_candidate",
+      "status": "catalog_only",
+      "execution_enabled": false,
+      "credential_inherited": false
+    },
+    {
+      "id": "supabase",
+      "name": "Supabase",
+      "kind": "plugin_candidate",
+      "status": "catalog_only",
+      "execution_enabled": false,
+      "credential_inherited": false
+    },
+    {
+      "id": "canva",
+      "name": "Canva",
+      "kind": "plugin_candidate",
+      "status": "catalog_only",
+      "execution_enabled": false,
+      "credential_inherited": false
+    },
+    {
+      "id": "descript",
+      "name": "Descript",
+      "kind": "plugin_candidate",
+      "status": "catalog_only",
+      "execution_enabled": false,
+      "credential_inherited": false
+    },
+    {
+      "id": "netlify",
+      "name": "Netlify",
+      "kind": "plugin_candidate",
+      "status": "catalog_only",
+      "execution_enabled": false,
+      "credential_inherited": false
+    }
+  ],
+  "skills": [
+    {
+      "id": "data-analysis",
+      "name": "Data analysis",
+      "kind": "skill_candidate",
+      "status": "catalog_only",
+      "executable": false,
+      "source": "ChatGPT environment category; separate import, licensing and trust review needed"
+    },
+    {
+      "id": "report-building",
+      "name": "Analytical reports",
+      "kind": "skill_candidate",
+      "status": "catalog_only",
+      "executable": false,
+      "source": "ChatGPT environment category; separate import, licensing and trust review needed"
+    },
+    {
+      "id": "google-sheets",
+      "name": "Google Sheets",
+      "kind": "skill_candidate",
+      "status": "catalog_only",
+      "executable": false,
+      "source": "ChatGPT environment category; separate import, licensing and trust review needed"
+    },
+    {
+      "id": "google-docs",
+      "name": "Google Docs",
+      "kind": "skill_candidate",
+      "status": "catalog_only",
+      "executable": false,
+      "source": "ChatGPT environment category; separate import, licensing and trust review needed"
+    },
+    {
+      "id": "google-slides",
+      "name": "Google Slides",
+      "kind": "skill_candidate",
+      "status": "catalog_only",
+      "executable": false,
+      "source": "ChatGPT environment category; separate import, licensing and trust review needed"
+    },
+    {
+      "id": "investment-banking",
+      "name": "Investment banking",
+      "kind": "skill_candidate",
+      "status": "catalog_only",
+      "executable": false,
+      "source": "ChatGPT environment category; separate import, licensing and trust review needed"
+    },
+    {
+      "id": "public-equity-investing",
+      "name": "Public equity research",
+      "kind": "skill_candidate",
+      "status": "catalog_only",
+      "executable": false,
+      "source": "ChatGPT environment category; separate import, licensing and trust review needed"
+    },
+    {
+      "id": "sales",
+      "name": "Sales workflows",
+      "kind": "skill_candidate",
+      "status": "catalog_only",
+      "executable": false,
+      "source": "ChatGPT environment category; separate import, licensing and trust review needed"
+    },
+    {
+      "id": "notion-knowledge",
+      "name": "Notion knowledge capture",
+      "kind": "skill_candidate",
+      "status": "catalog_only",
+      "executable": false,
+      "source": "ChatGPT environment category; separate import, licensing and trust review needed"
+    },
+    {
+      "id": "notion-research",
+      "name": "Notion research",
+      "kind": "skill_candidate",
+      "status": "catalog_only",
+      "executable": false,
+      "source": "ChatGPT environment category; separate import, licensing and trust review needed"
+    },
+    {
+      "id": "notion-implementation",
+      "name": "Notion implementation",
+      "kind": "skill_candidate",
+      "status": "catalog_only",
+      "executable": false,
+      "source": "ChatGPT environment category; separate import, licensing and trust review needed"
+    },
+    {
+      "id": "supabase",
+      "name": "Supabase operations",
+      "kind": "skill_candidate",
+      "status": "catalog_only",
+      "executable": false,
+      "source": "ChatGPT environment category; separate import, licensing and trust review needed"
+    },
+    {
+      "id": "pdf",
+      "name": "PDF creation",
+      "kind": "skill_candidate",
+      "status": "catalog_only",
+      "executable": false,
+      "source": "ChatGPT environment category; separate import, licensing and trust review needed"
+    },
+    {
+      "id": "documents",
+      "name": "Documents",
+      "kind": "skill_candidate",
+      "status": "catalog_only",
+      "executable": false,
+      "source": "ChatGPT environment category; separate import, licensing and trust review needed"
+    },
+    {
+      "id": "presentations",
+      "name": "Presentations",
+      "kind": "skill_candidate",
+      "status": "catalog_only",
+      "executable": false,
+      "source": "ChatGPT environment category; separate import, licensing and trust review needed"
+    },
+    {
+      "id": "spreadsheets",
+      "name": "Spreadsheets",
+      "kind": "skill_candidate",
+      "status": "catalog_only",
+      "executable": false,
+      "source": "ChatGPT environment category; separate import, licensing and trust review needed"
+    }
+  ]
+}
