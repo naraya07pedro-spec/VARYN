@@ -56,10 +56,10 @@ def _inventory(directory):
         with path.open("rb") as stream:
             digest = hashlib.file_digest(stream, "sha256").hexdigest()
         entries[name] = digest
-    if _EXECUTABLE not in entries or _README not in entries or
+    if (_EXECUTABLE not in entries or _README not in entries or
             _LAUNCHER not in entries or not any(
-        n.startswith("_internal/") for n in entries
-    ):
+                n.startswith("_internal/") for n in entries
+            )):
         raise PortableBundleRejected("Incomplete portable directory")
     with (root / _EXECUTABLE).open("rb") as stream:
         if stream.read(2) != b"MZ":
