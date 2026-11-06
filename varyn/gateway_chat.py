@@ -1,6 +1,7 @@
 """17S-39: fixed OpenAI-compatible Chat Completions endpoints. NO redirects."""
 import json
 import urllib.request
+import urllib.error
 import re
 
 from varyn.providers import ProviderError, ModelReply
@@ -16,6 +17,38 @@ KEY_ENVS = {
     "9router": "VARYN_9ROUTER_API_KEY",
 }
 MAX_BYTES = 131072
+
+
+# Categories are local constants, NEVER derived from a provider's error
+# body, headers, reason phrase, account name or untrusted response text.
+_HTTP_FAILURES = {
+    400: "bad_request",
+    401: "authentication",
+    402: "billing",
+    403: "access_denied",
+    404: "model_or_endpoint",
+    408: "timeout",
+    409: "conflict",
+    422: "invalid_parameters",
+    429: "rate_limited",
+}
+
+
+class SafeProviderHTTPError(ProviderError):
+    """Opaque HTTP diagnostic; may represent a provider OR an intermediary."""
+
+    def __init__(self, status):
+        if type(status) is not int:
+            category = "other_http"
+        elif status in _HTTP_FAILURES:
+            category = _HTTP_FAILURES[status]
+        elif 500 <= status <= 599:
+            category = "server_error"
+        else:
+            category = "other_http"
+        self.category = category
+        super().__init__("Provider HTTP failure category: " + category)
+
 _MODEL_LABEL = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._:/+-]{0,119}\Z")
 
 
@@ -59,10 +92,19 @@ def post(provider, payload, key, timeout):
     handlers = [NoRedirect]
     if provider == "9router":
         handlers.append(urllib.request.ProxyHandler({}))
-    with urllib.request.build_opener(*handlers).open(
-        request, timeout=timeout,
-    ) as response:
-        body = response.read(MAX_BYTES + 1)
+    try:
+        with urllib.request.build_opener(*handlers).open(
+            request, timeout=timeout,
+        ) as response:
+            body = response.read(MAX_BYTES + 1)
+    except urllib.error.HTTPError as exc:
+        # The exception can contain the provider's private response body,
+        # sensitive headers or request text. Never surface or chain it.
+        try:
+            exc.close()
+        except OSError:
+            pass
+        raise SafeProviderHTTPError(exc.code) from None
     if len(body) > MAX_BYTES:
         raise ProviderError("Oversized provider response")
     return body

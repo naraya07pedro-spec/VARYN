@@ -12,7 +12,7 @@ import threading
 import tkinter as tk
 from tkinter import ttk, filedialog
 
-from varyn.gateway_chat import KEY_ENVS
+from varyn.gateway_chat import KEY_ENVS, SafeProviderHTTPError
 from varyn.model_catalog_window import ModelCatalogWindow
 from varyn.provider_readiness import (
     readiness, local_observation, receipt_json, save_new, ReadinessRejected,
@@ -510,6 +510,8 @@ class ModelControlCenter(tk.Toplevel):
                 approve_request=True, authorized_upstream=upstream_approved,
             )
             output_queue.put(("ok", result))
+        except SafeProviderHTTPError as exc:
+            output_queue.put(("http_error", exc.category))
         except (ProviderError, RegistryRejected, BudgetExceeded,
                 PermissionError, ValueError, OSError):
             output_queue.put(("error", None))
@@ -555,6 +557,27 @@ class ModelControlCenter(tk.Toplevel):
                 data["reply"].model + ". " + claimed_text +
                 ". Untrusted answer RAM-only; model origin and actual billing "
                 "NOT independently verified."
+            )
+        elif kind == "http_error":
+            # Category comes only from SafeProviderHTTPError's static allowlist.
+            # Never display remote error body, headers, or untrusted reason.
+            hints = {
+                "bad_request": "HTTP 400: request or parameters refused",
+                "authentication": "HTTP 401: check API key locally",
+                "billing": "HTTP 402: check provider billing or credits",
+                "access_denied": "HTTP 403: check account/model permission",
+                "model_or_endpoint": "HTTP 404: check selected model ID",
+                "timeout": "HTTP 408: provider or intermediary timed out",
+                "conflict": "HTTP 409: provider reported a conflict",
+                "invalid_parameters": "HTTP 422: provider rejected parameters",
+                "rate_limited": "HTTP 429: rate limit or capacity restriction",
+                "server_error": "HTTP 5xx: provider/intermediary server failure",
+                "other_http": "Other provider/intermediary HTTP error",
+            }
+            self.status.set(
+                hints.get(data, hints["other_http"]) +
+                ". No response body exposed. Budget reservation retained; "
+                "actual billing unknown. No automatic retry."
             )
         else:
             self.status.set(
