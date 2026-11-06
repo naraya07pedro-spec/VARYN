@@ -45,6 +45,32 @@ WHAT TO OPEN
    Personal API tokens may grant more than read-only privileges at the
    provider itself: create limited-scope credentials whenever supported.
 
+REAL GOOGLE + HOSTINGER CONNECTIONS (ALPHA 11)
+- Apps > More services now has FUNCTIONAL Connect, Browse and Disconnect for
+  Gmail, Google Calendar, Google Drive and Hostinger Mail.
+- Google: one sign-in for all 3 apps, using the system browser and OAuth
+  authorization code + PKCE through a loopback-only callback. Google requires
+  you to create/select YOUR OWN OAuth Desktop client JSON from
+  https://console.cloud.google.com/apis/credentials because no approved
+  public VARYN Google OAuth application exists yet. Enable Gmail, Calendar
+  and Drive APIs, and add yourself as an OAuth test user if required.
+  In Apps click Connect > Choose JSON and sign in. Accept explicit read-only
+  scopes. Browse to list Inbox metadata, calendars or Drive file names.
+  Tokens exist ONLY in VARYN RAM until Disconnect/exit. No mail send,
+  file editing, or automatic transfer to any AI model.
+- Hostinger Mail: click Connect, enter mailbox email and password INSIDE
+  VARYN (not here in chat), then Connect mailbox. IMAP SSL to
+  imap.hostinger.com:993 verifies account and Browse lists only email
+  headers without marking them read. Password remains in RAM only.
+  Hostinger Email is supported, NOT Titan Email or Microsoft 365.
+- Existing GitHub/Notion/Netlify/Supabase and Telegram features are unchanged.
+- WhatsApp, LinkedIn, Canva and Descript still have no active adapter;
+  these require separate account/provider OAuth registration. A guide
+  is NOT the same thing as connected. NEVER share credentials in ChatGPT.
+- Google authorization depends on real provider consent and may require
+  Google app verification for restricted Gmail/Drive access. Actual owner
+  accounts are NOT tested by CI. Binary is UNSIGNED and experimental.
+
 REAL APP ICONS + SIMPLE, HONEST CONNECT FLOW (ALPHA 10)
 - Apps page displays original logos bundled as LOCAL PNG art from SuperTinyIcons,
   Simple Icons, Devicon, and Gilbarbara Logos. Logos do not mean VARYN is
@@ -57,7 +83,7 @@ REAL APP ICONS + SIMPLE, HONEST CONNECT FLOW (ALPHA 10)
   Use minimal permissions/scopes when issuing tokens.
 - Telegram uses an independently created @BotFather bot and your numeric
   Telegram user ID. It is a real owner-only channel, not a directory link.
-- Unsupported apps (Gmail, Calendar, Google Drive, WhatsApp, etc.) have
+- Unsupported apps (WhatsApp, LinkedIn, Canva, Descript, etc.) have
   an 'Official guide' action when a provider guide exists, or a link to
   request a connector. These actions DO NOT connect the account.
 - The app never reads or reuses existing ChatGPT connectors, cookies,

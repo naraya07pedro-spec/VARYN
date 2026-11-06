@@ -16,6 +16,7 @@ from tkinter import ttk, messagebox
 import webbrowser
 
 from varyn.integration_catalog import load_catalog, CatalogRejected
+from varyn.external_connect_ui import ExternalConnectMixin, EXTERNAL_APPS
 from varyn.app_api_connections import (
     AppConnectionError, CREDENTIAL_PAGES, guide_for,
     probe_connection, browse_resources,
@@ -110,7 +111,7 @@ def badge(parent, title, color, symbol=None):
     return canvas
 
 
-class AppHubMixin:
+class AppHubMixin(ExternalConnectMixin):
     def _loc(self, index):
         return LOC.get(self.language, LOC["en"])[index]
 
@@ -152,6 +153,7 @@ class AppHubMixin:
         self._app_queue = queue.Queue()
         self._app_poll = None
         self._app_busy = set()
+        self._init_external()
         self.app_search = tk.StringVar(master=self)
         canvas = tk.Canvas(frame, bg=BG, borderwidth=0, highlightthickness=0)
         bar = ttk.Scrollbar(frame, orient="vertical", command=canvas.yview)
@@ -253,15 +255,33 @@ class AppHubMixin:
             middle.pack(side="left",fill="x",expand=True,pady=8)
             tk.Label(middle,text=entry.name,bg=PAPER,fg=INK,
                      font=("Segoe UI",11,"bold")).pack(anchor="w")
-            tk.Label(middle,text=self._loc(5),bg=PAPER,fg=SUB,
-                     font=("Segoe UI",9)).pack(anchor="w",pady=(3,0))
+            if entry.id in EXTERNAL_APPS:
+                message=tk.StringVar(master=self,value="Not connected")
+                self._external_status[entry.id]=message
+                tk.Label(middle,textvariable=message,bg=PAPER,fg=SUB,
+                         font=("Segoe UI",9)).pack(anchor="w",pady=(3,0))
+                action=lambda k=entry.id:self._open_external(k)
+                caption=self._loc(0)
+            else:
+                tk.Label(middle,text=self._loc(5),bg=PAPER,fg=SUB,
+                         font=("Segoe UI",9)).pack(anchor="w",pady=(3,0))
+                action=lambda k=entry.id,n=entry.name:self._explain_app(k,n)
+                caption=self._loc(12) if guide_for(entry.id) else self._loc(13)
+            if entry.id in EXTERNAL_APPS:
+                tk.Button(
+                    card,text=self._loc(7),bg=PAPER,fg=SUB,bd=0,
+                    relief="flat",padx=9,pady=8,cursor="hand2",
+                    command=lambda k=entry.id:self._disconnect_external(k),
+                ).pack(side="right")
             button=tk.Button(
-                card,text=(self._loc(12) if guide_for(entry.id)
-                           else self._loc(13)),bg=BG,fg=BLUE,bd=0,
-                relief="flat",padx=14,pady=8,cursor="hand2",
-                command=lambda k=entry.id,n=entry.name:self._explain_app(k,n),
+                card,text=caption,bg=BLUE if entry.id in EXTERNAL_APPS else BG,
+                fg="white" if entry.id in EXTERNAL_APPS else BLUE,
+                bd=0,relief="flat",padx=14,pady=8,cursor="hand2",
+                command=action,
             )
             button.pack(side="right",padx=12)
+            if entry.id in EXTERNAL_APPS:
+                self._external_buttons[entry.id]=button
             self._app_rows.append((entry,card,button))
 
         # Legacy compatibility for previous hosted tests; this metadata
@@ -473,11 +493,18 @@ class AppHubMixin:
             elif service != "telegram":
                 var.set(self._loc(3))
         for entry,_,button in getattr(self,"_app_rows",[]):
-            button.configure(text=(
-                self._loc(12) if guide_for(entry.id) else self._loc(13)
-            ))
+            if entry.id in EXTERNAL_APPS:
+                active=("google" in self._external_sessions if
+                        entry.id in ("gmail","google_calendar","google_drive")
+                        else "hostinger_mail" in self._external_sessions)
+                button.configure(text=self._loc(6) if active else self._loc(0))
+            else:
+                button.configure(text=(
+                    self._loc(12) if guide_for(entry.id) else self._loc(13)
+                ))
 
     def close(self):
+        self._close_external()
         self._app_credentials.clear()
         self._app_labels.clear()
         super().close()

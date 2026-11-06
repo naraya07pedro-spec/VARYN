@@ -65,6 +65,17 @@ class ConsumerDesktopTests(unittest.TestCase):
                     self.assertIn("notion", window._app_buttons)
                     self.assertIn("telegram", window._app_buttons)
                     self.assertEqual(window._app_credentials, {})
+                    # Real More services connectors have actionable Tk controls.
+                    for service in ("gmail","google_calendar",
+                                    "google_drive","hostinger_mail"):
+                        self.assertIn(service,window._external_buttons)
+                        self.assertTrue(window._external_buttons[service].winfo_exists())
+                        self.assertEqual(
+                            window._external_buttons[service].cget("text"),
+                            "Connect",
+                        )
+                    self.assertFalse(window._external_sessions)
+
                     self.assertIsNone(window._telegram)
                     self.assertTrue(window.memory_preview.winfo_exists())
                     self.assertTrue(window.chat_surface.input.winfo_exists())
