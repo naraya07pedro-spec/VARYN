@@ -156,6 +156,11 @@ jobs:
       - name: 17S-42 hosted Windows actual Tk synthetic fake/declined approval/API denial
         if: runner.os == 'Windows'
         run: python -m unittest discover -s tests -p "test_frozen_model_center_smoke.py" -v
+      - name: 17S-43 pinned official GET model catalogue, owner consent and local real HTTP GET wire
+        run: python -m unittest discover -s tests -p "test_model_discovery.py" -v
+      - name: 17S-43 actual hosted Windows Tk read-only model listing and no automatic free quote
+        if: runner.os == 'Windows'
+        run: python -m unittest discover -s tests -p "test_model_catalog_tk.py" -v
       - name: Unit tests (including optional audited cryptography)
         run: python -m unittest discover -s tests -v
       - name: Synthetic-only desktop boundary and disposable sample cleanup
@@ -347,7 +352,7 @@ jobs:
         run: python -m varyn.portable_release --directory dist/VARYN-Portable --create
       - name: Verify complete portable executable and runtime inventory
         run: python -m varyn.portable_release --directory dist/VARYN-Portable --verify
-      - name: 17S-42 ACTUAL frozen Windows GUI complete synthetic model approval-denial and offline API refusal (no provider requests)
+      - name: 17S-43 actual frozen Windows GUI synthetic model workflow and default-off model catalog (no provider requests)
         shell: pwsh
         run: |
           $exe = (Resolve-Path -LiteralPath "dist/VARYN-Portable/VARYN-Portable.exe").Path
