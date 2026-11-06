@@ -126,6 +126,15 @@ def discover_once(provider, *, owner_approved=False,
         raise DiscoveryRejected("Model catalog request failed") from None
     if type(result) is not dict or result.get("native_consumer_history_synced") is not False:
         raise DiscoveryRejected("Unrecognized model list result")
+    ids = result.get("model_ids")
+    count = result.get("total_sanitized_model_ids")
+    truncated = result.get("list_truncated")
+    if (type(ids) is not tuple or len(ids) > MAX_LISTED_IDS or
+            any(not safe_model_id(x) for x in ids) or len(set(ids)) != len(ids) or
+            type(count) is not int or not len(ids) <= count <= MAX_ITEMS or
+            type(truncated) is not bool or
+            truncated != (count > MAX_LISTED_IDS)):
+        raise DiscoveryRejected("Invalid normalized model list result")
     return {
         "provider": provider,
         "ids": tuple(result["model_ids"]),
