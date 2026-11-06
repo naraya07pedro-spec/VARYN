@@ -75,6 +75,21 @@ class ConsumerDesktopTests(unittest.TestCase):
                             "Connect",
                         )
                     self.assertFalse(window._external_sessions)
+                    for service in ("slack", "linear", "hubspot",
+                                    "dropbox", "discord"):
+                        self.assertIn(service, window._app_buttons)
+                        self.assertTrue(
+                            window._app_buttons[service].winfo_exists()
+                        )
+                        self.assertEqual(
+                            window._app_buttons[service].cget("text"),
+                            "Connect",
+                        )
+                        self.assertIn(service,window._app_status)
+                        self.assertEqual(
+                            window._app_status[service].get(),
+                            "Not connected",
+                        )
 
                     self.assertIsNone(window._telegram)
                     self.assertTrue(window.memory_preview.winfo_exists())

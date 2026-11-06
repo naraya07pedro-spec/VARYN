@@ -1,6 +1,6 @@
 {
   "schema": "varyn.integration_catalog.v1",
-  "note": "Discovery only. These labels describe integrations seen in the ChatGPT environment on 2026-11-06. VARYN cannot inherit ChatGPT credentials, accounts, scopes or plugin sessions. Every external action needs a separately implemented official adapter and owner authorization.",
+  "note": "Discovery catalog and honest implementation metadata. Live sessions never inherited from ChatGPT. Provider-issued credentials are authorized by owner; supported UI adapters execute only explicit read-only API calls. Unimplemented items are setup-only.",
   "connectors": [
     {
       "id": "github",
@@ -151,6 +151,56 @@
       "execution_enabled": false,
       "implementation": "not_implemented",
       "auth": "separate_official_oauth_or_provider_credential_required"
+    },
+    {
+      "id": "slack",
+      "name": "Slack",
+      "kind": "connector",
+      "status": "catalog_only",
+      "credential_inherited": false,
+      "execution_enabled": false,
+      "implementation": "owner_initiated_readonly_api",
+      "auth": "separate_official_provider_token_required"
+    },
+    {
+      "id": "linear",
+      "name": "Linear",
+      "kind": "connector",
+      "status": "catalog_only",
+      "credential_inherited": false,
+      "execution_enabled": false,
+      "implementation": "owner_initiated_readonly_api",
+      "auth": "separate_official_provider_token_required"
+    },
+    {
+      "id": "hubspot",
+      "name": "HubSpot",
+      "kind": "connector",
+      "status": "catalog_only",
+      "credential_inherited": false,
+      "execution_enabled": false,
+      "implementation": "owner_initiated_readonly_api",
+      "auth": "separate_official_provider_token_required"
+    },
+    {
+      "id": "dropbox",
+      "name": "Dropbox",
+      "kind": "connector",
+      "status": "catalog_only",
+      "credential_inherited": false,
+      "execution_enabled": false,
+      "implementation": "owner_initiated_readonly_api",
+      "auth": "separate_official_provider_token_required"
+    },
+    {
+      "id": "discord",
+      "name": "Discord Bot",
+      "kind": "connector",
+      "status": "catalog_only",
+      "credential_inherited": false,
+      "execution_enabled": false,
+      "implementation": "owner_initiated_readonly_api",
+      "auth": "separate_official_provider_token_required"
     }
   ],
   "plugins": [

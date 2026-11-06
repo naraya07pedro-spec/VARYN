@@ -45,6 +45,27 @@ WHAT TO OPEN
    Personal API tokens may grant more than read-only privileges at the
    provider itself: create limited-scope credentials whenever supported.
 
+FIVE NEW READ-ONLY APP CONNECTIONS (ALPHA 12)
+- Apps > More services now includes Slack, Linear, HubSpot, Dropbox and
+  Discord BOT. Each has Connect, Browse and Disconnect, not "guide only".
+- Click Connect for a supported service, choose Create token (opens its
+  official developer/account page), create the needed read-only scopes,
+  then paste the issued token into the VARYN desktop only.
+- Slack: installed workspace app token with channels:read to browse public
+  channel names. Does not send or read chat message contents.
+- Linear: personal API key; reads viewer identity and up to 20 issue titles.
+- HubSpot: private-app token with crm.objects.contacts.read; reads up to 20
+  contact first/last names (may be private; do not share with agents).
+- Dropbox: app access token with account_info.read/files.metadata.read,
+  shows up to 20 file/folder names only; no download or modifications.
+- Discord BOT only: get official bot token from Discord Developer Portal;
+  reads bot identity and server list. NEVER use a Discord user account
+  token, cookie, or self-bot.
+- Tokens are RAM-only, not saved in the SQLite tasks DB or sent to AI.
+  Provider-issued privileges can exceed this app's use; scope carefully.
+- A successful synthetic CI test does NOT establish live authentication
+  for the user's accounts. No VPS requirement or background automation.
+
 REAL GOOGLE + HOSTINGER CONNECTIONS (ALPHA 11)
 - Apps > More services now has FUNCTIONAL Connect, Browse and Disconnect for
   Gmail, Google Calendar, Google Drive and Hostinger Mail.

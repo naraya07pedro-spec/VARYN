@@ -55,6 +55,7 @@ jobs:
       - name: No-network owner connector / model / privacy regression
         shell: bash
         run: |
+          python -m unittest discover -s tests -p 'test_more_api_alpha12.py' -v
           python -m unittest discover -s tests -p 'test_google_hostinger_alpha11.py' -v
           python -m unittest discover -s tests -p 'test_brand_icons_alpha10.py' -v
           python -m unittest discover -s tests -p 'test_app_connections_alpha9.py' -v
@@ -405,7 +406,8 @@ jobs:
         run: |
           foreach ($brand in @('github','notion','telegram','whatsapp',
                   'gmail','google_calendar','google_drive','supabase',
-                  'netlify','linkedin','hostinger_mail')) {
+                  'netlify','linkedin','hostinger_mail','linear','dropbox',
+                  'discord','slack','hubspot')) {
             $file = "assets/brand_png/$brand.png"
             if (-not (Test-Path -LiteralPath $file -PathType Leaf)) {
               throw "Missing genuine logo file: $brand"
@@ -514,7 +516,7 @@ jobs:
       - name: Package the verified unsigned folder and generate SHA256
         shell: pwsh
         run: |
-          $tag = 'v0.1.0-alpha.11'
+          $tag = 'v0.1.0-alpha.12'
           $zip = "VARYN-Windows-x64-$tag-unsigned.zip"
           Compress-Archive -LiteralPath 'dist/VARYN-Portable' -DestinationPath $zip -CompressionLevel Optimal
           if (-not (Test-Path -LiteralPath $zip -PathType Leaf)) { throw 'Release ZIP not created' }
@@ -527,7 +529,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = 'v0.1.0-alpha.11'
+          $tag = 'v0.1.0-alpha.12'
           $sha = $env:GITHUB_SHA
           $note = @"
           Experimental unsigned Windows x64 VARYN Portable build from source commit $sha.
@@ -555,6 +557,13 @@ jobs:
           picker via RAM-only handoff (never saved). Other app entries show
           setup guidance only. Legacy Tk root hidden, one visible window.
           WhatsApp remains not connected.
+          Alpha 12 adds owner-initiated, real read-only API authentication
+          and bounded resource browsing for Slack workspaces/channels,
+          Linear viewer/issues, HubSpot private-app contacts, Dropbox
+          account/folder metadata, and Discord BOT identity/guilds.
+          The owner must create each service's own properly scoped API
+          token; these are NOT inherited sessions or account OAuth apps.
+          Discord is BOT ONLY (never a user selfbot).
           Alpha 11 makes Gmail, Google Calendar and Google Drive actionable
           through a single owner-registered Desktop OAuth browser login
           (PKCE, localhost state check, read-only scopes, in-RAM tokens)
@@ -579,5 +588,5 @@ jobs:
           https://github.com/naraya07pedro-spec/VARYN/tree/$sha
           "@
           $note | Set-Content -LiteralPath 'release-notes-alpha.txt' -Encoding UTF8
-          gh release create $tag $env:RELEASE_ZIP --target $sha --prerelease --title 'VARYN v0.1.0-alpha.11 | real Google and Hostinger account connections' --notes-file 'release-notes-alpha.txt'
+          gh release create $tag $env:RELEASE_ZIP --target $sha --prerelease --title 'VARYN v0.1.0-alpha.12 | five more real read-only app connections' --notes-file 'release-notes-alpha.txt'
           if ($LASTEXITCODE -ne 0) { throw 'GitHub prerelease publish failed' }

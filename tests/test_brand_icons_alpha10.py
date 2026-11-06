@@ -15,7 +15,7 @@ ASSETS = (
     "google_calendar", "google_drive", "supabase", "linkedin",
     "netlify", "hostinger_mail", "google_docs", "google_sheets",
     "slack", "discord", "hubspot", "dropbox", "spotify",
-    "canva", "descript",
+    "canva", "descript", "linear",
 )
 
 

@@ -55,6 +55,7 @@ https://github.com/validator/validator
 Source: https://github.com/simple-icons/simple-icons/tree/develop/icons
 
 Used for:
+- linear.svg
 - netlify.svg
 - hostinger_mail.svg (original `hostinger.svg`)
 - google_docs.svg (original `googledocs.svg`)

@@ -53,7 +53,7 @@ def create_portable_desktop(*, smoke_only=False):
         # running source tree tests doesn't require generated build products.
         if getattr(sys, "frozen", False):
             icon_root = Path(getattr(sys, "_MEIPASS", "")) / "assets" / "brand_png"
-            for brand in ("github", "telegram", "gmail", "supabase", "netlify"):
+            for brand in ("github", "telegram", "gmail", "supabase", "netlify", "linear"):
                 image = tk.PhotoImage(
                     master=window, file=str(icon_root / (brand + ".png")),
                 )

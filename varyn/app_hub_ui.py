@@ -17,6 +17,10 @@ import webbrowser
 
 from varyn.integration_catalog import load_catalog, CatalogRejected
 from varyn.external_connect_ui import ExternalConnectMixin, EXTERNAL_APPS
+from varyn.more_api_connections import (
+    APPS as TOKEN_APPS, TOKEN_PAGES, HELP,
+    MoreAPIError, probe_more_api, browse_more_api,
+)
 from varyn.app_api_connections import (
     AppConnectionError, CREDENTIAL_PAGES, guide_for,
     probe_connection, browse_resources,
@@ -71,6 +75,7 @@ BRAND_COLORS = {
     "supabase":"#3ECF8E", "netlify":"#007F83", "google-sheets":"#34A853",
     "google-docs":"#4285F4", "hubspot":"#FF7A59",
     "canva":"#00C4CC", "linkedin":"#0A66C2",
+    "linear":"#5E6AD2", "dropbox":"#0061FF",
 }
 
 
@@ -235,7 +240,21 @@ class AppHubMixin(ExternalConnectMixin):
             self._app_entries = load_catalog()
         except (CatalogRejected,OSError):
             self._app_entries=()
-        for entry in self._app_entries:
+        # Real Connect/Browse controls are deliberately shown BEFORE the
+        # catalog-only entries, not buried below a wall of guide buttons.
+        connected_first = ("gmail","google_calendar","google_drive",
+                           "hostinger_mail","slack","linear","hubspot",
+                           "dropbox","discord")
+        ordered_apps = sorted(
+            self._app_entries,
+            key=lambda item: (
+                connected_first.index(item.id)
+                if item.id in connected_first and item.kind=="connector"
+                else 100,
+                item.name.casefold(),
+            ),
+        )
+        for entry in ordered_apps:
             # Only actual named app candidates belong in the Apps directory;
             # generic plugin/skill workflow labels do not imply an app login.
             if entry.kind != "connector":
@@ -255,33 +274,41 @@ class AppHubMixin(ExternalConnectMixin):
             middle.pack(side="left",fill="x",expand=True,pady=8)
             tk.Label(middle,text=entry.name,bg=PAPER,fg=INK,
                      font=("Segoe UI",11,"bold")).pack(anchor="w")
-            if entry.id in EXTERNAL_APPS:
+            if entry.id in EXTERNAL_APPS or entry.id in TOKEN_APPS:
                 message=tk.StringVar(master=self,value="Not connected")
-                self._external_status[entry.id]=message
+                (self._external_status if entry.id in EXTERNAL_APPS
+                 else self._app_status)[entry.id]=message
                 tk.Label(middle,textvariable=message,bg=PAPER,fg=SUB,
                          font=("Segoe UI",9)).pack(anchor="w",pady=(3,0))
-                action=lambda k=entry.id:self._open_external(k)
+                action=(lambda k=entry.id:self._open_external(k)) if (
+                    entry.id in EXTERNAL_APPS
+                ) else (lambda k=entry.id:self._open_app(k))
                 caption=self._loc(0)
             else:
                 tk.Label(middle,text=self._loc(5),bg=PAPER,fg=SUB,
                          font=("Segoe UI",9)).pack(anchor="w",pady=(3,0))
                 action=lambda k=entry.id,n=entry.name:self._explain_app(k,n)
                 caption=self._loc(12) if guide_for(entry.id) else self._loc(13)
-            if entry.id in EXTERNAL_APPS:
+            if entry.id in EXTERNAL_APPS or entry.id in TOKEN_APPS:
                 tk.Button(
                     card,text=self._loc(7),bg=PAPER,fg=SUB,bd=0,
                     relief="flat",padx=9,pady=8,cursor="hand2",
-                    command=lambda k=entry.id:self._disconnect_external(k),
+                    command=lambda k=entry.id:(
+                        self._disconnect_external(k) if k in EXTERNAL_APPS
+                        else self._disconnect_app(k)
+                    ),
                 ).pack(side="right")
             button=tk.Button(
-                card,text=caption,bg=BLUE if entry.id in EXTERNAL_APPS else BG,
-                fg="white" if entry.id in EXTERNAL_APPS else BLUE,
+                card,text=caption,bg=BLUE if entry.id in EXTERNAL_APPS or entry.id in TOKEN_APPS else BG,
+                fg="white" if entry.id in EXTERNAL_APPS or entry.id in TOKEN_APPS else BLUE,
                 bd=0,relief="flat",padx=14,pady=8,cursor="hand2",
                 command=action,
             )
             button.pack(side="right",padx=12)
             if entry.id in EXTERNAL_APPS:
                 self._external_buttons[entry.id]=button
+            elif entry.id in TOKEN_APPS:
+                self._app_buttons[entry.id]=button
             self._app_rows.append((entry,card,button))
 
         # Legacy compatibility for previous hosted tests; this metadata
@@ -339,22 +366,25 @@ class AppHubMixin(ExternalConnectMixin):
             )
 
     def _connect_app(self,service):
-        if service not in ("github","notion","netlify","supabase") or service in self._app_busy:
+        if service not in ("github","notion","netlify","supabase",*TOKEN_APPS) or service in self._app_busy:
             return
         popup=tk.Toplevel(self)
-        popup.title("VARYN | Connect "+service.title())
+        popup.title("VARYN | Connect "+(
+            "Discord Bot" if service=="discord" else service.title()
+        ))
         popup.geometry("535x330")
         popup.transient(self)
         popup.configure(bg=BG)
         popup.grab_set()
         tk.Label(popup,text="Connect "+service.title(),bg=BG,fg=INK,
                  font=("Segoe UI",18,"bold")).pack(anchor="w",padx=24,pady=(22,8))
-        tk.Label(popup,text="Paste a token issued by this service. "
-                 "VARYN will only make a read-only account verification GET "
-                 "and resource-listing calls when you click Browse. "
-                 "The token itself may have broader permissions. "
-                 "Use the least-privileged scope available. "
-                 "Token stays in RAM, never saved.",
+        tk.Label(popup,text=(
+                 HELP[service] if service in TOKEN_APPS
+                 else "Paste a token issued by this service. "
+                 "VARYN only makes read-only account and resource requests. "
+                 "Prefer narrowly scoped credentials."
+                 )+" Token stays in RAM, never saved. "
+                 "Never paste it into ChatGPT or GitHub.",
                  bg=BG,fg=SUB,font=("Segoe UI",10),
                  wraplength=470,justify="left").pack(anchor="w",padx=24)
         token=tk.StringVar(master=popup)
@@ -370,7 +400,10 @@ class AppHubMixin(ExternalConnectMixin):
         tk.Button(
             actions,text="Create token",bg=PAPER,fg=INK,bd=0,
             padx=13,pady=8,cursor="hand2",
-            command=lambda:webbrowser.open(CREDENTIAL_PAGES[service]),
+            command=lambda:webbrowser.open(
+                TOKEN_PAGES[service] if service in TOKEN_APPS
+                else CREDENTIAL_PAGES[service]
+            ),
         ).pack(side="left")
         def begin():
             key=token.get().strip()
@@ -383,7 +416,8 @@ class AppHubMixin(ExternalConnectMixin):
             self._app_busy.add(service)
             def work():
                 try:
-                    info=probe_connection(service,key)
+                    info=(probe_more_api(service,key) if service in TOKEN_APPS
+                          else probe_connection(service,key))
                     self._app_queue.put((service,"ok",key,info))
                 except AppConnectionError:
                     self._app_queue.put((service,"error",None,None))
@@ -452,8 +486,9 @@ class AppHubMixin(ExternalConnectMixin):
         result=queue.Queue()
         def work():
             try:
-                result.put(browse_resources(service,key))
-            except (AppConnectionError,OSError):
+                result.put(browse_more_api(service,key) if service in TOKEN_APPS
+                           else browse_resources(service,key))
+            except (AppConnectionError,MoreAPIError,OSError):
                 result.put(None)
             except Exception:
                 result.put(None)
@@ -493,7 +528,12 @@ class AppHubMixin(ExternalConnectMixin):
             elif service != "telegram":
                 var.set(self._loc(3))
         for entry,_,button in getattr(self,"_app_rows",[]):
-            if entry.id in EXTERNAL_APPS:
+            if entry.id in TOKEN_APPS:
+                button.configure(text=(
+                    self._loc(6) if entry.id in self._app_credentials
+                    else self._loc(0)
+                ))
+            elif entry.id in EXTERNAL_APPS:
                 active=("google" in self._external_sessions if
                         entry.id in ("gmail","google_calendar","google_drive")
                         else "hostinger_mail" in self._external_sessions)
