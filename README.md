@@ -2,14 +2,14 @@
 
 **A local-first AI workspace with human-approved model routing, persistent tasks, and experimental multi-model workflows.**
 
-[![Windows alpha](https://img.shields.io/badge/Windows-v0.1.0--alpha.11-2563eb?logo=windows)](https://github.com/naraya07pedro-spec/VARYN/releases/tag/v0.1.0-alpha.11)
-[![GitHub Actions](https://img.shields.io/badge/CI-Release%20passed-16a34a?logo=githubactions)](https://github.com/naraya07pedro-spec/VARYN/actions/runs/42243501365)
+[![Windows alpha](https://img.shields.io/badge/Windows-v0.1.0--alpha.12-2563eb?logo=windows)](https://github.com/naraya07pedro-spec/VARYN/releases/tag/v0.1.0-alpha.12)
+[![GitHub Actions](https://img.shields.io/badge/CI-Release%20passed-16a34a?logo=githubactions)](https://github.com/naraya07pedro-spec/VARYN/actions/runs/42248431919)
 [![License: MIT](https://img.shields.io/badge/License-MIT-111827.svg)](LICENSE)
 ![Status: Experimental](https://img.shields.io/badge/Status-Experimental-f59e0b)
 
 > **Public experimental alpha, not production software.** VARYN provides a local Windows chat workspace, owner-approved LLM calls, a local task tracker, **explicit ChatGPT-export memory import encrypted with Windows DPAPI**, and a manually configured **owner-only Telegram Bot API channel**. All third-party credentials must be configured independently. It does **not** offer autonomous tasks, inherited ChatGPT integrations, WhatsApp connectivity, or native two-way consumer-chat synchronization.
 
-### [Download Windows Alpha 11](https://github.com/naraya07pedro-spec/VARYN/releases/download/v0.1.0-alpha.11/VARYN-Windows-x64-v0.1.0-alpha.11-unsigned.zip) · [Release notes](https://github.com/naraya07pedro-spec/VARYN/releases/tag/v0.1.0-alpha.11) · [Browse full alpha source](https://github.com/naraya07pedro-spec/VARYN/tree/v0.1.0-alpha.11) · [Development PR](https://github.com/naraya07pedro-spec/VARYN/pull/1)
+### [Download Windows Alpha 12](https://github.com/naraya07pedro-spec/VARYN/releases/download/v0.1.0-alpha.12/VARYN-Windows-x64-v0.1.0-alpha.12-unsigned.zip) · [Release notes](https://github.com/naraya07pedro-spec/VARYN/releases/tag/v0.1.0-alpha.12) · [Browse full alpha source](https://github.com/naraya07pedro-spec/VARYN/tree/v0.1.0-alpha.12) · [Development PR](https://github.com/naraya07pedro-spec/VARYN/pull/1)
 
 ## Why VARYN?
 
@@ -27,7 +27,7 @@ The app remains an experimental API gateway with explicit per-request approvals;
 
 ## Apps that can actually connect
 
-Alpha 11 replaces faux letter badges with **20 offline brand-mark images** sourced from licensed icon collections, including GitHub, Telegram, WhatsApp, Gmail, Google, Netlify, Supabase, Canva, and Notion. Artwork is packaged inside the Windows EXE, not downloaded from icon servers; brand identification is **not endorsement or proof of connected accounts**. [Third-party artwork and licenses](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.11/assets/BRAND-LICENSES.md).
+Alpha 12 includes authentic packaged logos and replaces faux letter badges with **20 offline brand-mark images** sourced from licensed icon collections, including GitHub, Telegram, WhatsApp, Gmail, Google, Netlify, Supabase, Canva, and Notion. Artwork is packaged inside the Windows EXE, not downloaded from icon servers; brand identification is **not endorsement or proof of connected accounts**. [Third-party artwork and licenses](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.12/assets/BRAND-LICENSES.md).
 
 **Four token-based account-verified read-only adapters:** GitHub, Notion, Netlify and Supabase. From **Apps**, click **Connect → Create token → paste your own provider token → Connect**. VARYN validates it against the provider's official API and only then displays *Connected*. **Browse** lists accessible resources on deliberate request; **Disconnect** discards the credential from session RAM. Provider-issued tokens may grant broad permissions even though VARYN only uses read-only requests. Prefer limited scopes.
 
@@ -35,7 +35,7 @@ Alpha 11 replaces faux letter badges with **20 offline brand-mark images** sourc
 
 **Model selection:** Open **Browse AI models**. View the OpenRouter public catalog without a key when the provider permits, use the $0-reported-prices filter if desired, then paste your API key, select a model, check prices, and confirm the request. DeepSeek requires its own key for model listing. A catalog listing or zero-priced snapshot **never guarantees credits, free inference, eligibility or live access**. The old separate technical controller is hidden.
 
-[Complete Alpha 11 setup and security boundaries](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.11/docs/ALPHA10-APP-LOGOS-AND-SETUP.md).
+[Complete Alpha 11 setup and security boundaries](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.12/docs/ALPHA10-APP-LOGOS-AND-SETUP.md).
 
 ## New in Alpha 11: More services that actually connect
 
@@ -46,7 +46,21 @@ Four previously guide-only entries now have real, clickable **Connect, Browse, a
 
 **Google registration is still a real setup requirement.** VARYN does not have a Google-verified public OAuth application. The account owner must download their own Google Cloud **Desktop OAuth client JSON** and enable the Gmail/Calendar/Drive APIs. The setup button provides a Google Cloud link and local JSON selection. Restricted Gmail/Drive scopes may be blocked by Google pending test-user configuration or verification. This is not one-click public Google login yet.
 
-Only owner-authorized accounts can connect. VARYN never inherits third-party account sessions from ChatGPT or browsers, and these accounts are not automatically made available to agents. [Detailed Alpha 11 setup and access restrictions](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.11/docs/ALPHA11-REAL-GOOGLE-HOSTINGER-CONNECTIONS.md).
+Only owner-authorized accounts can connect. VARYN never inherits third-party account sessions from ChatGPT or browsers, and these accounts are not automatically made available to agents. [Detailed Alpha 11 setup and access restrictions](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.12/docs/ALPHA11-REAL-GOOGLE-HOSTINGER-CONNECTIONS.md).
+
+## New in Alpha 12: five additional authenticated apps
+
+**Slack, Linear, HubSpot, Dropbox and Discord Bot** are now implemented in Apps → More services. These are working **owner-authorized read-only API connections**, not catalog placeholders. Each has **Connect → provider token → API verification → Browse → Disconnect**, and the implemented connectors are displayed above unsupported guide-only entries.
+
+| App | What VARYN can do today |
+| --- | --- |
+| Slack | Verify workspace and view up to 20 public channel names available to the installed Slack app |
+| Linear | Verify user and list up to 20 issue identifiers and titles |
+| HubSpot | Verify read access to CRM contacts and list up to 20 names |
+| Dropbox | Verify account and list up to 20 file/folder names |
+| Discord Bot | Verify a genuine Discord bot token and list up to 20 servers; **never a user token or self-bot** |
+
+VARYN uses hardcoded official provider API endpoints and does not execute writes, send messages, download file content or automatically disclose private information to AI. It also never copies ChatGPT's connected accounts. **Provider-issued tokens and required scopes must be configured individually**, and can allow more capabilities at the provider than VARYN uses. A green CI badge is not proof anyone has successfully logged in with their real account. [Alpha 12 adapter details and setup](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.12/docs/ALPHA12-FIVE-REAL-APP-CONNECTORS.md).
 
 ## Memory import and Telegram bot
 
@@ -56,16 +70,16 @@ Only owner-authorized accounts can connect. VARYN never inherits third-party acc
 
 **WhatsApp is NOT connected.** A real WhatsApp integration needs separate official Meta Cloud API credentials, a business-enabled number and an HTTPS webhook. VARYN does not inherit messaging accounts from ChatGPT or Hermes.
 
-[Implementation scope, privacy constraints and setup instructions](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.11/docs/OWNER-MEMORY-TELEGRAM.md)
+[Implementation scope, privacy constraints and setup instructions](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.12/docs/OWNER-MEMORY-TELEGRAM.md)
 
-## What works in Alpha 11
+## What works in Alpha 12
 
 | Capability | Available behavior |
 | --- | --- |
 | **AI Chat** | OpenRouter/DeepSeek model picker, search, current provider-reported price snapshot, RAM-only API key, explicit one-request approval, offline simulated mode |
 | **Memory** | Manually import user-selected ChatGPT export excerpts to a Windows DPAPI local vault; owner-controlled search and context insertion |
 | **Tasks** | Create, view, pause and complete local SQLite tasks; no autonomous execution or notifications |
-| **Apps** | Working read-only account checks and resource lists for GitHub, Notion, Netlify and Supabase; independent credentials required |
+| **Apps** | Owner-authenticated read-only data browsing for GitHub, Notion, Netlify, Supabase, Slack, Linear, HubSpot, Dropbox, Discord Bot; independent credentials required |
 | **Telegram** | Owner-only Bot API polling, per-request /ask + /confirm, works only while the PC and app remain running |
 | **Google services** | Owner-authorized Google OAuth Desktop connection with Gmail inbox metadata, Google Calendar list and Drive file metadata, read-only, no AI sharing |
 | **Hostinger Mail** | Owner-entered mailbox credentials via TLS IMAP, verified connection and read-only inbox headers |
@@ -76,14 +90,14 @@ No native ChatGPT/Claude/Gemini consumer-history synchronization, WhatsApp integ
 
 ## Get started on Windows
 
-1. Download [**VARYN Alpha 11 portable Windows ZIP**](https://github.com/naraya07pedro-spec/VARYN/releases/download/v0.1.0-alpha.11/VARYN-Windows-x64-v0.1.0-alpha.11-unsigned.zip).
+1. Download [**VARYN Alpha 12 portable Windows ZIP**](https://github.com/naraya07pedro-spec/VARYN/releases/download/v0.1.0-alpha.12/VARYN-Windows-x64-v0.1.0-alpha.12-unsigned.zip).
 2. Verify the release ZIP SHA-256 (optional command in standard PowerShell, no administrator rights required):
 
    ```powershell
-   (Get-FileHash .\VARYN-Windows-x64-v0.1.0-alpha.11-unsigned.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+   (Get-FileHash .\VARYN-Windows-x64-v0.1.0-alpha.12-unsigned.zip -Algorithm SHA256).Hash.ToLowerInvariant()
    ```
 
-   Expected: `d4ace5b659a2261afcded87e4836c5c1f912aa3ad801bcd445f807209b708f50`.
+   Expected: `8e311f5636481c467e0700dc27a364ace8ade88299b265ad1e0949052ecf2268`.
 
 3. Extract the **entire ZIP to a new folder**, keeping the EXE, `_internal/` runtime and bundled assets together.
 4. Double-click **VARYN-Portable.exe** as a normal, non-administrator Windows user. PowerShell scripts and Python installation are **not required** for ordinary GUI use.
@@ -112,13 +126,13 @@ flowchart TD
 
 ## Architecture, development, and contributing
 
-**Why does `main` only contain the project entry point?** The full experimental implementation was developed on a long-running **draft PR #1** and is preserved in the **[v0.1.0-alpha.11 release tag](https://github.com/naraya07pedro-spec/VARYN/tree/v0.1.0-alpha.11)**. A public release does **not** imply that all experimental work has been merged into the default branch. To inspect or build the app source, select the release tag rather than cloning the `main` stub.
+**Why does `main` only contain the project entry point?** The full experimental implementation was developed on a long-running **draft PR #1** and is preserved in the **[v0.1.0-alpha.12 release tag](https://github.com/naraya07pedro-spec/VARYN/tree/v0.1.0-alpha.12)**. A public release does **not** imply that all experimental work has been merged into the default branch. To inspect or build the app source, select the release tag rather than cloning the `main` stub.
 
-- [Architecture and trust boundaries](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.11/docs/ARCHITECTURE.md)
-- [Task, connector, plugin, and skill limitations](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.11/docs/TASKS-CONNECTORS-SKILLS.md)
-- [Alpha 11 owner setup and product scope](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.11/docs/OWNER-HOME-ALPHA2.md)
-- [Contribution guidelines](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.11/CONTRIBUTING.md) and [security policy](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.11/SECURITY.md)
-- [Verified Windows + Ubuntu + Portable + Release pipeline](https://github.com/naraya07pedro-spec/VARYN/actions/runs/42243501365)
+- [Architecture and trust boundaries](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.12/docs/ARCHITECTURE.md)
+- [Task, connector, plugin, and skill limitations](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.12/docs/TASKS-CONNECTORS-SKILLS.md)
+- [Alpha 11 owner setup and product scope](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.12/docs/OWNER-HOME-ALPHA2.md)
+- [Contribution guidelines](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.12/CONTRIBUTING.md) and [security policy](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.12/SECURITY.md)
+- [Verified Windows + Ubuntu + Portable + Release pipeline](https://github.com/naraya07pedro-spec/VARYN/actions/runs/42248431919)
 - [Report a reproducible issue](https://github.com/naraya07pedro-spec/VARYN/issues)
 
 ## Roadmap
