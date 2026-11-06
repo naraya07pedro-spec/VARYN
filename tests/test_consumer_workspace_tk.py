@@ -58,6 +58,10 @@ class ConsumerDesktopTests(unittest.TestCase):
                     self.assertEqual(window.language, "en")
                     self.assertEqual(window._nav["tasks"].cget("text"), "Tasks")
                     self.assertEqual(window._nav["connectors"].cget("text"), "Apps")
+                    self.assertIn("memory", window._nav)
+                    self.assertTrue(window.telegram_token.winfo_exists())
+                    self.assertIsNone(window._telegram)
+                    self.assertTrue(window.memory_preview.winfo_exists())
                     self.assertTrue(window.chat_surface.input.winfo_exists())
                     self.assertEqual(window.transient(), "")
                     self.assertEqual(

@@ -28,6 +28,25 @@ WHAT TO OPEN
    the app is running, but DO NOT automatically execute.
    Connector, plugin and skill entries are NOT authenticated connections.
 
+MEMORY AND TELEGRAM (ALPHA 7 EXPERIMENTAL)
+- Memory page: manually select an official ChatGPT export ZIP (or
+  conversations.json), select conversations, and confirm import. Selected
+  plain-text excerpts are encrypted with Windows DPAPI at rest to the same
+  user account. The importer does NOT auto-upload or sync accounts.
+- Search saved memory, choose a result and Insert into Chat; or explicitly
+  check Use saved memory before one question. The full expanded prompt is
+  visible to the owner and requires the existing provider approval.
+- Apps page: Telegram bot can be started by the owner with their PRIVATE
+  BotFather token and numeric Telegram ID. Token stays in RAM. Set an actual
+  OpenRouter or DeepSeek model and provider key in the app first.
+- Authorized Telegram DMs use /ask <text>, then /confirm CODE within
+  two minutes to approve one provider request (charges may apply).
+  VARYN ignores unauthorized senders, bot messages and group chats.
+- Telegram polling works ONLY while VARYN is open and the PC is running.
+  No 24/7 uptime, voice/media support, chat sync or scheduled delivery.
+- WhatsApp is NOT YET CONNECTED. Do not assume Telegram setup gives access
+  to WhatsApp or other third-party accounts.
+
 IMPORTANT SECURITY AND PRIVACY BOUNDARIES
 - The code is unsigned. This is NOT a Microsoft-certified release.
 - Do NOT turn off Microsoft Defender, SmartScreen or antivirus to force-run it.

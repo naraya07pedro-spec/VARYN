@@ -439,7 +439,7 @@ jobs:
       - name: Package the verified unsigned folder and generate SHA256
         shell: pwsh
         run: |
-          $tag = 'v0.1.0-alpha.6'
+          $tag = 'v0.1.0-alpha.7'
           $zip = "VARYN-Windows-x64-$tag-unsigned.zip"
           Compress-Archive -LiteralPath 'dist/VARYN-Portable' -DestinationPath $zip -CompressionLevel Optimal
           if (-not (Test-Path -LiteralPath $zip -PathType Leaf)) { throw 'Release ZIP not created' }
@@ -452,7 +452,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = 'v0.1.0-alpha.6'
+          $tag = 'v0.1.0-alpha.7'
           $sha = $env:GITHUB_SHA
           $note = @"
           Experimental unsigned Windows x64 VARYN Portable build from source commit $sha.
@@ -460,7 +460,13 @@ jobs:
           Download `$env:RELEASE_ZIP`, verify its SHA-256:
           `$env:RELEASE_SHA256`
 
-          Includes owner-reviewed model API requests, offline fake model, and manual official-app relay.
+          Includes an explicit ChatGPT export importer into Windows DPAPI sealed local
+          memory, owner-approved context insertion, and an owner-only official
+          Telegram Bot API long-poll channel with /ask + /confirm approval.
+          Telegram must be configured by the owner with BotFather token and
+          numeric Telegram user ID; model provider credentials are separate.
+          WhatsApp is NOT connected. No inherited provider accounts.
+          Also includes owner-reviewed model API requests and offline fake model.
           Not production-safe, not a signed binary, not a hard billing cap, and NOT
           native two-way consumer ChatGPT/Claude/Gemini history sync.
           Run only as a normal, non-administrator Windows user; do not bypass
@@ -470,5 +476,5 @@ jobs:
           https://github.com/naraya07pedro-spec/VARYN/tree/$sha
           "@
           $note | Set-Content -LiteralPath 'release-notes-alpha.txt' -Encoding UTF8
-          gh release create $tag $env:RELEASE_ZIP --target $sha --prerelease --title 'VARYN v0.1.0-alpha.6 | natural multilingual workspace' --notes-file 'release-notes-alpha.txt'
+          gh release create $tag $env:RELEASE_ZIP --target $sha --prerelease --title 'VARYN v0.1.0-alpha.7 | encrypted memory import and Telegram' --notes-file 'release-notes-alpha.txt'
           if ($LASTEXITCODE -ne 0) { throw 'GitHub prerelease publish failed' }

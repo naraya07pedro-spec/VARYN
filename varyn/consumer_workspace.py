@@ -12,6 +12,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from varyn.owner_home import OwnerHome
+from varyn.owner_features_ui import OwnerFeaturesMixin
 from varyn.integration_catalog import load_catalog, CatalogRejected
 from varyn.unlimited_task_store import TaskRejected
 from varyn.consumer_chat import ConsumerChat
@@ -62,7 +63,7 @@ def _button(parent, caption, command, *, primary=False):
     )
 
 
-class ConsumerWorkspace(OwnerHome):
+class ConsumerWorkspace(OwnerFeaturesMixin, OwnerHome):
     """Real working owner home that does not require engineering terminology."""
 
     def __init__(self, desktop, *, database_path=None):
@@ -138,10 +139,11 @@ class ConsumerWorkspace(OwnerHome):
 
         for page, key in (
             ("chat", "home"), ("tasks", "tasks"),
-            ("connectors", "apps"), ("history", "history"),
+            ("connectors", "apps"), ("memory", "memory"),
+            ("history", "history"),
         ):
             entry = tk.Button(
-                sidebar, text=self._t(key),
+                sidebar, text=self._f(key) if key == "memory" else self._t(key),
                 command=lambda p=page: self._show(p),
                 bg=SIDE, fg=INK, activebackground="#E0E5E2",
                 activeforeground=INK,
@@ -194,11 +196,12 @@ class ConsumerWorkspace(OwnerHome):
 
         body = tk.Frame(right, bg=BG)
         body.pack(fill="both", expand=True, padx=19, pady=(0, 13))
-        for name in ("chat", "tasks", "connectors", "history"):
+        for name in ("chat", "tasks", "connectors", "memory", "history"):
             self._panels[name] = tk.Frame(body, bg=BG)
         self._build_chat(self._panels["chat"])
         self._build_tasks(self._panels["tasks"])
         self._build_connectors(self._panels["connectors"])
+        self._build_memory(self._panels["memory"])
         self._build_history(self._panels["history"])
         self._show("chat")
         # Normal Windows top-level window with native maximize support;
@@ -338,6 +341,7 @@ class ConsumerWorkspace(OwnerHome):
 
     def _build_connectors(self, frame):
         self._section_header(frame, "apps", "apps_intro")
+        self._build_telegram(frame)
         self._caption(
             frame, "apps_warning", size=10, fg=ACCENT,
         ).pack(anchor="w", padx=24, pady=(0, 16))
@@ -431,6 +435,8 @@ class ConsumerWorkspace(OwnerHome):
             ),
         )
         self.chat_surface.set_language(self.language)
+        self._nav["memory"].configure(text=self._f("memory"))
+        self._apply_features_language()
         for col, key in (
             ("title", "task_col"), ("status", "status_col"),
             ("due", "due_col"),
