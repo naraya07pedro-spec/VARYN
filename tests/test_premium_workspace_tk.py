@@ -52,12 +52,12 @@ class PremiumWorkspaceTests(unittest.TestCase):
                     "Halo VARYN", owner.history_view.get("1.0", "end"),
                 )
                 owner.chat_surface._go_tasks()
-                self.assertTrue(owner._panels["tasks"].winfo_ismapped())
+                self.assertEqual(owner._panels["tasks"].winfo_manager(), "pack")
                 owner.title_var.set("Rencana mingguan")
                 owner.add()
                 self.assertEqual(owner.store.count(), 1)
                 owner._show("connectors")
-                self.assertTrue(owner._panels["connectors"].winfo_ismapped())
+                self.assertEqual(owner._panels["connectors"].winfo_manager(), "pack")
                 self.assertEqual(
                     desktop.controller.status()["requests_used"], 0,
                 )
