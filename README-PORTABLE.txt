@@ -11,8 +11,12 @@ WHAT TO OPEN
 4. Extract the whole archive into a normal-user folder. Keep the EXE,
    _internal runtime, manifest and owner PowerShell launcher together.
 5. Run the launcher as a NORMAL Windows user, NOT Administrator.
-6. VARYN Home opens with Ask AI, My Tasks, and Connectors / Skills.
-   Real AI requests need YOUR provider API key and on-screen approval.
+6. VARYN opens directly to a CHAT, with My Tasks and Connectors tabs.
+   Type a message in the chat and click Send.
+   Offline demo never returns an actual AI-generated answer.
+   To receive live answers choose OpenRouter/DeepSeek, use your own local
+   provider API key and configure the exact reviewed model/price once in
+   Model Settings. Every real prompt needs fresh explicit approval.
    Tasks save in unencrypted user-local SQLite and update DUE status while
    the app is running, but DO NOT automatically execute.
    Connector, plugin and skill entries are NOT authenticated connections.

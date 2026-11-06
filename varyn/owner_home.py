@@ -11,6 +11,7 @@ from tkinter import ttk
 
 from varyn.integration_catalog import load_catalog, CatalogRejected
 from varyn.unlimited_task_store import TaskStore, TaskRejected
+from varyn.simple_chat import ChatSurface
 
 
 def owner_task_path():
@@ -60,19 +61,10 @@ class OwnerHome(tk.Toplevel):
         tabs.add(ai, text="Ask AI")
         tabs.add(tasks, text="My Tasks")
         tabs.add(apps, text="Connectors / Skills")
-        ttk.Label(ai, text="Ask a real AI model or test offline",
-                  font=("Segoe UI", 13, "bold")).pack(anchor="w", pady=6)
-        ttk.Label(ai, wraplength=730, text=(
-            "The Model Control Center can route one reviewed request to OpenRouter, "
-            "DeepSeek or authorized local 9Router. No key? Try the fake model offline. "
-            "Prices are your estimates, not provider billing caps."
-        )).pack(anchor="w")
-        ttk.Button(ai, text="Open Model Control Center",
-                   command=self._model).pack(anchor="w", pady=14)
-        ttk.Button(ai, text="Manual ChatGPT / Claude / Gemini handoff",
-                   command=self._relay).pack(anchor="w")
-        ttk.Label(ai, text="Official-app handoff requires manual copy/paste, not account sync.",
-                  wraplength=700).pack(anchor="w", pady=8)
+        # Chat is the FIRST and DEFAULT screen. Owner does not need to open
+        # the Model Control Center to type and see messages.
+        self.chat_surface = ChatSurface(ai, self.desktop)
+        self.chat_surface.pack(fill="both", expand=True)
 
         ttk.Label(tasks, text="Owner-local task board",
                   font=("Segoe UI", 13, "bold")).pack(anchor="w")
@@ -219,6 +211,9 @@ class OwnerHome(tk.Toplevel):
             try:self.after_cancel(self.tick_id)
             except tk.TclError:pass
             self.tick_id=None
+        chat = getattr(self, "chat_surface", None)
+        if chat is not None:
+            chat.close()
         if self.store is not None:
             self.store.close()
             self.store=None
