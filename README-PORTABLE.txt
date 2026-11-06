@@ -11,11 +11,14 @@ WHAT TO OPEN
 4. Extract the whole archive into a normal-user folder. Keep the EXE,
    _internal runtime, manifest and owner PowerShell launcher together.
 5. Run the launcher as a NORMAL Windows user, NOT Administrator.
-6. VARYN opens to the Premium Workspace screen: sunset mountain banner,
-   central chat composer, quick-access Tugas/Aplikasi/Template cards,
-   navigation for Chat/Tugas/Aplikasi/Riwayat and Pengaturan.
-   Send one message to transition from the home page to conversation.
-   History is RAM-only for this app session; tasks remain local SQLite.
+6. VARYN opens to the new calm, nontechnical Home screen (no robot imagery).
+   English is the default, with Indonesian, Spanish and French available
+   from the visible language dropdown and Settings. Language preference is
+   saved locally, without credentials or chat content.
+   The main window can be maximized, restored and resized (native Windows
+   titlebar or the in-app Maximize/Restore button); it opens maximized on
+   Windows. Home provides real chat, task tracking and an honest directory of
+   yet-to-be-connected apps. History is RAM-only for this app session.
    Type a message in the chat and click Send.
    Offline demo never returns an actual AI-generated answer.
    To receive live answers choose OpenRouter/DeepSeek, use your own local

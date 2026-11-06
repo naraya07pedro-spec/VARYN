@@ -61,7 +61,9 @@ class OwnerHome(tk.Toplevel):
         self.geometry("1170x760")
         self.minsize(870, 570)
         self.configure(bg=BG)
-        self.transient(desktop)
+        # This is the real owner application, not a temporary modal dialog.
+        # Windows Toplevel.transient() suppresses its maximize/restore controls.
+        self.resizable(True, True)
         try:
             self.store = TaskStore(database_path or owner_task_path())
             self._build()

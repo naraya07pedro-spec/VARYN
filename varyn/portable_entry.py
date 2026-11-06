@@ -16,7 +16,7 @@ import tkinter as tk
 from tkinter import messagebox
 
 from varyn.desktop import VarynDesktop
-from varyn.premium_workspace import PremiumOwnerHome
+from varyn.consumer_workspace import ConsumerWorkspace
 from varyn.desktop_controller import DesktopController
 from varyn.frozen_draft_probe import run_probe_phase, FrozenProbeRejected
 from varyn.dpapi_vault import SealedDataError, UnsupportedPlatformError
@@ -73,7 +73,7 @@ def create_portable_desktop(*, smoke_only=False):
     # The local task database is never created in smoke-only mode.
     def open_home():
         try:
-            window._owner_home = PremiumOwnerHome(window)
+            window._owner_home = ConsumerWorkspace(window)
         except (OSError, ValueError):
             # A corrupt or inaccessible task DB must not prevent the owner from
             # using the existing, separately approved model controls.
