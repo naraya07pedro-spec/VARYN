@@ -155,7 +155,13 @@ try {
     exit 0
 }
 catch {
-    # Never echo exception data that could contain credentials or proxy output.
+    # Verification-only cannot access a provider key or issue a request. The
+    # error is from checking local package files; useful for owner/CI triage.
+    # For actual key-bearing launch, do not print exception contents.
+    if ($VerifyOnly) {
+        Write-Host ('VERIFY-ONLY CHECK: ' + $_.Exception.GetType().Name +
+                    ': ' + $_.Exception.Message)
+    }
     Write-Host 'BLOCKED: Portable verification, permissions or launch failed.'
     Write-Host 'Do not disable Defender/SmartScreen or elevate the launcher.'
     exit 3
