@@ -2,32 +2,34 @@
 
 **A local-first AI workspace with human-approved model routing, persistent tasks, and experimental multi-model workflows.**
 
-[![Windows alpha](https://img.shields.io/badge/Windows-v0.1.0--alpha.5-2563eb?logo=windows)](https://github.com/naraya07pedro-spec/VARYN/releases/tag/v0.1.0-alpha.5)
-[![GitHub Actions](https://img.shields.io/badge/CI-4%2F4%20passed-16a34a?logo=githubactions)](https://github.com/naraya07pedro-spec/VARYN/actions/runs/42199096749)
+[![Windows alpha](https://img.shields.io/badge/Windows-v0.1.0--alpha.6-2563eb?logo=windows)](https://github.com/naraya07pedro-spec/VARYN/releases/tag/v0.1.0-alpha.6)
+[![GitHub Actions](https://img.shields.io/badge/CI-4%2F4%20passed-16a34a?logo=githubactions)](https://github.com/naraya07pedro-spec/VARYN/actions/runs/42203003604)
 [![License: MIT](https://img.shields.io/badge/License-MIT-111827.svg)](LICENSE)
 ![Status: Experimental](https://img.shields.io/badge/Status-Experimental-f59e0b)
 
 > **Public experimental alpha, not production software.** VARYN currently provides a Windows portable desktop, an owner-approved single-request LLM gateway, a local task tracker, and a directory of possible integrations. It does **not** yet offer autonomous task execution, connected third-party app accounts, or native two-way ChatGPT/Claude/Gemini consumer-chat synchronization.
 
-### [Download Windows Alpha 5](https://github.com/naraya07pedro-spec/VARYN/releases/download/v0.1.0-alpha.5/VARYN-Windows-x64-v0.1.0-alpha.5-unsigned.zip) · [Release notes](https://github.com/naraya07pedro-spec/VARYN/releases/tag/v0.1.0-alpha.5) · [Browse full alpha source](https://github.com/naraya07pedro-spec/VARYN/tree/v0.1.0-alpha.5) · [Development PR](https://github.com/naraya07pedro-spec/VARYN/pull/1)
+### [Download Windows Alpha 6](https://github.com/naraya07pedro-spec/VARYN/releases/download/v0.1.0-alpha.6/VARYN-Windows-x64-v0.1.0-alpha.6-unsigned.zip) · [Release notes](https://github.com/naraya07pedro-spec/VARYN/releases/tag/v0.1.0-alpha.6) · [Browse full alpha source](https://github.com/naraya07pedro-spec/VARYN/tree/v0.1.0-alpha.6) · [Development PR](https://github.com/naraya07pedro-spec/VARYN/pull/1)
 
 ## Why VARYN?
 
 Working with multiple AI models raises practical questions: What data is leaving the machine? Which model is selected? What might a request cost? Which tasks and permissions belong to the owner? VARYN explores these problems as an open-source desktop project, without claiming to control accounts or tools it has not actually connected.
 
-## Premium Workspace: a calmer place to think and work
+## A natural, multilingual workspace
 
-The default Windows home now follows the approved **Premium Workspace** visual direction: a quiet navy sidebar, a self-rendered dusk landscape, a centered question composer, and three working shortcuts for **Tugas**, **Aplikasi**, and **Template**. The common interface uses approachable Indonesian labels rather than leading with API parameters.
+Based on real user-device feedback, VARYN's latest Windows home removes the previous decorative mountain banner and generic AI-themed cards. The new **warm, editorial layout** places a familiar chat composer, a clear navigation sidebar, and working task/app shortcuts ahead of technical configuration.
 
-**Design fidelity:** The scenic banner is drawn locally by Tkinter; it is not an actual product screenshot or a downloaded model-generated UI. Font rendering and spacing depend on the Windows display. The interface is interactive, not a static mockup. After sending a message, the home switches to a conversation transcript. **Riwayat** is volatile and only covers this app session.
+**English is the default UI language.** Change it directly from the header or Settings to **Bahasa Indonesia, Español, or Français**. Your choice is saved locally; existing tasks and the current chat remain open when you switch. Advanced legacy developer views and third-party replies may remain in their original language.
 
-The app is still an experimental gateway with explicit per-request approvals; no verified third-party OAuth connectors or automatic task execution are claimed.
+**Maximize and resize are supported.** Unlike the earlier window treated as a transient dialog, the Alpha 6 owner home starts maximized on Windows and has both native window controls and an obvious Maximize / Restore button. The interface uses standard system typography without downloaded images, stock illustrations or robotic visual themes.
 
-## What works in Alpha 5
+The app remains an experimental API gateway with explicit per-request approvals; **no automatic task execution, verified third-party OAuth connectors, native consumer-chat sync, or production security guarantee** is implied.
+
+## What works in Alpha 6
 
 | Capability | Current implementation |
 | --- | --- |
-| **Ask AI** | Premium Workspace home with sunset landscape, accessible chat composer, Tugas/Aplikasi/Template shortcuts; choose a provider, type a message, and send **one** owner-approved request to a selected OpenRouter or DeepSeek API model, or authorized local 9Router; requires your own API credentials and per-request approval |
+| **Ask AI** | Everyday English-first home with simple chat, Tasks/Apps/History shortcuts and optional language selection; choose a provider, type a message, and send **one** owner-approved request to a selected OpenRouter or DeepSeek API model, or authorized local 9Router; requires your own API credentials and per-request approval |
 | **Offline mode** | Test a clearly labeled simulated response without an API key or real model billing |
 | **My Tasks** | Create, list, complete, pause, and cancel tasks in local SQLite, with no fixed application-wide item count limit |
 | **Due status** | Refreshes while the Windows app is running; **does not** execute tasks, issue notifications, or run when the PC is off |
@@ -39,14 +41,14 @@ The project also contains research prototypes for local memory, permission contr
 
 ## Get started on Windows
 
-1. **[Download VARYN v0.1.0-alpha.5 for Windows x64](https://github.com/naraya07pedro-spec/VARYN/releases/download/v0.1.0-alpha.5/VARYN-Windows-x64-v0.1.0-alpha.5-unsigned.zip)** (experimental, approximately 14 MB).
+1. **[Download VARYN v0.1.0-alpha.6 for Windows x64](https://github.com/naraya07pedro-spec/VARYN/releases/download/v0.1.0-alpha.6/VARYN-Windows-x64-v0.1.0-alpha.6-unsigned.zip)** (experimental, approximately 14 MB).
 2. Verify the downloaded **ZIP SHA-256** (this hash is for the ZIP, not the EXE):
 
    ```powershell
-   (Get-FileHash .\VARYN-Windows-x64-v0.1.0-alpha.5-unsigned.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+   (Get-FileHash .\VARYN-Windows-x64-v0.1.0-alpha.6-unsigned.zip -Algorithm SHA256).Hash.ToLowerInvariant()
    ```
 
-   Expected value: `fe9fcf0e115323b0d4ce3d72e1811001a009ff912575cf72c7140d17fc5be1f6`.
+   Expected value: `6e06d983e8ad6faf81ffcc285cb1777322f10eabbfb3e76b66e026ca99b9dd81`.
 
 3. Extract the **entire archive**, keeping `VARYN-Portable.exe`, `_internal/`, `BUNDLE-SHA256.json`, and `Start-VARYN-OwnerPilot.ps1` together.
 4. Open **non-administrator** PowerShell in the extracted `VARYN-Portable` directory. Verify and start in offline mode:
@@ -80,13 +82,13 @@ flowchart TD
 
 ## Architecture, development, and contributing
 
-**Why does `main` only contain the project entry point?** The full experimental implementation was developed on a long-running **draft PR #1** and is preserved in the **[v0.1.0-alpha.5 release tag](https://github.com/naraya07pedro-spec/VARYN/tree/v0.1.0-alpha.5)**. A public release does **not** imply that all experimental work has been merged into the default branch. To inspect or build the app source, select the release tag rather than cloning the `main` stub.
+**Why does `main` only contain the project entry point?** The full experimental implementation was developed on a long-running **draft PR #1** and is preserved in the **[v0.1.0-alpha.6 release tag](https://github.com/naraya07pedro-spec/VARYN/tree/v0.1.0-alpha.6)**. A public release does **not** imply that all experimental work has been merged into the default branch. To inspect or build the app source, select the release tag rather than cloning the `main` stub.
 
-- [Architecture and trust boundaries](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.5/docs/ARCHITECTURE.md)
-- [Task, connector, plugin, and skill limitations](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.5/docs/TASKS-CONNECTORS-SKILLS.md)
-- [Alpha 5 owner setup and product scope](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.5/docs/OWNER-HOME-ALPHA2.md)
-- [Contribution guidelines](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.5/CONTRIBUTING.md) and [security policy](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.5/SECURITY.md)
-- [Verified Windows + Ubuntu + Portable + Release pipeline](https://github.com/naraya07pedro-spec/VARYN/actions/runs/42199096749)
+- [Architecture and trust boundaries](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.6/docs/ARCHITECTURE.md)
+- [Task, connector, plugin, and skill limitations](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.6/docs/TASKS-CONNECTORS-SKILLS.md)
+- [Alpha 6 owner setup and product scope](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.6/docs/OWNER-HOME-ALPHA2.md)
+- [Contribution guidelines](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.6/CONTRIBUTING.md) and [security policy](https://github.com/naraya07pedro-spec/VARYN/blob/v0.1.0-alpha.6/SECURITY.md)
+- [Verified Windows + Ubuntu + Portable + Release pipeline](https://github.com/naraya07pedro-spec/VARYN/actions/runs/42203003604)
 - [Report a reproducible issue](https://github.com/naraya07pedro-spec/VARYN/issues)
 
 ## Roadmap
