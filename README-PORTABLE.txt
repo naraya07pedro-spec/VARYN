@@ -132,6 +132,23 @@ OWNER ACCEPTANCE IN THE APP (17S-32)
 - No automatic model request, native app read/write, history sync, or
   restoration of earlier session consent, browser state or credentials.
 
+17S-46 | ASK A REAL AI MODEL (OWNER-TYPED TEXT ONLY)
+- Open "17S-40 | Open Model Control Center (owner opt-in)" in the main app.
+- Choose a model (OpenRouter, DeepSeek, or permitted 9Router), review exact
+  input/output prices, and add your offer. The default FAKE model never calls
+  an external provider.
+- Replace the SYNTHETIC: sample in the task field with your own question.
+  Check "Authorize MY typed non-synthetic text for ONE reviewed request".
+- Set a conservative estimated-token ceiling and enable one network request.
+  Read the complete exact outgoing request and approve it separately.
+- With a real API key loaded by Start-VARYN-OwnerPilot.ps1, VARYN can now
+  send that SINGLE typed task and display the model response in RAM.
+- The real-task toggle resets OFF after an approved request. No automatic
+  conversation history, file access, tool execution, retries or fallback.
+- Never paste sensitive customer data or credentials. The provider can retain
+  your transmitted prompt. Local cost estimate is not a billing hard cap.
+- This is NOT native ChatGPT/Claude/Gemini consumer account synchronization.
+
 17S-39 | UNIVERSAL MODEL REGISTRY + PINNED CHEAP/FREE MODEL GATEWAY
 - New code: varyn/model_registry.py (dated, owner-reviewed price offers);
   varyn/gateway_chat.py (pinned OpenRouter, DeepSeek, local 9Router);
@@ -145,7 +162,8 @@ OWNER ACCEPTANCE IN THE APP (17S-32)
 - 9Router's local gateway is PINNED to 127.0.0.1:20128, not public.
   It also needs authorized_upstream=True. Its OWN fallback may change
   which provider/model bills, even if VARYN does not auto-fallback.
-- Only fictional SYNTHETIC: tasks are supported by the pilot API.
+- Original pilot API defaults to SYNTHETIC: tasks. 17S-46 supports real
+  owner-typed tasks only with an additional explicit opt-in per request.
   A 'free' or 'cheap' claim requires fresh explicit owner-reviewed
   input AND output prices; unknown/stale prices refuse auto-selection.
   Inferred token and cost estimates do not enforce real billing caps.

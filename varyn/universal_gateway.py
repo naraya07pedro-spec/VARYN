@@ -30,7 +30,7 @@ class UniversalGateway:
     def generate(self, task, *, input_estimate, max_output_tokens=512,
                  ceiling_micro_usd=0, today=None, provider=None,
                  approve_request=False, authorized_upstream=False,
-                 timeout_seconds=10):
+                 timeout_seconds=10, allow_real_task=False):
         # Always validate BEFORE reserving the uncertain request budget.
         today = date.today() if today is None else today
         selected, amount = self.registry.choose(
@@ -38,7 +38,8 @@ class UniversalGateway:
             ceiling_micro_usd=ceiling_micro_usd, today=today,
             provider=provider,
         )
-        payload = prepare(selected.model, task, max_tokens=max_output_tokens)
+        payload = prepare(selected.model, task, max_tokens=max_output_tokens,
+                          allow_real_task=allow_real_task)
         assert_no_obvious_secrets(task)
         if type(timeout_seconds) not in (int, float) or not 1 <= timeout_seconds <= 60:
             raise RegistryRejected("Invalid provider timeout")

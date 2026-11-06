@@ -65,6 +65,8 @@ def build_exact_preview(offer, task, input_estimate, output_limit, estimated):
         "format": "varyn.model_center_request.v1",
         "provider": offer.provider, "model": offer.model,
         "task": task,
+        "owner_typed_non_synthetic_task": not task.startswith("SYNTHETIC:"),
+        "no_local_files_or_memory_attached": True,
         "input_tokens_ESTIMATED_NOT_ACTUAL": input_estimate,
         "max_output_tokens": output_limit,
         "maximum_ESTIMATED_USD": str(Decimal(estimated) / 1000000),
@@ -99,7 +101,7 @@ class ModelControlCenter(tk.Toplevel):
         self._last_receipt = None
         self._catalog_window = None
         self._catalog_lock = False
-        self.title("VARYN 17S-40 | Model Control Center")
+        self.title("VARYN | Ask AI Model (17S-46)")
         self.geometry("760x640")
         self.minsize(540, 440)
         self.transient(owner)
@@ -111,6 +113,7 @@ class ModelControlCenter(tk.Toplevel):
         self.reviewed = tk.BooleanVar(master=self, value=False)
         self.fixed = tk.BooleanVar(master=self, value=False)
         self.network = tk.BooleanVar(master=self, value=False)
+        self.real_task_opt_in = tk.BooleanVar(master=self, value=False)
         self.upstream = tk.BooleanVar(master=self, value=False)
         self.selection = tk.StringVar(master=self, value="auto")
         self.input_tokens = tk.StringVar(master=self, value="128")
@@ -147,12 +150,13 @@ class ModelControlCenter(tk.Toplevel):
                 -1 if event.delta > 0 else 1, "units",
             ),
         )
-        ttk.Label(shell, text="17S-40 | Owner-reviewed model registry (RAM only)").pack(anchor="w")
+        ttk.Label(shell, text="VARYN | Choose a model and ask your own question").pack(anchor="w")
         ttk.Label(
             shell, wraplength=695,
-            text="No provider price feed, no unlimited-free guarantee. "
-                 "Only fictional SYNTHETIC: requests. Billing cap NOT enforced. "
-                 "Never enter an API key here; use your own OS environment.",
+            text="Real tasks are supported with a separate per-request opt-in. "
+                 "Typed text leaves this device if sent to a real API provider. "
+                 "No automatic local file, memory or app history upload. "
+                 "Estimated price is NOT a billing cap. Never type API keys here.",
         ).pack(anchor="w", pady=(2, 7))
         quote = ttk.LabelFrame(shell, text="1. Register exact model and owner-reviewed prices")
         quote.pack(fill="x", pady=(0, 6))
@@ -218,12 +222,18 @@ class ModelControlCenter(tk.Toplevel):
             control, text="9Router ONLY: I verified and authorize its upstream account use",
             variable=self.upstream,
         ).pack(anchor="w", padx=6)
-        ttk.Label(control, text="Fictional task to transmit; no local memory included").pack(
-            anchor="w", padx=6,
-        )
-        self.task = tk.Text(control, height=3, wrap="word")
+        ttk.Label(
+            control,
+            text="Write a question or task (max 4,000 characters). No files or memories attached.",
+        ).pack(anchor="w", padx=6)
+        self.task = tk.Text(control, height=4, wrap="word")
         self.task.pack(fill="x", padx=6, pady=4)
         self.task.insert("1.0", _TASK)
+        ttk.Checkbutton(
+            control,
+            text="Authorize MY typed non-synthetic text for ONE reviewed request (OFF by default)",
+            variable=self.real_task_opt_in,
+        ).pack(anchor="w", padx=6, pady=(0, 4))
         buttons = ttk.Frame(control)
         buttons.pack(fill="x", padx=6, pady=4)
         ttk.Button(
@@ -314,7 +324,8 @@ class ModelControlCenter(tk.Toplevel):
         self._refresh_options()
         self.network.set(False)
         self.upstream.set(False)
-        self.status.set("Quotes cleared; network and upstream opt-in reset OFF.")
+        self.real_task_opt_in.set(False)
+        self.status.set("Quotes cleared; network and real-task opt-ins reset OFF.")
 
     def _plan(self):
         if not self._offers:
@@ -335,8 +346,12 @@ class ModelControlCenter(tk.Toplevel):
             ceiling_micro_usd=ceiling_micro, today=date.today(),
         )
         task = self.task.get("1.0", "end-1c")
-        if not task.startswith("SYNTHETIC:") or len(task) > 4000:
-            raise ModelCenterRejected("Only bounded synthetic tasks")
+        if type(task) is not str or not task.strip() or len(task) > 4000:
+            raise ModelCenterRejected("Invalid task length")
+        if (not task.startswith("SYNTHETIC:") and
+                self.real_task_opt_in.get() is not True):
+            raise ModelCenterRejected("Real task requires an owner opt-in")
+        # Exact packet is still reviewed separately before ANY request.
         return chosen, estimated, task, input_estimate, output_limit, ceiling_micro
 
     def _preview(self):
@@ -440,6 +455,7 @@ class ModelControlCenter(tk.Toplevel):
             selection = self._plan()
             chosen, estimated, task, input_estimate, out, ceiling = selection
             live = chosen.provider != "fake"
+            real_task = not task.startswith("SYNTHETIC:")
             if live and (not self.network.get() or
                          not self._owner._universal_model_live_capability):
                 raise PermissionError("Network disabled in this window or desktop")
@@ -449,6 +465,7 @@ class ModelControlCenter(tk.Toplevel):
                 tuple(self._offers), self.selection.get(), self.task.get("1.0", "end-1c"),
                 self.input_tokens.get(), self.output_tokens.get(), self.ceiling.get(),
                 self.network.get(), self.upstream.get(),
+                self.real_task_opt_in.get(),
             )
             content = build_exact_preview(chosen, task, input_estimate, out, estimated)
             digest = hashlib.sha256(content.encode()).hexdigest()
@@ -457,10 +474,11 @@ class ModelControlCenter(tk.Toplevel):
                 heading="One NEW " + chosen.provider + " model request, NOT consumer app sync",
                 digest=digest,
                 content=content,
-                warning="Potential REAL BILLING; quote/estimated tokens are NOT caps. "
-                        "For 9Router, upstream provider may change. "
-                        "No provider account history, clipboard or memory sync. "
-                        "No retry or fallback at VARYN layer.",
+                warning="Your exact typed task is sent to the selected API and "
+                        "may be retained by its provider. No private data or "
+                        "secrets. Potential REAL BILLING; estimated tokens are "
+                        "NOT caps. No automatic retry or fallback. "
+                        "9Router upstream may route differently.",
                 approve_label="Approve ONE exact model request",
             )
             if not approved or not self._allowed():
@@ -470,11 +488,13 @@ class ModelControlCenter(tk.Toplevel):
                 tuple(self._offers), self.selection.get(), self.task.get("1.0", "end-1c"),
                 self.input_tokens.get(), self.output_tokens.get(), self.ceiling.get(),
                 self.network.get(), self.upstream.get(),
+                self.real_task_opt_in.get(),
             )
             if new_snapshot != snapshot or self._plan() != selection:
                 raise ModelCenterRejected("Request changed during approval")
             self.network.set(False)
             self.upstream.set(False)
+            self.real_task_opt_in.set(False)
             self._last_receipt = None
             self.receipt_button.configure(state="disabled")
             self._active_offer = chosen
@@ -489,7 +509,7 @@ class ModelControlCenter(tk.Toplevel):
             thread = threading.Thread(
                 target=ModelControlCenter._worker,
                 args=(gateway, selection, chosen.provider == "9router",
-                      self._results),
+                      self._results, real_task),
                 daemon=True,
             )
             thread.start()
@@ -501,13 +521,15 @@ class ModelControlCenter(tk.Toplevel):
             )
 
     @staticmethod
-    def _worker(gateway, selection, upstream_approved, output_queue):
+    def _worker(gateway, selection, upstream_approved, output_queue,
+                allow_real_task=False):
         chosen, estimated, task, input_estimate, out, ceiling = selection
         try:
             result = gateway.generate(
                 task, input_estimate=input_estimate, max_output_tokens=out,
                 ceiling_micro_usd=ceiling, provider=chosen.provider,
                 approve_request=True, authorized_upstream=upstream_approved,
+                allow_real_task=allow_real_task,
             )
             output_queue.put(("ok", result))
         except SafeProviderHTTPError as exc:

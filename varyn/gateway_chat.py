@@ -65,11 +65,15 @@ def reported_model(raw):
 
 
 
-def prepare(model, question, *, max_tokens):
-    if (type(question) is not str or not question.startswith("SYNTHETIC:") or
-            not 1 <= len(question) <= 4000 or type(max_tokens) is not int or
-            not 16 <= max_tokens <= 2048):
-        raise ValueError("Only bounded SYNTHETIC: input is permitted")
+def prepare(model, question, *, max_tokens, allow_real_task=False):
+    """Single user message only. Real user text requires an explicit opt-in."""
+    if (type(allow_real_task) is not bool or type(question) is not str or
+            not question.strip() or not 1 <= len(question) <= 4000 or
+            any(ord(char) < 32 and char not in "\n\r\t" for char in question) or
+            type(max_tokens) is not int or not 16 <= max_tokens <= 2048):
+        raise ValueError("Invalid bounded user task")
+    if not question.startswith("SYNTHETIC:") and allow_real_task is not True:
+        raise ValueError("Real task requires fresh explicit owner opt-in")
     return {
         "model": model, "stream": False, "max_tokens": max_tokens,
         "messages": [{"role": "user", "content": question}],
