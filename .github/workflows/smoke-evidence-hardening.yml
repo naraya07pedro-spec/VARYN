@@ -1,0 +1,59 @@
+name: Smoke evidence hardening and real public GitHub GET
+
+on:
+  pull_request:
+    paths:
+      - 'varyn/owner_provider_acceptance.py'
+      - 'varyn/agent_mode_gui.py'
+      - 'tests/test_owner_provider_acceptance.py'
+      - 'tests/test_public_github_real_network.py'
+      - '.github/workflows/smoke-evidence-hardening.yml'
+      - 'docs/SMOKE-EVIDENCE-ACCEPTANCE.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-hardening-ubuntu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile hardened code
+        run: python -m py_compile varyn/owner_provider_acceptance.py varyn/agent_mode_gui.py
+      - name: Adversarial local smoke acceptance
+        run: python -m unittest discover -s tests -p 'test_owner_provider_acceptance.py' -v
+      - name: Existing grounded and provider checks
+        run: |
+          python -m unittest discover -s tests -p 'test_grounded_learning_bridge.py' -v
+          python -m unittest discover -s tests -p 'test_owner_live_evaluation.py' -v
+
+  smoke-hardening-windows:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile hardened code
+        run: python -m py_compile varyn/owner_provider_acceptance.py varyn/agent_mode_gui.py
+      - name: Adversarial local smoke acceptance
+        run: python -m unittest discover -s tests -p 'test_owner_provider_acceptance.py' -v
+      - name: Windows native GUI smoke
+        run: python -m unittest discover -s tests -p 'test_consumer_workspace_tk.py' -v
+
+  real-anonymous-public-github-get:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: ONE real public GitHub GET via VARYN fixed-host adapter
+        run: python -m unittest discover -s tests -p 'test_public_github_real_network.py' -v
