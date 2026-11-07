@@ -28,6 +28,14 @@ _STATUSES = frozenset({
 _INPUT_ESTIMATE = 512
 _OUTPUT_LIMIT = 256
 _ESTIMATE_CEILING_MICRO_USD = 50000
+_RECEIPT_KEYS = (
+    "id", "utc_day", "started_utc", "finished_utc", "status",
+    "provider", "model_sha256", "source_kind",
+    "estimated_micro_usd", "public_reads_attempted",
+    "model_requests_attempted", "fact_matches_tool",
+    "observation_sha256", "provider_response_id_sha256",
+    "input_tokens_reported", "output_tokens_reported",
+)
 
 
 class SmokeRejected(ValueError):
@@ -229,19 +237,12 @@ class OwnerProviderAcceptance:
         if row is None:
             return None
         record = dict(row)
-        keys = (
-            "id", "utc_day", "started_utc", "finished_utc", "status",
-            "provider", "model_sha256", "source_kind",
-            "estimated_micro_usd", "public_reads_attempted",
-            "model_requests_attempted", "fact_matches_tool",
-            "observation_sha256", "provider_response_id_sha256",
-            "input_tokens_reported", "output_tokens_reported")
         if row["status"] == "running":
             record["status"] = "running_or_interrupted"
             record["local_digest_matches"] = None
         else:
             digest = sha256(json.dumps(
-                {k: record[k] for k in keys},
+                {k: record[k] for k in _RECEIPT_KEYS},
                 sort_keys=True, separators=(",", ":")).encode()).hexdigest()
             record["local_digest_matches"] = digest == record["receipt_sha256"]
         record["network_account_independently_verified"] = False
@@ -261,6 +262,15 @@ class OwnerProviderAcceptance:
         if type(record) is not dict:
             return {"status": "no_receipt", "real_account_proven": False}
         if record.get("local_digest_matches") is not True:
+            return {"status": "receipt_untrusted", "real_account_proven": False}
+        try:
+            canonical = {k: record[k] for k in _RECEIPT_KEYS}
+            valid_digest = sha256(json.dumps(
+                canonical, sort_keys=True,
+                separators=(",", ":")).encode()).hexdigest()
+        except (KeyError, TypeError, ValueError, UnicodeError):
+            return {"status": "receipt_untrusted", "real_account_proven": False}
+        if valid_digest != record.get("receipt_sha256"):
             return {"status": "receipt_untrusted", "real_account_proven": False}
         if record.get("status") != "verification_passed":
             return {"status": "no_verified_fact_match",
