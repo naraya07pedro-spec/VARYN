@@ -156,7 +156,9 @@ class RealGatewayBridge(unittest.TestCase):
         self.assertEqual(self.journal.status(result["run_id"])["state"],
                          "completed")
         self.assertEqual(len(self.outgoing), 2)
-        self.assertIn('"facts"', self.outgoing[1]["messages"][0]["content"])
+        prompt = json.loads(self.outgoing[1]["messages"][0]["content"])
+        self.assertIn("facts", prompt["output"])
+        self.assertEqual(prompt["untrusted_public_metadata"]["stars"], 3)
 
     def test_model_hallucinated_fields_are_not_learned(self):
         incorrect = {**FACTS, "stars": 999}
