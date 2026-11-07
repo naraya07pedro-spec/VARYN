@@ -27,7 +27,7 @@ jobs:
         run: python -m py_compile varyn/owner_provider_acceptance.py varyn/agent_mode_gui.py
       - name: One-shot provider acceptance tests without network
         run: python -m unittest discover -s tests -p 'test_owner_provider_acceptance.py' -v
-      - name: Regression: owner billing and prior accepted evidence
+      - name: "Regression: owner billing and prior accepted evidence"
         run: |
           python -m unittest discover -s tests -p 'test_owner_billing_reconciliation.py' -v
           python -m unittest discover -s tests -p 'test_local_evaluation_receipts.py' -v
@@ -47,7 +47,7 @@ jobs:
         run: python -m py_compile varyn/owner_provider_acceptance.py varyn/agent_mode_gui.py
       - name: One-shot provider acceptance tests without network
         run: python -m unittest discover -s tests -p 'test_owner_provider_acceptance.py' -v
-      - name: Regression: owner billing and prior accepted evidence
+      - name: "Regression: owner billing and prior accepted evidence"
         run: |
           python -m unittest discover -s tests -p 'test_owner_billing_reconciliation.py' -v
           python -m unittest discover -s tests -p 'test_local_evaluation_receipts.py' -v
