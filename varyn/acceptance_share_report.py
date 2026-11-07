@@ -42,7 +42,8 @@ def create_redacted_acceptance_report(record):
         and category not in ("receipt_untrusted", "no_receipt")
     )
     result = (record.get("status")
-              if intact and record.get("status") in _ALLOWED_RESULTS
+              if intact and type(record.get("status")) is str
+              and record["status"] in _ALLOWED_RESULTS
               else "unknown")
     adapter = (
         "standard_varyn_adapter_configured"
@@ -77,7 +78,8 @@ def create_redacted_acceptance_report(record):
         "smoke_status": result,
         "provider": (
             record.get("provider") if intact and
-            record.get("provider") in _PROVIDER else "unknown"
+            type(record.get("provider")) is str
+            and record["provider"] in _PROVIDER else "unknown"
         ),
         "adapter_configuration": adapter,
         "public_gets_attempted": (
