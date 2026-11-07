@@ -15,6 +15,7 @@ from varyn.safety import assert_no_obvious_secrets
 from varyn.grounded_github import (GroundingRejected, validate_grounded_claim,
                                    record_grounded_fact_receipt)
 from varyn.learning_kernel import LearningKernel, LearningRejected
+from varyn.verified_failure_feedback import VerifiedFailureLedger, FeedbackRejected
 
 
 class AgentLoopRejected(ValueError):
@@ -241,9 +242,17 @@ class OwnerApprovedAgentLoop:
         if verify_public_facts:
             try:
                 verified = validate_grounded_claim(final, observed)
-            except GroundingRejected:
+            except GroundingRejected as error:
                 self.journal.move(run_id, "synthesis_in_flight",
                                   "verification_failed")
+                # Keep a mismatch *failure*, not a fabricated successful
+                # learning event. The owner must have opted into feedback.
+                if persist_grounded_receipt and self.learning_kernel is not None:
+                    try:
+                        VerifiedFailureLedger(self.learning_kernel).record(
+                            run_id, error, observed, owner_opted_in=True)
+                    except (FeedbackRejected, OSError):
+                        pass  # Never suppress the original verification error.
                 raise
             answer = verified["report"]
         else:
