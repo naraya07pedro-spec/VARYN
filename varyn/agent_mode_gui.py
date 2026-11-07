@@ -441,8 +441,7 @@ class OwnerAgentWindow(tk.Toplevel):
             self._show(
                 "Model quality change requires independent held-out "
                 "verification. Status: " + result.get("status", "unknown") +
-                "
-Provider billing is not capped by local estimates.")
+                "\nProvider billing is not capped by local estimates.")
             return
         if kind == "learning_error":
             self.status.set("Evaluation stopped or was denied. No automatic "
