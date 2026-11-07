@@ -1,0 +1,39 @@
+name: Verified reflection learning acceptance
+
+on:
+  pull_request:
+    paths:
+      - 'varyn/verified_reflection.py'
+      - 'tests/test_verified_reflection.py'
+      - 'docs/VERIFIED-REFLECTION-WORKER.md'
+      - '.github/workflows/verified-reflection-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reflection-ubuntu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m py_compile varyn/verified_reflection.py
+      - run: python -m unittest discover -s tests -p 'test_verified_reflection.py' -v
+      - run: python -m unittest discover -s tests -p 'test_learning_kernel.py' -v
+      - run: python -m unittest discover -s tests -p 'test_agent_execution_loop.py' -v
+  reflection-windows:
+    runs-on: windows-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m py_compile varyn/verified_reflection.py
+      - run: python -m unittest discover -s tests -p 'test_verified_reflection.py' -v
+      - run: python -m unittest discover -s tests -p 'test_learning_kernel.py' -v
+      - run: python -m unittest discover -s tests -p 'test_agent_execution_loop.py' -v
