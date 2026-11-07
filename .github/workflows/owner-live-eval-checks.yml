@@ -1,0 +1,57 @@
+name: Owner-reviewed live evaluation acceptance
+
+on:
+  pull_request:
+    paths:
+      - 'varyn/owner_live_evaluation.py'
+      - 'varyn/budgeted_reflection_scheduler.py'
+      - 'varyn/agent_mode_gui.py'
+      - 'tests/test_owner_live_evaluation.py'
+      - 'tests/test_consumer_workspace_tk.py'
+      - 'docs/LIVE-OWNER-EVALUATION-WINDOWS.md'
+      - '.github/workflows/owner-live-eval-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  owner-live-eval-ubuntu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile new runtime
+        run: python -m py_compile varyn/owner_live_evaluation.py varyn/budgeted_reflection_scheduler.py varyn/agent_mode_gui.py
+      - name: Live-shaped model and GitHub tests (NO NETWORK)
+        run: python -m unittest discover -s tests -p 'test_owner_live_evaluation.py' -v
+      - name: Prior scheduler / grounding regression suites
+        run: |
+          python -m unittest discover -s tests -p 'test_feedback_evaluation_scheduler.py' -v
+          python -m unittest discover -s tests -p 'test_grounded_learning_bridge.py' -v
+          python -m unittest discover -s tests -p 'test_agent_execution_loop.py' -v
+          python -m unittest discover -s tests -p 'test_verified_reflection.py' -v
+
+  owner-live-eval-windows:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile new runtime
+        run: python -m py_compile varyn/owner_live_evaluation.py varyn/budgeted_reflection_scheduler.py varyn/agent_mode_gui.py
+      - name: Live-shaped model and GitHub tests (NO NETWORK)
+        run: python -m unittest discover -s tests -p 'test_owner_live_evaluation.py' -v
+      - name: Prior scheduler / grounding regression suites
+        run: |
+          python -m unittest discover -s tests -p 'test_feedback_evaluation_scheduler.py' -v
+          python -m unittest discover -s tests -p 'test_grounded_learning_bridge.py' -v
+          python -m unittest discover -s tests -p 'test_agent_execution_loop.py' -v
+          python -m unittest discover -s tests -p 'test_verified_reflection.py' -v
+      - name: Native owner Tk window smoke
+        run: python -m unittest discover -s tests -p 'test_consumer_workspace_tk.py' -v
