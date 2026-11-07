@@ -92,8 +92,8 @@ class OwnerAgentWindow(tk.Toplevel):
         self.eval_optin = tk.BooleanVar(master=self, value=False)
         self.eval_checkbox = ttk.Checkbutton(
             body, variable=self.eval_optin,
-            text="I authorize a separate 5-GitHub-read / 10-AI-call evaluation "
-                 "session (may incur actual provider charges)",
+            text="Allow 5 public GitHub reads + 10 reviewed AI calls "
+                 "(provider may charge)",
         )
         self.eval_checkbox.pack(anchor="w", pady=(10, 4))
         eval_row = ttk.Frame(body)
