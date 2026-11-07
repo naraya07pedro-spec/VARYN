@@ -252,6 +252,45 @@ class OwnerProviderAcceptance:
         return record
 
     @staticmethod
+    def acceptance_gate(record):
+        """Conservative, offline triage; NEVER prove account or invoice authenticity.
+
+        "configured_network_adapters" reflects configured Python functions,
+        not authenticated independent evidence of network origin.
+        """
+        if type(record) is not dict:
+            return {"status": "no_receipt", "real_account_proven": False}
+        if record.get("local_digest_matches") is not True:
+            return {"status": "receipt_untrusted", "real_account_proven": False}
+        if record.get("status") != "verification_passed":
+            return {"status": "no_verified_fact_match",
+                    "real_account_proven": False}
+        if (record.get("public_reads_attempted") != 1
+                or record.get("model_requests_attempted") != 1
+                or record.get("fact_matches_tool") != 1
+                or type(record.get("observation_sha256")) is not str
+                or _SHA.fullmatch(record["observation_sha256"]) is None):
+            return {"status": "incomplete_local_evidence",
+                    "real_account_proven": False}
+        if record.get("source_kind") != "configured_network_adapters":
+            return {"status": "simulated_or_custom_transport",
+                    "real_account_proven": False}
+        if (type(record.get("provider_response_id_sha256")) is not str
+                or _SHA.fullmatch(record["provider_response_id_sha256"]) is None
+                or any(type(record.get(key)) is not int
+                       or record[key] < 0 for key in
+                       ("input_tokens_reported", "output_tokens_reported"))):
+            return {"status": "provider_usage_evidence_incomplete",
+                    "real_account_proven": False}
+        return {
+            "status": "owner_live_candidate_needs_provider_account_check",
+            "real_account_proven": False,
+            "actual_provider_billing_verified": False,
+            "model_weights_attested": False,
+            "ready_for_unattended_autonomy": False,
+        }
+
+    @staticmethod
     def latest_local(kernel):
         if not isinstance(kernel, LearningKernel):
             raise TypeError("LearningKernel required")
