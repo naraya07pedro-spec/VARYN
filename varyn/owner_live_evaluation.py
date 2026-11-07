@@ -88,13 +88,21 @@ class OwnerReviewedLiveEvaluation:
             "WHERE family='github_public_facts' AND succeeded=1"
         ).fetchone()[0]
         failures = self.ledger.summary()["total_failed_fact_checks"]
-        eligible = (successes >= 2 and failures >= 1
-                    and remaining_requests >= 10
-                    and remaining_output >= 10 * output_limit)
-        # A session can be considered 'ready' only with evidence and budget.
-        reason = ("ready" if eligible else
-                  "insufficient_evidence" if successes < 2 or failures < 1
-                  else "insufficient_model_budget")
+        # Check the durable scheduler BEFORE spending GitHub GET quota.
+        # If a previous run/crash consumed the same source batch, refuse to
+        # fetch five public references for a doomed second attempt.
+        schedule = self.scheduler.preflight(
+            case_count=5, max_cycles_per_utc_day=1,
+            max_evaluator_calls_per_utc_day=10)
+        enough_evidence = successes >= 2 and failures >= 1
+        enough_model_budget = (
+            remaining_requests >= 10
+            and remaining_output >= 10 * output_limit)
+        reason = (
+            "insufficient_evidence" if not enough_evidence else
+            "insufficient_model_budget" if not enough_model_budget else
+            schedule["status"]
+        )
         return {
             "status": reason,
             "model": selected.model,
