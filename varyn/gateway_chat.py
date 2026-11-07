@@ -52,7 +52,7 @@ class SafeProviderHTTPError(ProviderError):
 _MODEL_LABEL = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._:/+-]{0,119}\Z")
 
 
-_RESPONSE_ID_LABEL = re.compile(r"\\A[A-Za-z0-9][A-Za-z0-9._:/+-]{2,159}\\Z")
+_RESPONSE_ID_LABEL = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._:/+-]{2,159}\Z")
 
 
 def reported_response_id(raw):
