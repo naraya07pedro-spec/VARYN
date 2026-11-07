@@ -1,0 +1,46 @@
+name: Local model-evaluation acceptance receipts
+
+on:
+  pull_request:
+    paths:
+      - 'varyn/local_evaluation_receipts.py'
+      - 'varyn/owner_live_evaluation.py'
+      - 'varyn/budgeted_reflection_scheduler.py'
+      - 'varyn/agent_mode_gui.py'
+      - 'tests/test_local_evaluation_receipts.py'
+      - 'docs/LOCAL-EVALUATION-ACCEPTANCE.md'
+      - '.github/workflows/local-evaluation-receipts-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  receipts-ubuntu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m py_compile varyn/local_evaluation_receipts.py varyn/owner_live_evaluation.py varyn/agent_mode_gui.py varyn/budgeted_reflection_scheduler.py
+      - run: python -m unittest discover -s tests -p 'test_local_evaluation_receipts.py' -v
+      - run: python -m unittest discover -s tests -p 'test_owner_live_evaluation.py' -v
+      - run: python -m unittest discover -s tests -p 'test_feedback_evaluation_scheduler.py' -v
+      - run: python -m unittest discover -s tests -p 'test_grounded_learning_bridge.py' -v
+
+  receipts-windows:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m py_compile varyn/local_evaluation_receipts.py varyn/owner_live_evaluation.py varyn/agent_mode_gui.py varyn/budgeted_reflection_scheduler.py
+      - run: python -m unittest discover -s tests -p 'test_local_evaluation_receipts.py' -v
+      - run: python -m unittest discover -s tests -p 'test_owner_live_evaluation.py' -v
+      - run: python -m unittest discover -s tests -p 'test_feedback_evaluation_scheduler.py' -v
+      - run: python -m unittest discover -s tests -p 'test_grounded_learning_bridge.py' -v
+      - run: python -m unittest discover -s tests -p 'test_consumer_workspace_tk.py' -v
