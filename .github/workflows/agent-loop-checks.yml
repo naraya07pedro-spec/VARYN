@@ -1,0 +1,44 @@
+name: Owner-gated agent loop acceptance
+
+on:
+  pull_request:
+    paths:
+      - 'varyn/agent_execution_loop.py'
+      - 'varyn/agent_loop_journal.py'
+      - 'tests/test_agent_execution_loop.py'
+      - 'docs/OWNER-GATED-AGENT-LOOP.md'
+      - '.github/workflows/agent-loop-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  agent-loop-ubuntu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile integration
+        run: python -m py_compile varyn/agent_execution_loop.py varyn/agent_loop_journal.py
+      - name: Run integration tests without network
+        run: python -m unittest discover -s tests -p 'test_agent_execution_loop.py' -v
+      - name: Preserve learning kernel regressions
+        run: python -m unittest discover -s tests -p 'test_learning_kernel.py' -v
+  agent-loop-windows:
+    runs-on: windows-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile integration
+        run: python -m py_compile varyn/agent_execution_loop.py varyn/agent_loop_journal.py
+      - name: Run integration tests without network
+        run: python -m unittest discover -s tests -p 'test_agent_execution_loop.py' -v
+      - name: Preserve learning kernel regressions
+        run: python -m unittest discover -s tests -p 'test_learning_kernel.py' -v
