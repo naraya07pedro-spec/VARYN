@@ -232,6 +232,10 @@ class BudgetedReflectionScheduler:
             "evaluator_calls": benchmark.calls,
             "reserved_evaluator_calls": required_calls,
             "regressions": result["evaluation"]["regressions"],
+            "baseline_passes": result["evaluation"]["baseline_passes"],
+            "candidate_passes": result["evaluation"]["candidate_passes"],
+            "evaluated_cases": len(case_ids),
+            "suite_sha256": result["evaluation"]["suite_sha256"],
             "model_weights_modified": False,
             "external_billing_cap_enforced": False,
         }
