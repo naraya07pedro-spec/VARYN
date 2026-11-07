@@ -61,6 +61,17 @@ class ConsumerDesktopTests(unittest.TestCase):
                     self.assertIn("memory", window._nav)
                     self.assertTrue(window.telegram_token.winfo_exists())
                     self.assertTrue(window.chat_surface.active_model_label.winfo_exists())
+                    self.assertTrue(window.chat_surface.agent_button.winfo_exists())
+                    window.chat_surface.open_public_github_agent()
+                    agent_panel = window.chat_surface._owner_agent_window
+                    self.assertTrue(agent_panel.winfo_exists())
+                    self.assertFalse(agent_panel.allow_read.get())
+                    self.assertFalse(agent_panel.allow_send_observation.get())
+                    agent_panel.run()
+                    self.assertIn("Choose a live model", agent_panel.status.get())
+                    self.assertEqual(
+                        desktop.controller.status()["requests_used"], 0)
+                    agent_panel.close()
                     self.assertIn("github", window._app_buttons)
                     self.assertIn("notion", window._app_buttons)
                     self.assertIn("telegram", window._app_buttons)
