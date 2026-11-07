@@ -19,6 +19,7 @@ from varyn.agent_execution_loop import OwnerApprovedAgentLoop
 from varyn.agent_loop_journal import AgentLoopJournal
 from varyn.grounded_github import GroundingRejected
 from varyn.learning_kernel import LearningKernel
+from varyn.local_evaluation_receipts import LocalEvaluationReceipts
 from varyn.owner_live_evaluation import OwnerReviewedLiveEvaluation, PUBLIC_CASE_REPOSITORIES
 from varyn.gateway_chat import KEY_ENVS
 from varyn.model_registry import Registry
@@ -106,6 +107,10 @@ class OwnerAgentWindow(tk.Toplevel):
             eval_row, text="Run live learning evaluation",
             command=self.run_live_evaluation)
         self.eval_button.pack(side="left", padx=(12, 0))
+        self.receipt_button = ttk.Button(
+            eval_row, text="Last evaluation receipt",
+            command=self.show_last_evaluation_receipt)
+        self.receipt_button.pack(side="left", padx=(12, 0))
         self.status = tk.StringVar(
             master=self, value="OFFLINE. Select an AI model and allow "
                                "one internet request in Chat first.")
@@ -224,6 +229,61 @@ class OwnerAgentWindow(tk.Toplevel):
             " | recorded failures " + str(info["verified_failures"]) +
             " | remaining session budget required: 10 AI requests."
         )
+
+    def show_last_evaluation_receipt(self):
+        """Read local metadata only; no network, provider or key required."""
+        if self._closed or self._busy:
+            return
+        try:
+            with LearningKernel(
+                self._learning_location() / "learning.sqlite3") as kernel:
+                receipt = LocalEvaluationReceipts(kernel).latest()
+        except Exception:
+            self.status.set("Local evaluation record unavailable.")
+            return
+        if receipt is None:
+            self.status.set("No live evaluation has been attempted yet.")
+            self._show("No local acceptance receipt.")
+            return
+        if receipt["local_receipt_digest_matches"] is False:
+            self.status.set("Local evaluation receipt checksum MISMATCH.")
+            self._show("Stored result may have been altered or corrupted. "
+                       "Do not trust this result.")
+            return
+        status = receipt["status"]
+        count = receipt["evaluated_cases"]
+        score = ("No complete quality comparison"
+                 if count is None else
+                 str(receipt["baseline_passes"]) + "/" + str(count) +
+                 " baseline vs " + str(receipt["candidate_passes"]) +
+                 "/" + str(count) + " candidate; regressions " +
+                 str(receipt["regressions"]))
+        summary = (
+            "Session status: " + status + "\n"
+            "Checked cases: " + (str(count) if count is not None else "0") + "\n"
+            "Quality: " + score + "\n"
+            "Public GitHub reads: " + str(receipt["public_reads"]) + "\n"
+            "AI calls attempted: " + str(receipt["model_requests_attempted"]) + "\n"
+            "Successful model responses: " +
+                str(receipt["model_responses_succeeded"]) + "\n"
+            "Failed/uncertain calls: " +
+                str(receipt["model_requests_failed_or_uncertain"]) + "\n"
+            "Provider-reported input tokens: " +
+                str(receipt["reported_input_tokens"]) + "\n"
+            "Provider-reported output tokens: " +
+                str(receipt["reported_output_tokens"]) + "\n"
+            "Responses with missing usage: " +
+                str(receipt["responses_with_incomplete_usage"]) + "\n"
+            "Session estimated cost (not actual): " +
+                str(receipt["estimated_micro_usd"]) + " micro-USD\n"
+            "Actual provider charges: NOT VERIFIED\n"
+            "Local record SHA-256: " +
+                str(receipt["evidence_sha256"] or "pending") + "\n"
+            "Stored content: metadata only, no prompts or keys.\n"
+            "A checksum is NOT a trusted third-party signature."
+        )
+        self.status.set("Latest local evaluation: " + status)
+        self._show(summary)
 
     def run_live_evaluation(self):
         if self._closed or self._busy:
@@ -438,10 +498,24 @@ class OwnerAgentWindow(tk.Toplevel):
                 "Learning evaluation: " + result.get("status", "unknown") +
                 " | public reads " + str(result.get("public_reads", 0)) +
                 " | AI calls " + str(result.get("model_calls", 0)))
+            baseline = result.get("baseline_passes")
+            candidate = result.get("candidate_passes")
+            total = result.get("evaluated_cases")
+            scores = ("No complete quality comparison"
+                      if total is None else
+                      "Baseline " + str(baseline) + "/" + str(total) +
+                      " | candidate " + str(candidate) + "/" + str(total) +
+                      " | regressions " + str(result.get("regressions")))
             self._show(
-                "Model quality change requires independent held-out "
-                "verification. Status: " + result.get("status", "unknown") +
-                "\nProvider billing is not capped by local estimates.")
+                "Verified public-fact test result: " + scores +
+                "\nProvider-reported input tokens: " +
+                str(result.get("provider_reported_input_tokens", 0)) +
+                "\nProvider-reported output tokens: " +
+                str(result.get("provider_reported_output_tokens", 0)) +
+                "\nSession record SHA-256: " +
+                str(result.get("receipt_sha256") or "not completed") +
+                "\nActual provider billing remains UNKNOWN. "
+                "Use Last evaluation receipt for local details.")
             return
         if kind == "learning_error":
             self.status.set("Evaluation stopped or was denied. No automatic "
