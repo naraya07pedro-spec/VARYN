@@ -111,6 +111,9 @@ class ProviderAcceptanceSmokeTests(unittest.TestCase):
         self.assertEqual(res["input_tokens_reported"], 91)
         self.assertEqual(res["output_tokens_reported"], 48)
         self.assertEqual(res["source_kind"], "injected_test_or_custom_transport")
+        self.assertEqual(
+            self.acceptance.acceptance_gate(res)["status"],
+            "simulated_or_custom_transport")
         self.assertFalse(res["network_account_independently_verified"])
         self.assertFalse(res["provider_billing_verified"])
 
@@ -124,6 +127,7 @@ class ProviderAcceptanceSmokeTests(unittest.TestCase):
     def test_denied_model_only_public_get(self):
         r = self.run_approved(review_model=lambda _: False)
         self.assertEqual(r["status"], "approved_model_request_denied")
+        self.assertEqual(len(r["observation_sha256"]), 64)
         self.assertEqual(self.public_gets, ["python/cpython"])
         self.assertEqual(self.model_requests, [])
         self.assertTrue(r["local_digest_matches"])
@@ -133,9 +137,60 @@ class ProviderAcceptanceSmokeTests(unittest.TestCase):
         r = self.run_approved()
         self.assertEqual(r["status"], "verification_failed")
         self.assertEqual(r["fact_matches_tool"], 0)
-        self.assertIsNone(r["observation_sha256"])
+        self.assertEqual(len(r["observation_sha256"]), 64)
         self.assertEqual(self.kernel.db.execute(
             "SELECT COUNT(*) FROM outcomes").fetchone()[0], 0)
+
+    def test_failed_fact_carries_exact_same_observation_hash_as_success(self):
+        import json
+        fail = self.run_approved(
+            review_model=lambda _: False)
+        # Because one session/day is already reserved, use source snapshot
+        # from the existing denied-model read and compare canonical hash.
+        selected = {key: OBSERVED[key] for key in (
+            "repository", "default_branch", "stars",
+            "open_items_including_prs", "archived")}
+        digest = sha256(json.dumps(
+            selected, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        self.assertEqual(fail["observation_sha256"], digest)
+
+    def test_private_helper_cannot_mark_unverified_claim_passed(self):
+        current = self.acceptance.preflight(provider="openrouter")
+        ident = self.acceptance._begin(
+            provider="openrouter", model=current["model"],
+            quoted=current["estimated_micro_usd"],
+            now=__import__("datetime").datetime.now(
+                __import__("datetime").timezone.utc))
+        with self.assertRaises(SmokeRejected):
+            self.acceptance._finish(
+                ident, status="verification_passed",
+                public_reads=1, model_requests=1,
+                observation_sha256="a" * 64)
+        with self.assertRaises(SmokeRejected):
+            self.acceptance._finish(
+                ident, status="verification_failed",
+                public_reads=1, model_requests=1)
+        self.assertEqual(self.acceptance.latest()["status"],
+                         "running_or_interrupted")
+
+    def test_pure_gate_never_claims_independently_proven_account(self):
+        record = self.run_approved()
+        forged = dict(record)
+        forged["source_kind"] = "configured_network_adapters"
+        fake = self.acceptance.acceptance_gate(forged)
+        self.assertEqual(
+            fake["status"], "owner_live_candidate_needs_provider_account_check")
+        self.assertFalse(fake["real_account_proven"])
+        self.assertFalse(fake["actual_provider_billing_verified"])
+        self.assertFalse(fake["ready_for_unattended_autonomy"])
+        forged["provider_response_id_sha256"] = None
+        self.assertEqual(
+            self.acceptance.acceptance_gate(forged)["status"],
+            "provider_usage_evidence_incomplete")
+        forged["local_digest_matches"] = False
+        self.assertEqual(
+            self.acceptance.acceptance_gate(forged)["status"],
+            "receipt_untrusted")
 
     def test_upstream_identity_missing_or_wrong_must_not_claim_pass(self):
         for case in ("missing_model", "wrong_model"):
