@@ -22,6 +22,7 @@ from varyn.learning_kernel import LearningKernel
 from varyn.local_evaluation_receipts import LocalEvaluationReceipts
 from varyn.owner_billing_reconciliation import OwnerBillingReconciliation
 from varyn.owner_provider_acceptance import OwnerProviderAcceptance, REPOSITORY
+from varyn.acceptance_share_report import render_redacted_acceptance_report
 from varyn.owner_live_evaluation import OwnerReviewedLiveEvaluation, PUBLIC_CASE_REPOSITORIES
 from varyn.gateway_chat import KEY_ENVS
 from varyn.model_registry import Registry
@@ -130,10 +131,16 @@ class OwnerAgentWindow(tk.Toplevel):
             smoke_row, text="Test 1 GET + 1 AI",
             command=self.run_provider_smoke)
         self.smoke_button.pack(side="left", padx=(8, 0))
+        smoke_actions = ttk.Frame(body)
+        smoke_actions.pack(fill="x", pady=(4, 0))
         self.smoke_last_button = ttk.Button(
-            body, text="Last provider smoke receipt (offline)",
+            smoke_actions, text="Last provider smoke receipt (offline)",
             command=self.show_last_provider_smoke)
-        self.smoke_last_button.pack(anchor="w", pady=(4, 0))
+        self.smoke_last_button.pack(side="left")
+        self.smoke_share_button = ttk.Button(
+            smoke_actions, text="Copy safe diagnostic summary",
+            command=self.copy_safe_smoke_summary)
+        self.smoke_share_button.pack(side="left", padx=(10, 0))
         self.status = tk.StringVar(
             master=self, value="OFFLINE. Select an AI model and allow "
                                "one internet request in Chat first.")
@@ -344,9 +351,12 @@ class OwnerAgentWindow(tk.Toplevel):
             self.status.set("Provider acceptance local checksum MISMATCH.")
             self._show("Stored metadata may be corrupt or edited; do not trust it.")
             return
-        self.status.set("Last provider smoke: " + record["status"])
+        verdict = OwnerProviderAcceptance.acceptance_gate(record)
+        self.status.set("Last provider smoke: " + record["status"] +
+                        " | " + verdict["status"])
         self._show(
             "Status: " + record["status"] + "\n"
+            "Evidence classification: " + verdict["status"] + "\n"
             "Transport: " + record["source_kind"] + "\n"
             "Provider: " + record["provider"] + "\n"
             "Public GETs attempted: " +
@@ -368,6 +378,33 @@ class OwnerAgentWindow(tk.Toplevel):
             "General reasoning capability: NOT certified.\n"
             "Stored data are local metadata only, not raw responses or API keys."
         )
+
+    def copy_safe_smoke_summary(self):
+        """User-initiated offline diagnostic copy; never includes private data."""
+        if self._closed or self._busy:
+            return
+        try:
+            with LearningKernel(
+                    self._learning_location() / "learning.sqlite3") as kernel:
+                record = OwnerProviderAcceptance.latest_local(kernel)
+            data = render_redacted_acceptance_report(record)
+        except Exception:
+            self.status.set("Could not prepare safe local diagnostic. "
+                            "No clipboard action taken.")
+            return
+        try:
+            self.clipboard_clear()
+            self.clipboard_append(data)
+            self.update_idletasks()
+        except tk.TclError:
+            self.status.set("Clipboard unavailable; safe summary is shown "
+                            "below for manual inspection.")
+            self._show(data)
+            return
+        self.status.set(
+            "Safe diagnostic copied. You control whether to share it. "
+            "No API keys, messages, raw IDs or charges included.")
+        self._show(data)
 
     def _provider_smoke_preflight(self, provider, offer, secret):
         root = self._learning_location()

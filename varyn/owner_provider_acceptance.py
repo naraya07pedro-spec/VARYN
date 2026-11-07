@@ -28,6 +28,14 @@ _STATUSES = frozenset({
 _INPUT_ESTIMATE = 512
 _OUTPUT_LIMIT = 256
 _ESTIMATE_CEILING_MICRO_USD = 50000
+_RECEIPT_KEYS = (
+    "id", "utc_day", "started_utc", "finished_utc", "status",
+    "provider", "model_sha256", "source_kind",
+    "estimated_micro_usd", "public_reads_attempted",
+    "model_requests_attempted", "fact_matches_tool",
+    "observation_sha256", "provider_response_id_sha256",
+    "input_tokens_reported", "output_tokens_reported",
+)
 
 
 class SmokeRejected(ValueError):
@@ -141,7 +149,8 @@ class OwnerProviderAcceptance:
         return ident
 
     def _finish(self, ident, *, status, public_reads, model_requests,
-                checked=None, provider_response_id_sha256=None,
+                checked=None, observation_sha256=None,
+                provider_response_id_sha256=None,
                 input_tokens=None, output_tokens=None):
         if (status not in _STATUSES or type(public_reads) is not int
                 or not 0 <= public_reads <= 1
@@ -160,10 +169,22 @@ class OwnerProviderAcceptance:
         checked_status = (
             1 if status == "verification_passed" else
             0 if status == "verification_failed" else None)
-        evidence = checked["observation_sha256"] if checked else None
-        if evidence is not None and (
-                type(evidence) is not str or _SHA.fullmatch(evidence) is None):
+        if (observation_sha256 is not None and
+                (type(observation_sha256) is not str
+                 or _SHA.fullmatch(observation_sha256) is None
+                 or public_reads != 1)):
             raise SmokeRejected("Invalid public observation fingerprint")
+        if status == "verification_passed":
+            if (type(checked) is not dict
+                    or checked.get("verified_against_tool_observation") is not True
+                    or type(checked.get("observation_sha256")) is not str
+                    or checked["observation_sha256"] != observation_sha256):
+                raise SmokeRejected("Missing actual tool-based verification evidence")
+        elif checked is not None:
+            raise SmokeRejected("Only successful verification has checked evidence")
+        if (status == "verification_failed" and observation_sha256 is None):
+            raise SmokeRejected("Failure must retain public source fingerprint")
+        evidence = observation_sha256
         row = self.kernel.db.execute(
             "SELECT utc_day,started_utc,provider,model_sha256,source_kind,"
             "estimated_micro_usd FROM owner_provider_smoke "
@@ -216,19 +237,12 @@ class OwnerProviderAcceptance:
         if row is None:
             return None
         record = dict(row)
-        keys = (
-            "id", "utc_day", "started_utc", "finished_utc", "status",
-            "provider", "model_sha256", "source_kind",
-            "estimated_micro_usd", "public_reads_attempted",
-            "model_requests_attempted", "fact_matches_tool",
-            "observation_sha256", "provider_response_id_sha256",
-            "input_tokens_reported", "output_tokens_reported")
         if row["status"] == "running":
             record["status"] = "running_or_interrupted"
             record["local_digest_matches"] = None
         else:
             digest = sha256(json.dumps(
-                {k: record[k] for k in keys},
+                {k: record[k] for k in _RECEIPT_KEYS},
                 sort_keys=True, separators=(",", ":")).encode()).hexdigest()
             record["local_digest_matches"] = digest == record["receipt_sha256"]
         record["network_account_independently_verified"] = False
@@ -237,6 +251,54 @@ class OwnerProviderAcceptance:
         record["general_model_quality_verified"] = False
         record["raw_prompt_or_response_stored"] = False
         return record
+
+    @staticmethod
+    def acceptance_gate(record):
+        """Conservative, offline triage; NEVER prove account or invoice authenticity.
+
+        "configured_network_adapters" reflects configured Python functions,
+        not authenticated independent evidence of network origin.
+        """
+        if type(record) is not dict:
+            return {"status": "no_receipt", "real_account_proven": False}
+        if record.get("local_digest_matches") is not True:
+            return {"status": "receipt_untrusted", "real_account_proven": False}
+        try:
+            canonical = {k: record[k] for k in _RECEIPT_KEYS}
+            valid_digest = sha256(json.dumps(
+                canonical, sort_keys=True,
+                separators=(",", ":")).encode()).hexdigest()
+        except (KeyError, TypeError, ValueError, UnicodeError):
+            return {"status": "receipt_untrusted", "real_account_proven": False}
+        if valid_digest != record.get("receipt_sha256"):
+            return {"status": "receipt_untrusted", "real_account_proven": False}
+        if record.get("status") != "verification_passed":
+            return {"status": "no_verified_fact_match",
+                    "real_account_proven": False}
+        if (record.get("public_reads_attempted") != 1
+                or record.get("model_requests_attempted") != 1
+                or record.get("fact_matches_tool") != 1
+                or type(record.get("observation_sha256")) is not str
+                or _SHA.fullmatch(record["observation_sha256"]) is None):
+            return {"status": "incomplete_local_evidence",
+                    "real_account_proven": False}
+        if record.get("source_kind") != "configured_network_adapters":
+            return {"status": "simulated_or_custom_transport",
+                    "real_account_proven": False}
+        if (type(record.get("provider_response_id_sha256")) is not str
+                or _SHA.fullmatch(record["provider_response_id_sha256"]) is None
+                or any(type(record.get(key)) is not int
+                       or record[key] < 0 for key in
+                       ("input_tokens_reported", "output_tokens_reported"))):
+            return {"status": "provider_usage_evidence_incomplete",
+                    "real_account_proven": False}
+        return {
+            "status": "owner_live_candidate_needs_provider_account_check",
+            "real_account_proven": False,
+            "actual_provider_billing_verified": False,
+            "model_weights_attested": False,
+            "ready_for_unattended_autonomy": False,
+        }
 
     @staticmethod
     def latest_local(kernel):
@@ -273,6 +335,7 @@ class OwnerProviderAcceptance:
         reads = 0
         models = 0
         checked = None
+        observation_hash = None
         response_id_hash = None
         tokens_in = None
         tokens_out = None
@@ -305,6 +368,9 @@ class OwnerProviderAcceptance:
             selected = {key: facts[key] for key in (
                 "repository", "default_branch", "stars",
                 "open_items_including_prs", "archived")}
+            observation_hash = sha256(json.dumps(
+                selected, sort_keys=True, separators=(",", ":"),
+                ensure_ascii=True).encode("utf-8")).hexdigest()
             prompt = json.dumps({
                 "task": "Copy verified public GitHub metadata to strict JSON.",
                 "public_metadata_untrusted_data": selected,
@@ -331,7 +397,8 @@ class OwnerProviderAcceptance:
             if authorization is not True:
                 return self._finish(
                     ident, status="approved_model_request_denied",
-                    public_reads=reads, model_requests=0)
+                    public_reads=reads, model_requests=0,
+                    observation_sha256=observation_hash)
             models = 1
             result = self.gateway.generate(
                 prompt, provider=provider,
@@ -355,12 +422,13 @@ class OwnerProviderAcceptance:
                 return self._finish(
                     ident, status="verification_failed",
                     public_reads=reads, model_requests=models,
+                    observation_sha256=observation_hash,
                     provider_response_id_sha256=response_id_hash,
                     input_tokens=tokens_in, output_tokens=tokens_out)
             return self._finish(
                 ident, status="verification_passed",
                 public_reads=reads, model_requests=models,
-                checked=checked,
+                checked=checked, observation_sha256=observation_hash,
                 provider_response_id_sha256=response_id_hash,
                 input_tokens=tokens_in, output_tokens=tokens_out)
         except BaseException:
@@ -370,7 +438,7 @@ class OwnerProviderAcceptance:
                 self._finish(
                     ident, status="needs_review",
                     public_reads=reads, model_requests=models,
-                    checked=checked,
+                    observation_sha256=observation_hash,
                     provider_response_id_sha256=response_id_hash,
                     input_tokens=tokens_in, output_tokens=tokens_out)
             except Exception:

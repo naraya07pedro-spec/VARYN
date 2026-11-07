@@ -14,12 +14,14 @@ on:
       - 'varyn/local_evaluation_receipts.py'
       - 'varyn/owner_billing_reconciliation.py'
       - 'varyn/owner_provider_acceptance.py'
+      - 'varyn/acceptance_share_report.py'
       - 'varyn/gateway_chat.py'
       - 'varyn/universal_gateway.py'
       - 'varyn/consumer_chat.py'
       - 'docs/LOCAL-EVALUATION-ACCEPTANCE.md'
       - 'docs/OWNER-BILLING-CORRELATION.md'
       - 'docs/OWNER-PROVIDER-SMOKE-ACCEPTANCE.md'
+      - 'docs/SMOKE-EVIDENCE-ACCEPTANCE.md'
       - 'docs/LIVE-OWNER-EVALUATION-WINDOWS.md'
       - 'docs/AGENT-MODE-WINDOWS-PILOT.md'
       - 'docs/GROUNDED-LEARNING-BRIDGE.md'
@@ -30,7 +32,7 @@ permissions:
 
 jobs:
   brand-assets:
-    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'feat/agent-mode-desktop-v1-20261107' || github.head_ref == 'feat/grounded-learning-bridge-20261107' || github.head_ref == 'feat/feedback-evaluation-scheduler-20261107' || github.head_ref == 'feat/live-evaluator-desktop-20261107' || github.head_ref == 'feat/learning-acceptance-receipts-v1-20261107' || github.head_ref == 'feat/provider-billing-reconciliation-20261107' || github.head_ref == 'feat/owner-provider-smoke-acceptance-20261107'
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'feat/agent-mode-desktop-v1-20261107' || github.head_ref == 'feat/grounded-learning-bridge-20261107' || github.head_ref == 'feat/feedback-evaluation-scheduler-20261107' || github.head_ref == 'feat/live-evaluator-desktop-20261107' || github.head_ref == 'feat/learning-acceptance-receipts-v1-20261107' || github.head_ref == 'feat/provider-billing-reconciliation-20261107' || github.head_ref == 'feat/owner-provider-smoke-acceptance-20261107' || github.head_ref == 'feat/smoke-evidence-hardening-20261107'
     runs-on: ubuntu-latest
     timeout-minutes: 7
     steps:
