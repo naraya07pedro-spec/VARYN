@@ -69,6 +69,13 @@ class ConsumerDesktopTests(unittest.TestCase):
                     self.assertFalse(agent_panel.allow_send_observation.get())
                     self.assertFalse(agent_panel.store_verified_facts.get())
                     self.assertFalse(agent_panel.use_learned_skill.get())
+                    self.assertFalse(agent_panel.eval_optin.get())
+                    self.assertTrue(agent_panel.eval_button.winfo_exists())
+                    agent_panel.run_live_evaluation()
+                    self.assertIn(
+                        "separate", agent_panel.status.get().lower())
+                    self.assertEqual(
+                        desktop.controller.status()["requests_used"], 0)
                     agent_panel.run()
                     self.assertIn("Choose a live model", agent_panel.status.get())
                     self.assertEqual(
