@@ -5,8 +5,11 @@ on:
     paths:
       - '.github/workflows/agent-mode-portable-preview.yml'
       - 'varyn/agent_mode_gui.py'
+      - 'varyn/agent_execution_loop.py'
+      - 'varyn/grounded_github.py'
       - 'varyn/consumer_chat.py'
       - 'docs/AGENT-MODE-WINDOWS-PILOT.md'
+      - 'docs/GROUNDED-LEARNING-BRIDGE.md'
   workflow_dispatch:
 
 permissions:
@@ -14,7 +17,7 @@ permissions:
 
 jobs:
   brand-assets:
-    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'feat/agent-mode-desktop-v1-20261107'
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'feat/agent-mode-desktop-v1-20261107' || github.head_ref == 'feat/grounded-learning-bridge-20261107'
     runs-on: ubuntu-latest
     timeout-minutes: 7
     steps:
