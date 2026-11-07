@@ -67,6 +67,8 @@ class ConsumerDesktopTests(unittest.TestCase):
                     self.assertTrue(agent_panel.winfo_exists())
                     self.assertFalse(agent_panel.allow_read.get())
                     self.assertFalse(agent_panel.allow_send_observation.get())
+                    self.assertFalse(agent_panel.store_verified_facts.get())
+                    self.assertFalse(agent_panel.use_learned_skill.get())
                     agent_panel.run()
                     self.assertIn("Choose a live model", agent_panel.status.get())
                     self.assertEqual(
