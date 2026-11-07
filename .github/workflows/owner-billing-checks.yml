@@ -1,0 +1,49 @@
+name: Owner billing correlation acceptance
+
+on:
+  pull_request:
+    paths:
+      - 'varyn/gateway_chat.py'
+      - 'varyn/universal_gateway.py'
+      - 'varyn/owner_live_evaluation.py'
+      - 'varyn/owner_billing_reconciliation.py'
+      - 'varyn/agent_mode_gui.py'
+      - 'tests/test_owner_billing_reconciliation.py'
+      - 'tests/test_consumer_workspace_tk.py'
+      - 'docs/OWNER-BILLING-CORRELATION.md'
+      - '.github/workflows/owner-billing-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  billing-ubuntu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m py_compile varyn/gateway_chat.py varyn/universal_gateway.py varyn/owner_live_evaluation.py varyn/owner_billing_reconciliation.py varyn/agent_mode_gui.py
+      - run: python -m unittest discover -s tests -p 'test_owner_billing_reconciliation.py' -v
+      - run: python -m unittest discover -s tests -p 'test_local_evaluation_receipts.py' -v
+      - run: python -m unittest discover -s tests -p 'test_owner_live_evaluation.py' -v
+      - run: python -m unittest discover -s tests -p 'test_feedback_evaluation_scheduler.py' -v
+      - run: python -m unittest discover -s tests -p 'test_grounded_learning_bridge.py' -v
+  billing-windows:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m py_compile varyn/gateway_chat.py varyn/universal_gateway.py varyn/owner_live_evaluation.py varyn/owner_billing_reconciliation.py varyn/agent_mode_gui.py
+      - run: python -m unittest discover -s tests -p 'test_owner_billing_reconciliation.py' -v
+      - run: python -m unittest discover -s tests -p 'test_local_evaluation_receipts.py' -v
+      - run: python -m unittest discover -s tests -p 'test_owner_live_evaluation.py' -v
+      - run: python -m unittest discover -s tests -p 'test_feedback_evaluation_scheduler.py' -v
+      - run: python -m unittest discover -s tests -p 'test_grounded_learning_bridge.py' -v
+      - run: python -m unittest discover -s tests -p 'test_consumer_workspace_tk.py' -v

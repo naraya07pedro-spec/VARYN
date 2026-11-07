@@ -6,9 +6,10 @@ Owner-reviewed cost estimates do NOT enforce actual provider billing limits.
 """
 import os
 import urllib.error
+from hashlib import sha256
 from datetime import date
 
-from varyn.gateway_chat import KEY_ENVS, prepare, parse, post, reported_model
+from varyn.gateway_chat import KEY_ENVS, prepare, parse, post, reported_model, reported_response_id
 from varyn.model_registry import Registry, RegistryRejected
 from varyn.providers import ModelReply, ProviderError
 from varyn.safety import assert_no_obvious_secrets
@@ -60,6 +61,7 @@ class UniversalGateway:
                 raise ProviderError("Model API credential missing")
         self.budget.reserve(max_output_tokens)
         observed_model = None
+        response_id_sha256 = None
         try:
             if selected.provider == "fake":
                 reply = ModelReply("FAKE: no API or paid model called",
@@ -72,6 +74,10 @@ class UniversalGateway:
                 reply = parse(selected.provider, selected.model, body)
                 # Do not silently call selected model the ACTUAL upstream model.
                 observed_model = reported_model(body)
+                response_identifier = reported_response_id(body)
+                if response_identifier is not None:
+                    response_id_sha256 = sha256(
+                        response_identifier.encode("utf-8")).hexdigest()
         except (urllib.error.URLError, TimeoutError, OSError):
             self.budget.report_failure()
             raise ProviderError("Model API request failed") from None
@@ -84,6 +90,9 @@ class UniversalGateway:
             "estimate_only": True, "actual_billing_cap_enforced": False,
             "native_consumer_history_sync": False, "varyn_fallback": False,
             "provider_reported_model": observed_model,
+            # Only a hash of the UNTRUSTED provider claim is returned,
+            # never the raw response ID or bearer credential.
+            "provider_response_id_sha256": response_id_sha256,
             "provider_reported_model_matches_selected": (
                 None if observed_model is None else
                 observed_model == selected.model),

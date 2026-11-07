@@ -17,6 +17,7 @@ from varyn.budgeted_reflection_scheduler import (
 from varyn.grounded_benchmark import GroundedFactBenchmark
 from varyn.learning_kernel import LearningKernel
 from varyn.local_evaluation_receipts import LocalEvaluationReceipts
+from varyn.owner_billing_reconciliation import OwnerBillingReconciliation
 from varyn.public_github_tool import (
     PublicGithubToolGateway, parse_public_tool_intent)
 from varyn.safety import assert_no_obvious_secrets
@@ -148,6 +149,7 @@ class OwnerReviewedLiveEvaluation:
             return {**readiness, "public_reads": 0, "model_calls": 0}
 
         receipts = LocalEvaluationReceipts(self.kernel)
+        billing = OwnerBillingReconciliation(self.kernel)
         session_id = receipts.begin(
             provider=provider, model=readiness["model"],
             estimated_micro_usd=readiness["estimated_micro_usd"],
@@ -249,6 +251,10 @@ class OwnerReviewedLiveEvaluation:
                     usage["requests_failed_or_uncertain"] += 1
                     raise
                 usage["requests_succeeded"] += 1
+                # Hashes are generated from provider-claimed response IDs.
+                # An absent ID remains unknown, never an invented match.
+                billing.capture_provider_response(
+                    session_id, result.get("provider_response_id_sha256"))
                 reported = result["reply"].usage
                 input_tokens = reported.get("input_tokens") if type(reported) is dict else None
                 output_tokens = reported.get("output_tokens") if type(reported) is dict else None

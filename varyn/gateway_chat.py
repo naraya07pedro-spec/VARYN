@@ -52,6 +52,21 @@ class SafeProviderHTTPError(ProviderError):
 _MODEL_LABEL = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._:/+-]{0,119}\Z")
 
 
+_RESPONSE_ID_LABEL = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._:-]{2,159}\Z")
+
+
+def reported_response_id(raw):
+    """An untrusted provider-generated billing correlation label, not proof."""
+    try:
+        identifier = json.loads(raw).get("id")
+        if (type(identifier) is str
+                and _RESPONSE_ID_LABEL.fullmatch(identifier)):
+            return identifier
+    except (ValueError, AttributeError, TypeError, UnicodeError):
+        pass
+    return None
+
+
 def reported_model(raw):
     """Only a provider-CLAIMED model label, never authenticated upstream identity."""
     try:
