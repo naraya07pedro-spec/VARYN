@@ -76,6 +76,7 @@ class ConsumerDesktopTests(unittest.TestCase):
                     self.assertFalse(agent_panel.smoke_optin.get())
                     self.assertTrue(agent_panel.smoke_button.winfo_exists())
                     self.assertTrue(agent_panel.smoke_last_button.winfo_exists())
+                    self.assertTrue(agent_panel.smoke_share_button.winfo_exists())
                     agent_panel.run_provider_smoke()
                     self.assertIn("OFF", agent_panel.status.get())
                     with patch.object(agent_panel, "_learning_location",
@@ -84,6 +85,14 @@ class ConsumerDesktopTests(unittest.TestCase):
                         self.assertIn(
                             "No provider smoke session",
                             agent_panel.status.get())
+                        agent_panel.copy_safe_smoke_summary()
+                        self.assertIn("Safe diagnostic copied",
+                                      agent_panel.status.get())
+                        clip = agent_panel.clipboard_get()
+                        self.assertIn(
+                            "varyn.owner_acceptance_share.v1", clip)
+                        self.assertIn('"no_receipt"', clip)
+                        self.assertNotIn("api_key", clip)
                         agent_panel.show_last_evaluation_receipt()
                         self.assertIn(
                             "No live evaluation", agent_panel.status.get())
