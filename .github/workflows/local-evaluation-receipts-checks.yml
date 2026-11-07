@@ -8,6 +8,7 @@ on:
       - 'varyn/budgeted_reflection_scheduler.py'
       - 'varyn/agent_mode_gui.py'
       - 'tests/test_local_evaluation_receipts.py'
+      - 'tests/test_consumer_workspace_tk.py'
       - 'docs/LOCAL-EVALUATION-ACCEPTANCE.md'
       - '.github/workflows/local-evaluation-receipts-checks.yml'
   workflow_dispatch:
