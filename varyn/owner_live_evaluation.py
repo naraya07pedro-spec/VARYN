@@ -221,6 +221,11 @@ class OwnerReviewedLiveEvaluation:
                 allow_real_task=True, input_estimate=input_estimate,
                 max_output_tokens=output_limit,
                 ceiling_micro_usd=readiness["estimated_micro_usd"] // 10)
+            # A provider may alias/route models. A confirmed mismatch
+            # invalidates cross-skill comparison; no promotion is allowed.
+            if result["provider_reported_model_matches_selected"] is False:
+                raise LiveEvaluationRejected(
+                    "Provider reported a different model than the approved route")
             return result["reply"].text
 
         bench = GroundedFactBenchmark(tuple(cases), model_runner)
