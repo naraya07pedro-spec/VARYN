@@ -77,7 +77,7 @@ class OwnerAgentWindow(tk.Toplevel):
         ).pack(anchor="w", pady=(3, 2))
         ttk.Checkbutton(
             body, variable=self.store_verified_facts,
-            text="Save a hashed evidence receipt only after factual verification",
+            text="Store hashed fact-match receipts AND failure categories (local only)",
         ).pack(anchor="w", pady=(3, 2))
         ttk.Checkbutton(
             body, variable=self.use_learned_skill,
@@ -274,8 +274,9 @@ class OwnerAgentWindow(tk.Toplevel):
         self._busy = False
         self.start.configure(state="normal")
         if kind == "fact_mismatch":
-            self.status.set("AI facts failed comparison with GitHub data. "
-                            "No learning receipt saved. No automatic retry.")
+            self.status.set("AI facts failed GitHub verification. "
+                            "No success receipt saved. A hashed failure category "
+                            "is stored only if feedback opt-in was enabled.")
             self._show("The AI report did not match the approved tool evidence.")
             return
         if kind != "result":
