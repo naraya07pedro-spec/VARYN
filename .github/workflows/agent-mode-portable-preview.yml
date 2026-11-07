@@ -10,7 +10,9 @@ on:
       - 'varyn/verified_failure_feedback.py'
       - 'varyn/grounded_benchmark.py'
       - 'varyn/budgeted_reflection_scheduler.py'
+      - 'varyn/owner_live_evaluation.py'
       - 'varyn/consumer_chat.py'
+      - 'docs/LIVE-OWNER-EVALUATION-WINDOWS.md'
       - 'docs/AGENT-MODE-WINDOWS-PILOT.md'
       - 'docs/GROUNDED-LEARNING-BRIDGE.md'
   workflow_dispatch:
@@ -20,7 +22,7 @@ permissions:
 
 jobs:
   brand-assets:
-    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'feat/agent-mode-desktop-v1-20261107' || github.head_ref == 'feat/grounded-learning-bridge-20261107' || github.head_ref == 'feat/feedback-evaluation-scheduler-20261107'
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'feat/agent-mode-desktop-v1-20261107' || github.head_ref == 'feat/grounded-learning-bridge-20261107' || github.head_ref == 'feat/feedback-evaluation-scheduler-20261107' || github.head_ref == 'feat/live-evaluator-desktop-20261107'
     runs-on: ubuntu-latest
     timeout-minutes: 7
     steps:

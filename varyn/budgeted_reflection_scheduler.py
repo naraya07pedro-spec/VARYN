@@ -76,6 +76,56 @@ class BudgetedReflectionScheduler:
                 "ORDER BY started_utc DESC,id DESC LIMIT ?", (limit,))
         ]
 
+    def preflight(self, *, case_count=5,
+                  max_cycles_per_utc_day=1,
+                  max_evaluator_calls_per_utc_day=10, now=None):
+        """Non-reserving readiness check before gathering live test data.
+
+        This avoids fetching five GitHub cases when a crash/previous run
+        has already consumed the exact evidence batch or daily quota.
+        Still not a concurrency reservation: tick rechecks transactionally.
+        """
+        if (type(case_count) is not int or not 5 <= case_count <= 20
+                or type(max_cycles_per_utc_day) is not int
+                or not 1 <= max_cycles_per_utc_day <= 3
+                or type(max_evaluator_calls_per_utc_day) is not int
+                or not 10 <= max_evaluator_calls_per_utc_day <= 80):
+            raise ScheduleRejected("Invalid evaluation preflight limits")
+        current = datetime.now(timezone.utc) if now is None else now
+        if (not isinstance(current, datetime) or current.tzinfo is None
+                or current.utcoffset() is None):
+            raise ScheduleRejected("UTC-aware clock required")
+        day = current.astimezone(timezone.utc).date().isoformat()
+        required = case_count * 2
+        if required > max_evaluator_calls_per_utc_day:
+            return {"status": "budget_exhausted", "reserved_calls": 0}
+        failures = self.ledger.recent_fingerprints()
+        if not failures:
+            return {"status": "no_verified_failure", "reserved_calls": 0}
+        sources = [
+            row[0] for row in self.kernel.db.execute(
+                "SELECT id FROM outcomes "
+                "WHERE family='github_public_facts' AND succeeded=1 "
+                "ORDER BY created_at DESC,id DESC LIMIT 4")]
+        if len(sources) < 2:
+            return {"status": "not_enough_success_evidence",
+                    "reserved_calls": 0}
+        fingerprint = sha256(json.dumps({
+            "sources": sorted(sources), "failures": sorted(failures)
+        }, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+        consumed = self.kernel.db.execute(
+            "SELECT 1 FROM scheduled_reflection_runs WHERE source_hash=?",
+            (fingerprint,)).fetchone()
+        if consumed:
+            return {"status": "already_processed", "reserved_calls": 0}
+        count, used = self.kernel.db.execute(
+            "SELECT COUNT(*), COALESCE(SUM(reserved_evaluator_calls),0) "
+            "FROM scheduled_reflection_runs WHERE day=?", (day,)).fetchone()
+        if (count >= max_cycles_per_utc_day
+                or used + required > max_evaluator_calls_per_utc_day):
+            return {"status": "budget_exhausted", "reserved_calls": 0}
+        return {"status": "ready", "reserved_calls": required}
+
     def tick(self, *, enabled=False, trusted_evaluator=False,
              allow_declassified_reflection=False, benchmark=None,
              reflector=None, max_cycles_per_utc_day=1,
