@@ -14,6 +14,7 @@ on:
       - 'varyn/local_evaluation_receipts.py'
       - 'varyn/owner_billing_reconciliation.py'
       - 'varyn/owner_provider_acceptance.py'
+      - 'varyn/acceptance_share_report.py'
       - 'varyn/gateway_chat.py'
       - 'varyn/universal_gateway.py'
       - 'varyn/consumer_chat.py'
