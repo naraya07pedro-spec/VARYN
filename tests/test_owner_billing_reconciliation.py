@@ -141,8 +141,9 @@ class BillingCorrelationTests(unittest.TestCase):
         self.kernel = LearningKernel(self.path)
         self.billing = OwnerBillingReconciliation(self.kernel)
         self.assertTrue(self.billing.get(session_id)["local_checksum_matches"])
-        self.assertFalse(self.receipts.get(session_id)["actual_provider_cost_known"]
-                         if self.receipts is not None and False else False)
+        self.assertFalse(
+            LocalEvaluationReceipts(self.kernel).get(session_id)[
+                "actual_provider_cost_known"])
 
     def test_mismatched_csv_ids_rejected_without_stored_comparison(self):
         result = self.live()
@@ -228,8 +229,7 @@ class BillingCorrelationTests(unittest.TestCase):
             b'{"id":"a\\nb"}',
         ):
             value = reported_response_id(raw)
-            if raw in (b'{"id":"eval-ok-0001"}',
-                       b'{"id":"https://example.com"}'):
+            if raw == b'{"id":"eval-ok-0001"}':
                 self.assertIsNotNone(value)
             else:
                 self.assertIsNone(value)
