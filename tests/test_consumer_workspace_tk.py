@@ -72,11 +72,15 @@ class ConsumerDesktopTests(unittest.TestCase):
                     self.assertFalse(agent_panel.eval_optin.get())
                     self.assertTrue(agent_panel.eval_button.winfo_exists())
                     self.assertTrue(agent_panel.receipt_button.winfo_exists())
+                    self.assertTrue(agent_panel.billing_button.winfo_exists())
                     with patch.object(agent_panel, "_learning_location",
                                       return_value=Path(folder)):
                         agent_panel.show_last_evaluation_receipt()
-                    self.assertIn(
-                        "No live evaluation", agent_panel.status.get())
+                        self.assertIn(
+                            "No live evaluation", agent_panel.status.get())
+                        agent_panel.import_billing_csv()
+                        self.assertIn(
+                            "No complete intact", agent_panel.status.get())
                     self.assertEqual(
                         desktop.controller.status()["requests_used"], 0)
                     agent_panel.run_live_evaluation()
