@@ -1,0 +1,61 @@
+name: Verified failure and bounded scheduler acceptance
+
+on:
+  pull_request:
+    paths:
+      - 'varyn/verified_failure_feedback.py'
+      - 'varyn/grounded_benchmark.py'
+      - 'varyn/budgeted_reflection_scheduler.py'
+      - 'varyn/agent_execution_loop.py'
+      - 'varyn/agent_mode_gui.py'
+      - 'tests/test_feedback_evaluation_scheduler.py'
+      - 'tests/test_grounded_learning_bridge.py'
+      - 'docs/VERIFIED-FAILURE-SCHEDULER.md'
+      - '.github/workflows/feedback-scheduler-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  feedback-ubuntu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile bounded learning stack
+        run: python -m py_compile varyn/verified_failure_feedback.py varyn/grounded_benchmark.py varyn/budgeted_reflection_scheduler.py varyn/agent_execution_loop.py varyn/agent_mode_gui.py
+      - name: Budget and feedback regressions
+        run: python -m unittest discover -s tests -p 'test_feedback_evaluation_scheduler.py' -v
+      - name: Public fact execution and verified evidence
+        run: python -m unittest discover -s tests -p 'test_grounded_learning_bridge.py' -v
+      - name: Existing reflection and runtime regressions
+        run: |
+          python -m unittest discover -s tests -p 'test_verified_reflection.py' -v
+          python -m unittest discover -s tests -p 'test_agent_execution_loop.py' -v
+          python -m unittest discover -s tests -p 'test_learning_kernel.py' -v
+
+  feedback-windows:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile bounded learning stack
+        run: python -m py_compile varyn/verified_failure_feedback.py varyn/grounded_benchmark.py varyn/budgeted_reflection_scheduler.py varyn/agent_execution_loop.py varyn/agent_mode_gui.py
+      - name: Budget and feedback regressions
+        run: python -m unittest discover -s tests -p 'test_feedback_evaluation_scheduler.py' -v
+      - name: Public fact execution and verified evidence
+        run: python -m unittest discover -s tests -p 'test_grounded_learning_bridge.py' -v
+      - name: Existing reflection and runtime regressions
+        run: |
+          python -m unittest discover -s tests -p 'test_verified_reflection.py' -v
+          python -m unittest discover -s tests -p 'test_agent_execution_loop.py' -v
+          python -m unittest discover -s tests -p 'test_learning_kernel.py' -v
+      - name: Native owner-facing Windows GUI smoke
+        run: python -m unittest discover -s tests -p 'test_consumer_workspace_tk.py' -v
