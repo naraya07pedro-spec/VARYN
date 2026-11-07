@@ -141,7 +141,8 @@ class OwnerProviderAcceptance:
         return ident
 
     def _finish(self, ident, *, status, public_reads, model_requests,
-                checked=None, provider_response_id_sha256=None,
+                checked=None, observation_sha256=None,
+                provider_response_id_sha256=None,
                 input_tokens=None, output_tokens=None):
         if (status not in _STATUSES or type(public_reads) is not int
                 or not 0 <= public_reads <= 1
@@ -160,10 +161,22 @@ class OwnerProviderAcceptance:
         checked_status = (
             1 if status == "verification_passed" else
             0 if status == "verification_failed" else None)
-        evidence = checked["observation_sha256"] if checked else None
-        if evidence is not None and (
-                type(evidence) is not str or _SHA.fullmatch(evidence) is None):
+        if (observation_sha256 is not None and
+                (type(observation_sha256) is not str
+                 or _SHA.fullmatch(observation_sha256) is None
+                 or public_reads != 1)):
             raise SmokeRejected("Invalid public observation fingerprint")
+        if status == "verification_passed":
+            if (type(checked) is not dict
+                    or checked.get("verified_against_tool_observation") is not True
+                    or type(checked.get("observation_sha256")) is not str
+                    or checked["observation_sha256"] != observation_sha256):
+                raise SmokeRejected("Missing actual tool-based verification evidence")
+        elif checked is not None:
+            raise SmokeRejected("Only successful verification has checked evidence")
+        if (status == "verification_failed" and observation_sha256 is None):
+            raise SmokeRejected("Failure must retain public source fingerprint")
+        evidence = observation_sha256
         row = self.kernel.db.execute(
             "SELECT utc_day,started_utc,provider,model_sha256,source_kind,"
             "estimated_micro_usd FROM owner_provider_smoke "
@@ -273,6 +286,7 @@ class OwnerProviderAcceptance:
         reads = 0
         models = 0
         checked = None
+        observation_hash = None
         response_id_hash = None
         tokens_in = None
         tokens_out = None
@@ -305,6 +319,9 @@ class OwnerProviderAcceptance:
             selected = {key: facts[key] for key in (
                 "repository", "default_branch", "stars",
                 "open_items_including_prs", "archived")}
+            observation_hash = sha256(json.dumps(
+                selected, sort_keys=True, separators=(",", ":"),
+                ensure_ascii=True).encode("utf-8")).hexdigest()
             prompt = json.dumps({
                 "task": "Copy verified public GitHub metadata to strict JSON.",
                 "public_metadata_untrusted_data": selected,
@@ -331,7 +348,8 @@ class OwnerProviderAcceptance:
             if authorization is not True:
                 return self._finish(
                     ident, status="approved_model_request_denied",
-                    public_reads=reads, model_requests=0)
+                    public_reads=reads, model_requests=0,
+                    observation_sha256=observation_hash)
             models = 1
             result = self.gateway.generate(
                 prompt, provider=provider,
@@ -355,12 +373,13 @@ class OwnerProviderAcceptance:
                 return self._finish(
                     ident, status="verification_failed",
                     public_reads=reads, model_requests=models,
+                    observation_sha256=observation_hash,
                     provider_response_id_sha256=response_id_hash,
                     input_tokens=tokens_in, output_tokens=tokens_out)
             return self._finish(
                 ident, status="verification_passed",
                 public_reads=reads, model_requests=models,
-                checked=checked,
+                checked=checked, observation_sha256=observation_hash,
                 provider_response_id_sha256=response_id_hash,
                 input_tokens=tokens_in, output_tokens=tokens_out)
         except BaseException:
@@ -370,7 +389,7 @@ class OwnerProviderAcceptance:
                 self._finish(
                     ident, status="needs_review",
                     public_reads=reads, model_requests=models,
-                    checked=checked,
+                    observation_sha256=observation_hash,
                     provider_response_id_sha256=response_id_hash,
                     input_tokens=tokens_in, output_tokens=tokens_out)
             except Exception:
