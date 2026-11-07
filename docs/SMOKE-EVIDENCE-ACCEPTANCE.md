@@ -63,3 +63,36 @@ than claiming an unavailable real OpenRouter/DeepSeek account test.
 - Unsigned Windows portable EXE build and frozen GUI smoke
 
 The stacked PR remains draft and does not merge to main.
+
+
+## Safely share a result for independent review (new)
+
+On the owner Windows PC, in **Public GitHub agent**, choose **Copy safe
+diagnostic summary**. This reads the latest local smoke receipt and
+copies a fixed redacted JSON status to the Windows clipboard; it does
+**not** make a network request or spend provider tokens. The user can
+then choose to paste the result into a support conversation.
+
+The summary contains only an allowlisted provider name, local source
+category, attempted request counts (0 or 1), result of the local fact
+comparison, whether upstream response ID and usage counters were
+reported, and explicit **NOT independently verified** flags. The
+clipboard text never includes model/response/session hashes, exact
+timestamps, money, local file paths, private messages, model responses,
+prompts, raw request IDs, credentials or provider account information.
+
+If no run exists, the summary says \`no_receipt\`. If local integrity is
+missing, changed or unverified, evidence details are withheld and the
+report says \`receipt_untrusted\`. A synthetically run model can never
+become an authenticated provider result merely by pasting the JSON.
+
+The clipboard is a shared OS resource and other local apps may be able
+to inspect it. The summary minimizes data, but the owner still decides
+whether and where to paste it. Never share the original local SQLite
+database, API keys, screenshots containing credentials or complete
+provider invoices to request troubleshooting assistance.
+
+**Crucial limit:** the copied summary provides a route for discussing
+the owner's local test. It is not a signed provider receipt, independent
+proof that the model ran on a paid account, a spending cap, or authority
+to merge the draft PR stack.
