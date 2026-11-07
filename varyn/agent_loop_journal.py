@@ -21,7 +21,7 @@ _STATES = {
     "tool_pending": {"tool_in_flight", "denied"},
     "tool_in_flight": {"observation_ready"},
     "observation_ready": {"synthesis_in_flight", "denied", "observation_only"},
-    "synthesis_in_flight": {"completed"},
+    "synthesis_in_flight": {"completed", "verification_failed"},
 }
 
 

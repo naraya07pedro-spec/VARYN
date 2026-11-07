@@ -1,0 +1,45 @@
+name: Grounded GitHub learning bridge acceptance
+
+on:
+  pull_request:
+    paths:
+      - 'varyn/grounded_github.py'
+      - 'varyn/agent_execution_loop.py'
+      - 'varyn/agent_loop_journal.py'
+      - 'varyn/agent_mode_gui.py'
+      - 'tests/test_grounded_learning_bridge.py'
+      - 'docs/GROUNDED-LEARNING-BRIDGE.md'
+      - '.github/workflows/grounded-learning-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  grounded-ubuntu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m py_compile varyn/grounded_github.py varyn/agent_execution_loop.py varyn/agent_loop_journal.py varyn/agent_mode_gui.py
+      - run: python -m unittest discover -s tests -p 'test_grounded_learning_bridge.py' -v
+      - run: python -m unittest discover -s tests -p 'test_agent_execution_loop.py' -v
+      - run: python -m unittest discover -s tests -p 'test_verified_reflection.py' -v
+      - run: python -m unittest discover -s tests -p 'test_learning_kernel.py' -v
+  grounded-windows:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m py_compile varyn/grounded_github.py varyn/agent_execution_loop.py varyn/agent_loop_journal.py varyn/agent_mode_gui.py
+      - run: python -m unittest discover -s tests -p 'test_grounded_learning_bridge.py' -v
+      - run: python -m unittest discover -s tests -p 'test_agent_execution_loop.py' -v
+      - run: python -m unittest discover -s tests -p 'test_verified_reflection.py' -v
+      - run: python -m unittest discover -s tests -p 'test_learning_kernel.py' -v
+      - run: python -m unittest discover -s tests -p 'test_consumer_workspace_tk.py' -v
