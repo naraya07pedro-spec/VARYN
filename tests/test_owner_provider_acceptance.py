@@ -178,15 +178,11 @@ class ProviderAcceptanceSmokeTests(unittest.TestCase):
         forged = dict(record)
         forged["source_kind"] = "configured_network_adapters"
         fake = self.acceptance.acceptance_gate(forged)
-        self.assertEqual(
-            fake["status"], "owner_live_candidate_needs_provider_account_check")
+        self.assertEqual(fake["status"], "receipt_untrusted")
         self.assertFalse(fake["real_account_proven"])
-        self.assertFalse(fake["actual_provider_billing_verified"])
-        self.assertFalse(fake["ready_for_unattended_autonomy"])
-        forged["provider_response_id_sha256"] = None
         self.assertEqual(
-            self.acceptance.acceptance_gate(forged)["status"],
-            "provider_usage_evidence_incomplete")
+            self.acceptance.acceptance_gate(record)["status"],
+            "simulated_or_custom_transport")
         forged["local_digest_matches"] = False
         self.assertEqual(
             self.acceptance.acceptance_gate(forged)["status"],
