@@ -73,8 +73,17 @@ class ConsumerDesktopTests(unittest.TestCase):
                     self.assertTrue(agent_panel.eval_button.winfo_exists())
                     self.assertTrue(agent_panel.receipt_button.winfo_exists())
                     self.assertTrue(agent_panel.billing_button.winfo_exists())
+                    self.assertFalse(agent_panel.smoke_optin.get())
+                    self.assertTrue(agent_panel.smoke_button.winfo_exists())
+                    self.assertTrue(agent_panel.smoke_last_button.winfo_exists())
+                    agent_panel.run_provider_smoke()
+                    self.assertIn("OFF", agent_panel.status.get())
                     with patch.object(agent_panel, "_learning_location",
                                       return_value=Path(folder)):
+                        agent_panel.show_last_provider_smoke()
+                        self.assertIn(
+                            "No provider smoke session",
+                            agent_panel.status.get())
                         agent_panel.show_last_evaluation_receipt()
                         self.assertIn(
                             "No live evaluation", agent_panel.status.get())
