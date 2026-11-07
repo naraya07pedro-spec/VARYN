@@ -1,0 +1,35 @@
+name: Isolated procedural learning tests
+
+on:
+  pull_request:
+    paths:
+      - 'varyn/learning_kernel.py'
+      - 'tests/test_learning_kernel.py'
+      - 'docs/SELF-IMPROVEMENT-KERNEL.md'
+      - '.github/workflows/learning-kernel.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  learning-ubuntu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m py_compile varyn/learning_kernel.py
+      - run: python -m unittest discover -s tests -p 'test_learning_kernel.py' -v
+  learning-windows:
+    runs-on: windows-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m py_compile varyn/learning_kernel.py
+      - run: python -m unittest discover -s tests -p 'test_learning_kernel.py' -v
