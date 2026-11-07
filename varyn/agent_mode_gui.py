@@ -17,6 +17,8 @@ from tkinter import ttk
 
 from varyn.agent_execution_loop import OwnerApprovedAgentLoop
 from varyn.agent_loop_journal import AgentLoopJournal
+from varyn.grounded_github import GroundingRejected
+from varyn.learning_kernel import LearningKernel
 from varyn.gateway_chat import KEY_ENVS
 from varyn.model_registry import Registry
 from varyn.public_github_tool import PublicGithubToolGateway
@@ -63,6 +65,8 @@ class OwnerAgentWindow(tk.Toplevel):
                          "naraya07pedro-spec/VARYN and summarize its status.")
         self.allow_read = tk.BooleanVar(master=self, value=False)
         self.allow_send_observation = tk.BooleanVar(master=self, value=False)
+        self.store_verified_facts = tk.BooleanVar(master=self, value=False)
+        self.use_learned_skill = tk.BooleanVar(master=self, value=False)
         ttk.Checkbutton(
             body, variable=self.allow_read,
             text="Allow ONE reviewed public GitHub read",
@@ -70,6 +74,14 @@ class OwnerAgentWindow(tk.Toplevel):
         ttk.Checkbutton(
             body, variable=self.allow_send_observation,
             text="Allow public metadata in second reviewed AI request",
+        ).pack(anchor="w", pady=(3, 2))
+        ttk.Checkbutton(
+            body, variable=self.store_verified_facts,
+            text="Save a hashed evidence receipt only after factual verification",
+        ).pack(anchor="w", pady=(3, 2))
+        ttk.Checkbutton(
+            body, variable=self.use_learned_skill,
+            text="Include an existing learned skill in exact AI request review",
         ).pack(anchor="w", pady=(3, 9))
         row = ttk.Frame(body)
         row.pack(fill="x")
@@ -127,8 +139,12 @@ class OwnerAgentWindow(tk.Toplevel):
             return
         read = self.allow_read.get()
         upload = self.allow_send_observation.get()
+        save_receipt = self.store_verified_facts.get()
+        use_skill = self.use_learned_skill.get()
         self.allow_read.set(False)
         self.allow_send_observation.set(False)
+        self.store_verified_facts.set(False)
+        self.use_learned_skill.set(False)
         self.chat.allow_network.set(False)
         self.start.configure(state="disabled")
         self._busy = True
@@ -136,7 +152,8 @@ class OwnerAgentWindow(tk.Toplevel):
         self._show("")
         Thread(
             target=self._worker,
-            args=(task, provider, offer, secret, read, upload),
+            args=(task, provider, offer, secret, read, upload,
+                  save_receipt, use_skill),
             daemon=True,
         ).start()
         self._after_id = self.after(70, self._poll)
@@ -155,9 +172,11 @@ class OwnerAgentWindow(tk.Toplevel):
                 self._waiters.remove(pending)
             return pending["value"] if pending["event"].is_set() else False
 
-    def _worker(self, task, provider, offer, secret, read, upload):
+    def _worker(self, task, provider, offer, secret, read, upload,
+                save_receipt, use_skill):
         tool = None
         journal = None
+        learning = None
         try:
             location = Path(
                 os.environ.get("LOCALAPPDATA")
@@ -167,21 +186,28 @@ class OwnerAgentWindow(tk.Toplevel):
                 raise ValueError("Local journal root cannot be a link")
             journal = AgentLoopJournal(location / "agent-loop.sqlite3")
             journal.recover()  # Mark interrupted actions for review; never replay.
+            if save_receipt or use_skill:
+                learning = LearningKernel(location / "learning.sqlite3")
             tool = PublicGithubToolGateway()
             with self._lock:
                 self._tool = tool
             model = UniversalGateway(
                 Registry([offer]), allow_network=True,
                 budget=self.desktop._universal_model_budget, api_key=secret)
-            loop = OwnerApprovedAgentLoop(model, tool, journal)
+            loop = OwnerApprovedAgentLoop(
+                model, tool, journal, learning_kernel=learning)
             result = loop.run(
                 task, provider=provider,
                 review_model=lambda p: self._request_review("model", p),
                 review_tool=lambda p: self._request_review("tool", p),
                 allow_public_network=read, allow_metadata_upload=upload,
                 input_estimate=512, max_output_tokens=512,
-                ceiling_micro_usd=100000)
+                ceiling_micro_usd=100000, verify_public_facts=True,
+                persist_grounded_receipt=save_receipt,
+                include_learned_skill=use_skill)
             self._completions.put(("result", result))
+        except GroundingRejected:
+            self._completions.put(("fact_mismatch", None))
         except BaseException:
             # Avoid echoing provider exception bodies, prompts, or credentials.
             self._completions.put(("error", None))
@@ -192,6 +218,8 @@ class OwnerAgentWindow(tk.Toplevel):
                 self._tool = None
             if journal is not None:
                 journal.close()
+            if learning is not None:
+                learning.close()
 
     def _review_on_ui(self, pending):
         if self._closed:
@@ -245,12 +273,27 @@ class OwnerAgentWindow(tk.Toplevel):
             return
         self._busy = False
         self.start.configure(state="normal")
+        if kind == "fact_mismatch":
+            self.status.set("AI facts failed comparison with GitHub data. "
+                            "No learning receipt saved. No automatic retry.")
+            self._show("The AI report did not match the approved tool evidence.")
+            return
         if kind != "result":
             self.status.set("Agent stopped safely. Check model access, "
                             "local budget or journal; no automatic retry.")
             return
         status = result.get("status", "unknown")
-        self.status.set("Agent finished with status: " + status)
+        detail = ""
+        if result.get("verified_public_facts"):
+            detail = " · Facts checked against public GitHub tool data"
+            saved = result.get("learning_receipt_status")
+            if saved == "recorded":
+                detail += " · Hashed evidence saved"
+            elif saved == "duplicate":
+                detail += " · Existing evidence reused"
+            elif saved == "not_recorded":
+                detail += " · Evidence saving failed"
+        self.status.set("Agent finished with status: " + status + detail)
         if status == "completed":
             self._show(result.get("answer", ""))
         elif status in ("observation_only", "synthesis_denied"):
