@@ -786,19 +786,14 @@ class OwnerAgentWindow(tk.Toplevel):
             self._show(
                 "Completed 1+1 provider smoke workflow: " +
                 result.get("status", "unknown") +
-                "
-Transport: " + str(result.get("source_kind", "n/a")) +
-                "
-GitHub GET attempted: " +
+                "\nTransport: " + str(result.get("source_kind", "n/a")) +
+                "\nGitHub GET attempted: " +
                 str(result.get("public_reads_attempted", 0)) +
-                "
-Model calls attempted: " +
+                "\nModel calls attempted: " +
                 str(result.get("model_requests_attempted", 0)) +
-                "
-Facts match approved tool observation: " +
+                "\nFacts match approved tool observation: " +
                 str(result.get("fact_matches_tool")) +
-                "
-Quoted cost is NOT actual billing. "
+                "\nQuoted cost is NOT actual billing. "
                 "Use Last provider smoke receipt for the audit record.")
             return
         if kind == "smoke_error":
