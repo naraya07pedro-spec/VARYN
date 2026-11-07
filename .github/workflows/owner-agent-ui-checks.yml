@@ -1,0 +1,39 @@
+name: Owner GitHub agent desktop acceptance
+
+on:
+  pull_request:
+    paths:
+      - 'varyn/agent_mode_gui.py'
+      - 'varyn/consumer_chat.py'
+      - 'tests/test_consumer_workspace_tk.py'
+      - 'docs/AGENT-MODE-WINDOWS-PILOT.md'
+      - '.github/workflows/owner-agent-ui-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-ubuntu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m py_compile varyn/agent_mode_gui.py varyn/consumer_chat.py
+      - run: python -m unittest discover -s tests -p 'test_agent_execution_loop.py' -v
+      - run: python -m unittest discover -s tests -p 'test_verified_reflection.py' -v
+  desktop-windows:
+    runs-on: windows-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m py_compile varyn/agent_mode_gui.py varyn/consumer_chat.py
+      - run: python -m unittest discover -s tests -p 'test_agent_execution_loop.py' -v
+      - run: python -m unittest discover -s tests -p 'test_verified_reflection.py' -v
+      - run: python -m unittest discover -s tests -p 'test_consumer_workspace_tk.py' -v
