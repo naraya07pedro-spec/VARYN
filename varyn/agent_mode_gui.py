@@ -166,6 +166,7 @@ class OwnerAgentWindow(tk.Toplevel):
             if location.is_symlink():
                 raise ValueError("Local journal root cannot be a link")
             journal = AgentLoopJournal(location / "agent-loop.sqlite3")
+            journal.recover()  # Mark interrupted actions for review; never replay.
             tool = PublicGithubToolGateway()
             with self._lock:
                 self._tool = tool
@@ -199,7 +200,8 @@ class OwnerAgentWindow(tk.Toplevel):
         data = pending["preview"]
         if pending["kind"] == "model":
             content = data["exact_outgoing_prompt"]
-            heading = "Approve ONE model request (" + data["phase"] + ")"
+            heading = ("Approve ONE request to " + data["provider"] +
+                       " (" + data["phase"] + ")")
             warning = ("This exact text will leave the PC. "
                        "Provider estimates are not billing limits. "
                        "No automatic retries.")
