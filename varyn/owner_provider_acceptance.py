@@ -203,9 +203,15 @@ class OwnerProviderAcceptance:
         return self.get(ident)
 
     def get(self, ident):
+        return self.read_local(self.kernel, ident)
+
+    @staticmethod
+    def read_local(kernel, ident):
+        if not isinstance(kernel, LearningKernel):
+            raise TypeError("LearningKernel required")
         if type(ident) is not str or _ID.fullmatch(ident) is None:
             raise SmokeRejected("Invalid smoke identifier")
-        row = self.kernel.db.execute(
+        row = kernel.db.execute(
             "SELECT * FROM owner_provider_smoke WHERE id=?", (ident,)).fetchone()
         if row is None:
             return None
@@ -232,11 +238,24 @@ class OwnerProviderAcceptance:
         record["raw_prompt_or_response_stored"] = False
         return record
 
-    def latest(self):
-        row = self.kernel.db.execute(
+    @staticmethod
+    def latest_local(kernel):
+        if not isinstance(kernel, LearningKernel):
+            raise TypeError("LearningKernel required")
+        exists = kernel.db.execute(
+            "SELECT 1 FROM sqlite_master "
+            "WHERE type='table' AND name='owner_provider_smoke'"
+        ).fetchone()
+        if exists is None:
+            return None
+        row = kernel.db.execute(
             "SELECT id FROM owner_provider_smoke "
             "ORDER BY started_utc DESC,id DESC LIMIT 1").fetchone()
-        return None if row is None else self.get(row[0])
+        return (None if row is None else
+                OwnerProviderAcceptance.read_local(kernel, row[0]))
+
+    def latest(self):
+        return self.latest_local(self.kernel)
 
     def run(self, *, provider, review_tool, review_model,
             owner_enabled=False):
