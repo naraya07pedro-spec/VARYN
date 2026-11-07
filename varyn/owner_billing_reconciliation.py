@@ -25,7 +25,7 @@ class BillingReconciliationRejected(ValueError):
 
 
 _HASH = re.compile(r"\A[0-9a-f]{64}\Z")
-_RESPONSE_ID = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._:/+-]{2,159}\Z")
+_RESPONSE_ID = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._:-]{2,159}\Z")
 _COLUMNS = ("request_id", "charged_micro_usd")
 
 
