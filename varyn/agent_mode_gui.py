@@ -13,13 +13,14 @@ from threading import Event, Lock, Thread
 import json
 import os
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, filedialog
 
 from varyn.agent_execution_loop import OwnerApprovedAgentLoop
 from varyn.agent_loop_journal import AgentLoopJournal
 from varyn.grounded_github import GroundingRejected
 from varyn.learning_kernel import LearningKernel
 from varyn.local_evaluation_receipts import LocalEvaluationReceipts
+from varyn.owner_billing_reconciliation import OwnerBillingReconciliation
 from varyn.owner_live_evaluation import OwnerReviewedLiveEvaluation, PUBLIC_CASE_REPOSITORIES
 from varyn.gateway_chat import KEY_ENVS
 from varyn.model_registry import Registry
@@ -111,6 +112,12 @@ class OwnerAgentWindow(tk.Toplevel):
             eval_row, text="Last evaluation receipt",
             command=self.show_last_evaluation_receipt)
         self.receipt_button.pack(side="left", padx=(12, 0))
+        bill_row = ttk.Frame(body)
+        bill_row.pack(fill="x", pady=(6, 0))
+        self.billing_button = ttk.Button(
+            bill_row, text="Reconcile owner billing CSV (offline)",
+            command=self.import_billing_csv)
+        self.billing_button.pack(side="left")
         self.status = tk.StringVar(
             master=self, value="OFFLINE. Select an AI model and allow "
                                "one internet request in Chat first.")
@@ -238,6 +245,8 @@ class OwnerAgentWindow(tk.Toplevel):
             with LearningKernel(
                 self._learning_location() / "learning.sqlite3") as kernel:
                 receipt = LocalEvaluationReceipts(kernel).latest()
+                billing = (OwnerBillingReconciliation(kernel).get(receipt["id"])
+                           if receipt is not None else None)
         except Exception:
             self.status.set("Local evaluation record unavailable.")
             return
@@ -282,8 +291,119 @@ class OwnerAgentWindow(tk.Toplevel):
             "Stored content: metadata only, no prompts or keys.\n"
             "A checksum is NOT a trusted third-party signature."
         )
+        if billing is not None:
+            summary += (
+                "\nOwner-supplied billing comparison: " +
+                str(billing["matched_response_ids"]) +
+                "/10 IDs matched\n"
+                "Owner-supplied amount: " +
+                str(billing["owner_reported_total_micro_usd"]) +
+                " micro-USD\n"
+                "Difference from local estimate: " +
+                str(billing["difference_micro_usd"]) +
+                " micro-USD\n"
+                "Local billing comparison checksum valid: " +
+                str(billing["local_checksum_matches"]) +
+                "\nProvider-side invoice authenticity: UNVERIFIED."
+            )
         self.status.set("Latest local evaluation: " + status)
         self._show(summary)
+
+    def import_billing_csv(self):
+        """Manual owner-supplied normalized CSV. Never contacts the provider."""
+        if self._closed or self._busy:
+            return
+        try:
+            with LearningKernel(
+                self._learning_location() / "learning.sqlite3") as kernel:
+                latest = LocalEvaluationReceipts(kernel).latest()
+                if latest is None or latest.get("local_receipt_digest_matches") is not True:
+                    self.status.set("No complete intact local evaluation receipt.")
+                    return
+                session_id = latest["id"]
+                existing = OwnerBillingReconciliation(kernel).get(session_id)
+                if existing is not None:
+                    self.status.set("This session already has one immutable "
+                                    "owner-supplied billing comparison.")
+                    return
+        except Exception:
+            self.status.set("Could not inspect local evaluation receipt.")
+            return
+        filename = filedialog.askopenfilename(
+            parent=self, title="Choose a normalized provider billing CSV",
+            filetypes=[("CSV files", "*.csv")])
+        if not filename or self._closed:
+            return
+        try:
+            candidate = Path(filename)
+            if (candidate.suffix.lower() != ".csv" or candidate.is_symlink()
+                    or not candidate.is_file()
+                    or not 0 < candidate.stat().st_size <= 16384):
+                raise ValueError("Invalid local CSV")
+            raw = candidate.read_text(encoding="utf-8-sig")
+            with LearningKernel(
+                self._learning_location() / "learning.sqlite3") as kernel:
+                reconciliation = OwnerBillingReconciliation(kernel)
+                preview = reconciliation.preview(session_id, raw)
+        except Exception:
+            self.status.set("CSV rejected. Requires exactly 10 request IDs "
+                            "and nonnegative integer micro-USD amounts.")
+            return
+        if preview["status"] != "ready_for_owner_review":
+            self.status.set(
+                "Billing ID mismatch: " + str(preview["matched_count"]) +
+                "/10 provider response IDs matched. Nothing saved.")
+            return
+        summary = json.dumps({
+            "source": "Owner-selected normalized CSV, NOT provider verified",
+            "matching_ids": preview["matched_count"],
+            "expected_ids": preview["expected_count"],
+            "owner_reported_total_micro_usd":
+                preview["owner_reported_total_micro_usd"],
+            "locally_estimated_total_micro_usd":
+                preview["estimated_total_micro_usd"],
+            "difference_micro_usd": preview["difference_micro_usd"],
+            "raw_csv_will_be_stored": False,
+            "provider_account_authenticated": False,
+            "original_invoice_verified": False,
+        }, indent=2)
+        try:
+            approved = self.desktop._review_scrollable_manual_text(
+                title="VARYN | Owner billing comparison",
+                heading="Review owner-supplied billing correlation",
+                digest=sha256(summary.encode()).hexdigest(),
+                content=summary,
+                warning="This is NOT provider-certified billing evidence, "
+                        "does NOT enforce a spending limit and is NOT "
+                        "a live billing API check. One immutable local "
+                        "comparison per session; original CSV not saved.",
+                approve_label="Save this owner-supplied comparison",
+            ) is True
+        except Exception:
+            approved = False
+        if not approved or self._closed:
+            self.status.set("Billing comparison cancelled. Nothing saved.")
+            return
+        try:
+            with LearningKernel(
+                self._learning_location() / "learning.sqlite3") as kernel:
+                saved = OwnerBillingReconciliation(kernel).reconcile(
+                    session_id, raw, owner_approved=True)
+        except Exception:
+            self.status.set("Billing comparison rejected; local receipt "
+                            "may have changed. Nothing overwritten.")
+            return
+        self.status.set("Owner CSV matched 10/10 provider response IDs "
+                        "(NOT authenticated against provider account).")
+        self._show(
+            "Owner-supplied amount: " +
+            str(saved["owner_reported_total_micro_usd"]) + " micro-USD\n"
+            "Local estimate: " +
+            str(saved["estimated_total_micro_usd"]) + " micro-USD\n"
+            "Difference: " + str(saved["difference_micro_usd"]) +
+            " micro-USD\n"
+            "Provider invoice authenticity: UNVERIFIED.\n"
+            "No raw CSV, API keys or response IDs stored.")
 
     def run_live_evaluation(self):
         if self._closed or self._busy:
