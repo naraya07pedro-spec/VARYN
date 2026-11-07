@@ -1,0 +1,118 @@
+name: VARYN agent-mode unsigned Windows preview
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/agent-mode-portable-preview.yml'
+      - 'varyn/agent_mode_gui.py'
+      - 'varyn/consumer_chat.py'
+      - 'docs/AGENT-MODE-WINDOWS-PILOT.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  brand-assets:
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'feat/agent-mode-desktop-v1-20261107'
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install "CairoSVG==2.7.1"
+      - run: python -m varyn.brand_asset_render assets/brand_svg dist/brand_png
+      - uses: actions/upload-artifact@v4
+        with:
+          name: agent-preview-brand-assets
+          path: dist/brand_png/
+          if-no-files-found: error
+          retention-days: 7
+
+  portable-agent-preview:
+    needs: brand-assets
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+      - name: Install pinned packaging tool
+        run: python -m pip install "pyinstaller==6.22.3"
+      - uses: actions/download-artifact@v4
+        with:
+          name: agent-preview-brand-assets
+          path: assets/brand_png
+      - name: Verify required brand assets
+        shell: pwsh
+        run: |
+          foreach ($name in @('github','notion','telegram','whatsapp',
+              'gmail','google_calendar','google_drive','supabase','netlify',
+              'linkedin','hostinger_mail','linear','dropbox','discord',
+              'slack','hubspot')) {
+            if (-not (Test-Path "assets/brand_png/$name.png" -PathType Leaf)) {
+              throw "Missing bundled brand artwork: $name"
+            }
+          }
+      - name: Freeze source as Windows x64 portable EXE
+        run: python -m PyInstaller --noconfirm --clean --onedir --windowed --name VARYN-Portable --paths . --add-data "integrations/catalog.json;integrations" --add-data "assets/brand_png;assets/brand_png" varyn/portable_entry.py
+      - name: Include launcher and honest preview notice
+        shell: pwsh
+        run: |
+          Copy-Item README-PORTABLE.txt dist/VARYN-Portable/README-PORTABLE.txt
+          Copy-Item Start-VARYN-OwnerPilot.ps1 dist/VARYN-Portable/Start-VARYN-OwnerPilot.ps1
+          $notice = @'
+          VARYN Experimental Agent-Mode Preview
+          This is an unsigned CI artifact, NOT an official stable release.
+          Read-only GitHub agent with per-request owner review.
+          Existing provider API credentials must be configured locally.
+          No live-provider account acceptance or PC user validation has occurred.
+          No native consumer-app synchronization or autonomous background learning.
+          Do not disable Windows security safeguards to run this software.
+          '@
+          Set-Content -Path dist/VARYN-Portable/AGENT-PREVIEW-NOTICE.txt -Value $notice -Encoding utf8
+      - name: Write and verify file-by-file bundle SHA256 inventory
+        run: |
+          python -m varyn.portable_release --directory dist/VARYN-Portable --create
+          python -m varyn.portable_release --directory dist/VARYN-Portable --verify
+      - name: Verify launcher with full file manifest
+        shell: pwsh
+        run: |
+          & "dist/VARYN-Portable/Start-VARYN-OwnerPilot.ps1" -VerifyOnly
+          if ($LASTEXITCODE -ne 0) { throw "Owner launcher verification failed" }
+      - name: Test genuine frozen offline GUI
+        shell: pwsh
+        run: |
+          $exe = (Resolve-Path "dist/VARYN-Portable/VARYN-Portable.exe").Path
+          $p = Start-Process -FilePath $exe -ArgumentList @("--smoke-only") -PassThru
+          if (-not $p.WaitForExit(45000)) {
+            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+            throw "Frozen GUI smoke timeout"
+          }
+          if ($p.ExitCode -ne 0) { throw "Frozen GUI smoke failed" }
+      - name: Prove packaged files unchanged
+        run: python -m varyn.portable_release --directory dist/VARYN-Portable --verify
+      - name: Zip preview and publish source-specific checksum
+        shell: pwsh
+        run: |
+          $zip = "VARYN-Agent-Preview-Windows-x64-unsigned.zip"
+          Compress-Archive -LiteralPath "dist/VARYN-Portable" -DestinationPath $zip -CompressionLevel Optimal
+          $hash = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          @(
+            "SOURCE_COMMIT=$env:GITHUB_SHA",
+            "ZIP_FILE=$zip",
+            "ZIP_SHA256=$hash",
+            "EXPERIMENTAL_UNSIGNED=true"
+          ) | Set-Content -LiteralPath "AGENT-PREVIEW-SHA256.txt" -Encoding utf8
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VARYN-Agent-Windows-Preview-Unsigned
+          path: |
+            VARYN-Agent-Preview-Windows-x64-unsigned.zip
+            AGENT-PREVIEW-SHA256.txt
+          if-no-files-found: error
+          retention-days: 7

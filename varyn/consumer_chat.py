@@ -130,6 +130,15 @@ class ConsumerChat(PremiumChatSurface):
             padx=22, pady=9, bd=0, relief="flat",
         )
         self.send.pack(side="right")
+        self.agent_button = tk.Button(
+            controls, text="Public GitHub agent",
+            command=self.open_public_github_agent,
+            bg=WHITE, fg=ACCENT, activebackground=WHITE,
+            bd=0, relief="flat", cursor="hand2", padx=10, pady=8,
+            font=("Segoe UI", 9, "bold"),
+        )
+        self.agent_button.pack(side="right", padx=(0, 9),
+                               before=self.send)
         self.live_permission = tk.Checkbutton(
             controls, text=self._t("online_approval"),
             variable=self.allow_network, bg=WHITE, fg=SOFT,
@@ -215,6 +224,23 @@ class ConsumerChat(PremiumChatSurface):
         self.chat.configure(yscrollcommand=scroll.set)
         self._append("VARYN", self._t("greeting"))
         self._show_status()
+
+    def open_public_github_agent(self):
+        if self._closed or self._busy:
+            return
+        window = getattr(self, "_owner_agent_window", None)
+        if window is not None and window.winfo_exists():
+            window.lift()
+            window.focus_set()
+            return
+        from varyn.agent_mode_gui import OwnerAgentWindow
+        self._owner_agent_window = OwnerAgentWindow(self)
+
+    def close(self):
+        window = getattr(self, "_owner_agent_window", None)
+        if window is not None and window.winfo_exists():
+            window.close()
+        super().close()
 
     def _model_values(self):
         choices = [self._t("offline"), "OpenRouter", "DeepSeek"]
