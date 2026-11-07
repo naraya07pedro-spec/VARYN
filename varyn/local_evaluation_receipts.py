@@ -210,6 +210,26 @@ class LocalEvaluationReceipts:
         record["usage_counters_are_session_local"] = True
         record["storage_is_encrypted"] = False
         record["quality_verified_against_public_tool_only"] = True
+        if record["status"] != "running":
+            # Self-check detects accidental/local corruption, NOT a
+            # malicious actor who can rewrite both DB row and digest.
+            keys = (
+                "format", "id", "started_utc", "finished_utc",
+                "status", "provider", "model_sha256",
+                "estimated_micro_usd", "public_reads",
+                "model_requests_attempted", "model_responses_succeeded",
+                "model_requests_failed_or_uncertain",
+                "reported_input_tokens", "reported_output_tokens",
+                "responses_with_incomplete_usage", "evaluated_cases",
+                "baseline_passes", "candidate_passes", "regressions",
+                "case_observations_sha256", "actual_provider_cost_known")
+            expected = sha256(json.dumps(
+                {key: record[key] for key in keys},
+                sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+            record["local_receipt_digest_matches"] = (
+                expected == record["evidence_sha256"])
+        else:
+            record["local_receipt_digest_matches"] = None
         if record["status"] == "running":
             record["status"] = "running_or_interrupted"
         return record
