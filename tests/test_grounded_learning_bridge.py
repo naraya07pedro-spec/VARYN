@@ -10,6 +10,7 @@ from varyn.agent_loop_journal import AgentLoopJournal
 from varyn.grounded_github import (
     GroundingRejected, record_grounded_fact_receipt, validate_grounded_claim)
 from varyn.learning_kernel import LearningKernel
+from varyn.verified_failure_feedback import VerifiedFailureLedger
 from varyn.model_registry import Offer, Registry
 from varyn.public_github_tool import PublicGithubToolGateway
 from varyn.universal_gateway import UniversalGateway
@@ -168,10 +169,25 @@ class RealGatewayBridge(unittest.TestCase):
             self.go()
         self.assertEqual(self.learning.db.execute(
             "SELECT COUNT(*) FROM outcomes").fetchone()[0], 0)
+        failures = VerifiedFailureLedger(self.learning).summary()
+        self.assertEqual(failures["total_failed_fact_checks"], 1)
+        self.assertEqual(failures["categories"], {"fact_mismatch": 1})
         row = self.journal.db.execute(
             "SELECT state FROM agent_loop_runs").fetchone()[0]
         self.assertEqual(row, "verification_failed")
         self.assertEqual(self.journal.recover()["auto_replayed"], 0)
+
+    def test_wrong_fact_without_opt_in_keeps_feedback_empty(self):
+        incorrect = {**FACTS, "stars": 999}
+        self.results = [
+            READ, json.dumps({"action": "finish", "facts": incorrect})]
+        with self.assertRaises(GroundingRejected):
+            self.go(persist_grounded_receipt=False)
+        count = self.learning.db.execute(
+            "SELECT COUNT(*) FROM sqlite_master "
+            "WHERE type='table' AND name='grounded_failure_feedback'"
+        ).fetchone()[0]
+        self.assertEqual(count, 0)
 
     def test_no_receipt_without_opt_in(self):
         result = self.go(persist_grounded_receipt=False)
