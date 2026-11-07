@@ -21,6 +21,7 @@ from varyn.grounded_github import GroundingRejected
 from varyn.learning_kernel import LearningKernel
 from varyn.local_evaluation_receipts import LocalEvaluationReceipts
 from varyn.owner_billing_reconciliation import OwnerBillingReconciliation
+from varyn.owner_provider_acceptance import OwnerProviderAcceptance, REPOSITORY
 from varyn.owner_live_evaluation import OwnerReviewedLiveEvaluation, PUBLIC_CASE_REPOSITORIES
 from varyn.gateway_chat import KEY_ENVS
 from varyn.model_registry import Registry
@@ -44,7 +45,7 @@ class OwnerAgentWindow(tk.Toplevel):
         self._waiters = []
         self._tool = None
         self.title("VARYN | Public GitHub Agent (experimental)")
-        self.geometry("770x680")
+        self.geometry("800x760")
         self.minsize(540, 390)
         self.transient(chat.winfo_toplevel())
         self._build()
@@ -118,6 +119,21 @@ class OwnerAgentWindow(tk.Toplevel):
             bill_row, text="Reconcile owner billing CSV (offline)",
             command=self.import_billing_csv)
         self.billing_button.pack(side="left")
+        smoke_row = ttk.Frame(body)
+        smoke_row.pack(fill="x", pady=(6, 0))
+        self.smoke_optin = tk.BooleanVar(master=self, value=False)
+        ttk.Checkbutton(
+            smoke_row, variable=self.smoke_optin,
+            text="Enable ONE reviewed provider acceptance session (may bill)",
+        ).pack(side="left")
+        self.smoke_button = ttk.Button(
+            smoke_row, text="Test 1 GET + 1 AI",
+            command=self.run_provider_smoke)
+        self.smoke_button.pack(side="left", padx=(8, 0))
+        self.smoke_last_button = ttk.Button(
+            body, text="Last provider smoke receipt (offline)",
+            command=self.show_last_provider_smoke)
+        self.smoke_last_button.pack(anchor="w", pady=(4, 0))
         self.status = tk.StringVar(
             master=self, value="OFFLINE. Select an AI model and allow "
                                "one internet request in Chat first.")
@@ -308,6 +324,156 @@ class OwnerAgentWindow(tk.Toplevel):
             )
         self.status.set("Latest local evaluation: " + status)
         self._show(summary)
+
+    def show_last_provider_smoke(self):
+        """Inspect host-written acceptance metadata, completely offline."""
+        if self._closed or self._busy:
+            return
+        try:
+            with LearningKernel(
+                    self._learning_location() / "learning.sqlite3") as kernel:
+                record = OwnerProviderAcceptance.latest_local(kernel)
+        except Exception:
+            self.status.set("Provider smoke receipt could not be read.")
+            return
+        if record is None:
+            self.status.set("No provider smoke session has been attempted.")
+            self._show("No real-provider acceptance evidence on this PC yet.")
+            return
+        if record["local_digest_matches"] is False:
+            self.status.set("Provider acceptance local checksum MISMATCH.")
+            self._show("Stored metadata may be corrupt or edited; do not trust it.")
+            return
+        self.status.set("Last provider smoke: " + record["status"])
+        self._show(
+            "Status: " + record["status"] + "\n"
+            "Transport: " + record["source_kind"] + "\n"
+            "Provider: " + record["provider"] + "\n"
+            "Public GETs attempted: " +
+                str(record["public_reads_attempted"]) + "/1\n"
+            "Model calls attempted: " +
+                str(record["model_requests_attempted"]) + "/1\n"
+            "Agrees with received public GitHub observation: " +
+                str(record["fact_matches_tool"]) + "\n"
+            "Provider-reported input tokens: " +
+                str(record["input_tokens_reported"]) + "\n"
+            "Provider-reported output tokens: " +
+                str(record["output_tokens_reported"]) + "\n"
+            "Quote ESTIMATE: " +
+                str(record["estimated_micro_usd"]) + " micro-USD\n"
+            "Actual provider cost: UNKNOWN\n"
+            "Local receipt SHA-256: " +
+                str(record["receipt_sha256"] or "not finalized") + "\n"
+            "Independent account authentication: NOT performed.\n"
+            "General reasoning capability: NOT certified.\n"
+            "Stored data are local metadata only, not raw responses or API keys."
+        )
+
+    def _provider_smoke_preflight(self, provider, offer, secret):
+        root = self._learning_location()
+        with LearningKernel(root / "learning.sqlite3") as kernel:
+            model = UniversalGateway(
+                Registry([offer]), allow_network=False,
+                budget=self.desktop._universal_model_budget, api_key=secret)
+            tool = PublicGithubToolGateway(max_requests=1)
+            try:
+                worker = OwnerProviderAcceptance(model, tool, kernel)
+                return worker.preflight(provider=provider)
+            finally:
+                tool.close()
+
+    def run_provider_smoke(self):
+        if self._closed or self._busy:
+            return
+        if self.smoke_optin.get() is not True:
+            self.status.set("Provider smoke is OFF. Enable its dedicated "
+                            "checkbox first; no request was sent.")
+            return
+        try:
+            provider, offer, secret = self._config()
+            info = self._provider_smoke_preflight(provider, offer, secret)
+        except Exception:
+            self.status.set("Provider smoke unavailable. Configure one reviewed "
+                            "live OpenRouter/DeepSeek model, quote, API key "
+                            "and Chat network consent.")
+            return
+        if info["status"] != "ready":
+            self.status.set("Provider smoke blocked: " + info["status"] +
+                            ". One reserved attempt per UTC day, no retries.")
+            return
+        session = json.dumps({
+            "test": "One owner-reviewed public GitHub read plus one owner-reviewed "
+                    "model request and deterministic fact comparison",
+            "provider": provider, "model": offer.model,
+            "fixed_public_target": REPOSITORY,
+            "max_public_gets": 1, "max_model_calls": 1,
+            "reserved_output_tokens": 256,
+            "estimated_cost_micro_usd": info["estimated_micro_usd"],
+            "monetary_cap_enforced": False,
+            "one_reserved_attempt_per_utc_day": True,
+            "network_identity_attested": False,
+            "no_private_repo_or_write_permissions": True,
+        }, indent=2)
+        try:
+            owner_approved = self.desktop._review_scrollable_manual_text(
+                title="VARYN | One real-provider acceptance session",
+                heading="Approve 1 GitHub GET + 1 model request for review",
+                digest=sha256(session.encode()).hexdigest(),
+                content=session,
+                warning="This can incur an actual provider charge. The quote "
+                        "is NOT an account-level billing cap. After this "
+                        "summary you MUST still approve each individual "
+                        "network request, or no such request is dispatched.",
+                approve_label="Proceed to review these two requests",
+            ) is True
+        except Exception:
+            owner_approved = False
+        if not owner_approved or self._closed:
+            self.status.set("Provider smoke session was not authorized.")
+            return
+        self.smoke_optin.set(False)
+        self.chat.allow_network.set(False)
+        self.start.configure(state="disabled")
+        self.eval_button.configure(state="disabled")
+        self.eval_status_button.configure(state="disabled")
+        self.smoke_button.configure(state="disabled")
+        self._busy = True
+        self.status.set("Smoke session running: review one public GitHub "
+                        "GET and one exact provider request. No retries.")
+        self._show("No private files are read and no GitHub write is allowed.")
+        Thread(
+            target=self._provider_smoke_worker,
+            args=(provider, offer, secret), daemon=True).start()
+        self._after_id = self.after(70, self._poll)
+
+    def _provider_smoke_worker(self, provider, offer, secret):
+        kernel = None
+        tool = None
+        try:
+            kernel = LearningKernel(
+                self._learning_location() / "learning.sqlite3")
+            tool = PublicGithubToolGateway(max_requests=1)
+            with self._lock:
+                self._tool = tool
+            model = UniversalGateway(
+                Registry([offer]), allow_network=True,
+                budget=self.desktop._universal_model_budget, api_key=secret)
+            runner = OwnerProviderAcceptance(model, tool, kernel)
+            result = runner.run(
+                provider=provider, owner_enabled=True,
+                review_tool=lambda p: self._request_review("tool", p),
+                review_model=lambda p: self._request_review("model", p))
+            self._completions.put(("smoke", result))
+        except BaseException:
+            # Do not display untrusted provider error bodies or API keys.
+            self._completions.put(("smoke_error", None))
+        finally:
+            if tool is not None:
+                tool.close()
+            with self._lock:
+                self._tool = None
+            if kernel is not None:
+                kernel.close()
 
     def import_billing_csv(self):
         """Manual owner-supplied normalized CSV. Never contacts the provider."""
@@ -613,6 +779,34 @@ class OwnerAgentWindow(tk.Toplevel):
         self.start.configure(state="normal")
         self.eval_button.configure(state="normal")
         self.eval_status_button.configure(state="normal")
+        self.smoke_button.configure(state="normal")
+        if kind == "smoke":
+            self.status.set("Provider acceptance: " +
+                            result.get("status", "unknown"))
+            self._show(
+                "Completed 1+1 provider smoke workflow: " +
+                result.get("status", "unknown") +
+                "
+Transport: " + str(result.get("source_kind", "n/a")) +
+                "
+GitHub GET attempted: " +
+                str(result.get("public_reads_attempted", 0)) +
+                "
+Model calls attempted: " +
+                str(result.get("model_requests_attempted", 0)) +
+                "
+Facts match approved tool observation: " +
+                str(result.get("fact_matches_tool")) +
+                "
+Quoted cost is NOT actual billing. "
+                "Use Last provider smoke receipt for the audit record.")
+            return
+        if kind == "smoke_error":
+            self.status.set("Provider smoke stopped safely. See the offline "
+                            "receipt for its state; no automatic replay.")
+            self._show("A provider/tool error or cancelled review stopped "
+                       "this one-shot session. Charges may still apply.")
+            return
         if kind == "learning":
             self.status.set(
                 "Learning evaluation: " + result.get("status", "unknown") +
