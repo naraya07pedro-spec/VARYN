@@ -209,6 +209,27 @@ class OwnerLiveEvaluationTests(unittest.TestCase):
         finally:
             second_tool.close()
 
+    def test_provider_reported_model_mismatch_refuses_promotion(self):
+        self.evidence()
+        def incorrect_route(provider, payload, api_key, timeout):
+            return json.dumps({
+                "model": "unexpected-upstream-model",
+                "choices": [{"message": {
+                    "role": "assistant",
+                    "content": '{"action":"finish","facts":{}}',
+                }, "finish_reason": "stop"}],
+                "usage": {"prompt_tokens": 20, "completion_tokens": 10},
+            }).encode("utf-8")
+        self.gateway.transport = incorrect_route
+        with self.assertRaises(LiveEvaluationRejected):
+            self.run_reviewed()
+        self.assertIsNone(
+            self.kernel.active_skill("github_public_facts"))
+        self.assertEqual(
+            BudgetedReflectionScheduler(self.kernel, self.ledger)
+            .history()[0]["status"], "needs_review")
+        self.assertEqual(self.budget.snapshot()["requests_reserved"], 1)
+
     def test_insufficient_local_budget_prevents_reads(self):
         self.evidence()
         self.budget.reserve(256)
