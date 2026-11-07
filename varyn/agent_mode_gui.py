@@ -344,9 +344,12 @@ class OwnerAgentWindow(tk.Toplevel):
             self.status.set("Provider acceptance local checksum MISMATCH.")
             self._show("Stored metadata may be corrupt or edited; do not trust it.")
             return
-        self.status.set("Last provider smoke: " + record["status"])
+        verdict = OwnerProviderAcceptance.acceptance_gate(record)
+        self.status.set("Last provider smoke: " + record["status"] +
+                        " | " + verdict["status"])
         self._show(
             "Status: " + record["status"] + "\n"
+            "Evidence classification: " + verdict["status"] + "\n"
             "Transport: " + record["source_kind"] + "\n"
             "Provider: " + record["provider"] + "\n"
             "Public GETs attempted: " +
