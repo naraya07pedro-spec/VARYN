@@ -45,7 +45,7 @@ class LocalEvaluationReceipts:
                 model_sha256 TEXT NOT NULL,
                 estimated_micro_usd INTEGER NOT NULL,
                 public_reads INTEGER NOT NULL,
-                model_requests_reserved INTEGER NOT NULL,
+                model_requests_attempted INTEGER NOT NULL,
                 model_responses_succeeded INTEGER NOT NULL,
                 model_requests_failed_or_uncertain INTEGER NOT NULL,
                 reported_input_tokens INTEGER NOT NULL,
@@ -75,7 +75,7 @@ class LocalEvaluationReceipts:
         self.kernel.db.execute(
             "INSERT INTO live_evaluation_receipts"
             "(id,started_utc,status,provider,model_sha256,"
-            "estimated_micro_usd,public_reads,model_requests_reserved,"
+            "estimated_micro_usd,public_reads,model_requests_attempted,"
             "model_responses_succeeded,model_requests_failed_or_uncertain,"
             "reported_input_tokens,reported_output_tokens,"
             "responses_with_incomplete_usage,actual_provider_cost_known)"
@@ -102,7 +102,7 @@ class LocalEvaluationReceipts:
                 + diff["requests_failed_or_uncertain"]
                 > diff["requests_reserved"]
                 or diff["requests_reserved"] > 10):
-            raise ReceiptRejected("Out of bounds model usage")
+            raise ReceiptRejected("Out of bounds per-session attempted model calls")
         return diff
 
     def finish(self, ident, *, status, before, after, public_reads,
@@ -158,7 +158,7 @@ class LocalEvaluationReceipts:
             "provider": row[1], "model_sha256": row[2],
             "estimated_micro_usd": row[3],
             "public_reads": public_reads,
-            "model_requests_reserved": diff["requests_reserved"],
+            "model_requests_attempted": diff["requests_reserved"],
             "model_responses_succeeded": diff["requests_succeeded"],
             "model_requests_failed_or_uncertain":
                 diff["requests_failed_or_uncertain"],
@@ -178,7 +178,7 @@ class LocalEvaluationReceipts:
         cur = self.kernel.db.execute(
             "UPDATE live_evaluation_receipts SET "
             "finished_utc=?,status=?,public_reads=?,"
-            "model_requests_reserved=?,model_responses_succeeded=?,"
+            "model_requests_attempted=?,model_responses_succeeded=?,"
             "model_requests_failed_or_uncertain=?,reported_input_tokens=?,"
             "reported_output_tokens=?,responses_with_incomplete_usage=?,"
             "evaluated_cases=?,baseline_passes=?,candidate_passes=?,"
@@ -207,6 +207,7 @@ class LocalEvaluationReceipts:
         record["format"] = _FORMAT
         record["actual_provider_cost_known"] = False
         record["provider_billing_ceiling_enforced"] = False
+        record["usage_counters_are_session_local"] = True
         record["storage_is_encrypted"] = False
         record["quality_verified_against_public_tool_only"] = True
         if record["status"] == "running":
